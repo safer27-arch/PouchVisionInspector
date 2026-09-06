@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F4F6F8"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 상단 헤더 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="88dp"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:background="#102A43">
+
+            <TextView
+                android:id="@+id/tvGuideTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="검사 안내"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvGuideSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Inspection Guide"
+                android:textColor="#D9E2EC"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
+
+
+        <!-- 검사 목적 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="14dp"
+            android:padding="16dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="검사 목적"
+                android:textColor="#102A43"
+                android:textSize="17sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvGuidePurpose"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="검사 목적 설명"
+                android:textColor="#486581"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"/>
+
+        </LinearLayout>
+
+
+        <!-- ROI 안내 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="14dp"
+            android:padding="16dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ROI 위치"
+                android:textColor="#102A43"
+                android:textSize="17sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvGuideRoi"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="ROI 위치 설명"
+                android:textColor="#486581"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"/>
+
+        </LinearLayout>
+
+
+        <!-- 주요 판정 포인트 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="14dp"
+            android:padding="16dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="주요 판정 포인트"
+                android:textColor="#102A43"
+                android:textSize="17sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvGuidePoints"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="판정 포인트 설명"
+                android:textColor="#486581"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"/>
+
+        </LinearLayout>
+
+
+        <!-- 사용 방법 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="14dp"
+            android:padding="16dp"
+            android:orientation="vertical"
+            android:background="#EAF2F8">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="검사 방법"
+                android:textColor="#102A43"
+                android:textSize="17sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvGuideMethod"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="1. 사진을 선택합니다.\n2. 검사 부위에 ROI를 맞춥니다.\n3. 필요하면 사진 확대와 ROI 크기를 조정합니다.\n4. 검사를 실행합니다.\n5. 빨간 표시와 Score를 함께 확인합니다."
+                android:textColor="#486581"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"/>
+
+        </LinearLayout>
+
+
+        <!-- 샘플 사진 영역 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="14dp"
+            android:padding="16dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="샘플 사진"
+                android:textColor="#102A43"
+                android:textSize="17sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="현장 승인 샘플사진을 추후 등록할 수 있습니다."
+                android:textColor="#627D98"
+                android:textSize="12sp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="정상"
+                        android:textColor="#2E7D32"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvSampleNormal"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:background="#E8F5E9"
+                        android:text="정상 샘플\n사진 영역"
+                        android:textColor="#2E7D32"
+                        android:textSize="13sp"/>
+
+                </LinearLayout>
+
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="주의"
+                        android:textColor="#F9A825"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvSampleWarning"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:background="#FFF8E1"
+                        android:text="주의 샘플\n사진 영역"
+                        android:textColor="#F57F17"
+                        android:textSize="13sp"/>
+
+                </LinearLayout>
+
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="불량"
+                        android:textColor="#C62828"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvSampleNg"
+                        android:layout_width="match_parent"
+                        android:layout_height="120dp"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:background="#FFEBEE"
+                        android:text="불량 샘플\n사진 영역"
+                        android:textColor="#C62828"
+                        android:textSize="13sp"/>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+
+        <!-- 주의 문구 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="14dp"
+            android:padding="14dp"
+            android:background="#FFF3E0"
+            android:text="※ 현재 앱의 이미지 판정은 품질 검사용 보조 기능입니다. 실제 OK/NG 기준은 승인된 현장 Spec 및 기준 샘플을 적용한 후 확정해야 합니다."
+            android:textColor="#7A4F01"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp"/>
+
+
+        <Button
+            android:id="@+id/btnGuideBack"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginBottom="22dp"
+            android:text="메뉴로 돌아가기"
+            android:textSize="14sp"/>
+
+    </LinearLayout>
+
+</ScrollView>

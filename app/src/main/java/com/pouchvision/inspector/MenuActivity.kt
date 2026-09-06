@@ -18,12 +18,6 @@ class MenuActivity : AppCompatActivity() {
 
         setContentView(binding.root)
 
-
-        /*
-         * =========================================================
-         * 종합 검사
-         * =========================================================
-         */
         binding.btnTotalInspection.setOnClickListener {
 
             Toast.makeText(
@@ -33,12 +27,6 @@ class MenuActivity : AppCompatActivity() {
             ).show()
         }
 
-
-        /*
-         * =========================================================
-         * BOTTOM CORNER 검사
-         * =========================================================
-         */
         binding.btnBottomCorner.setOnClickListener {
 
             val intent =
@@ -57,12 +45,6 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-
-        /*
-         * =========================================================
-         * SEAL 검사
-         * =========================================================
-         */
         binding.btnSealInspection.setOnClickListener {
 
             val intent =
@@ -81,12 +63,6 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-
-        /*
-         * =========================================================
-         * FORMING 검사
-         * =========================================================
-         */
         binding.btnFormingInspection.setOnClickListener {
 
             val intent =
@@ -105,12 +81,6 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-
-        /*
-         * =========================================================
-         * TAB 검사
-         * =========================================================
-         */
         binding.btnTabInspection.setOnClickListener {
 
             val intent =
@@ -129,27 +99,17 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-
-        /*
-         * =========================================================
-         * 분해 검사
-         * =========================================================
-         */
         binding.btnDisassemblyInspection.setOnClickListener {
 
-            Toast.makeText(
-                this,
-                "분해 검사 기능은 준비 중입니다.",
-                Toast.LENGTH_SHORT
-            ).show()
+            val intent =
+                Intent(
+                    this,
+                    DisassemblyActivity::class.java
+                )
+
+            startActivity(intent)
         }
 
-
-        /*
-         * =========================================================
-         * 검사 결과 / 이력
-         * =========================================================
-         */
         binding.btnHistory.setOnClickListener {
 
             val intent =
@@ -162,12 +122,6 @@ class MenuActivity : AppCompatActivity() {
         }
     }
 
-
-    /*
-     * =========================================================
-     * 공용 검사 안내 화면
-     * =========================================================
-     */
     private fun openGuide(
         guideType: String
     ) {

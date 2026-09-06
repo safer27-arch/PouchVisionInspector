@@ -12,6 +12,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- =====================================================
+             HEADER
+             ===================================================== -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="72dp"
@@ -38,6 +42,11 @@
 
         </LinearLayout>
 
+
+        <!-- =====================================================
+             IMAGE + ROI
+             ===================================================== -->
+
         <FrameLayout
             android:id="@+id/sealImageArea"
             android:layout_width="match_parent"
@@ -50,7 +59,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="#000000"
-                android:scaleType="matrix"/>
+                android:scaleType="matrix"
+                android:contentDescription="SEAL 검사 이미지"/>
 
             <View
                 android:id="@+id/sealRoiGuide"
@@ -77,6 +87,7 @@
 
         </FrameLayout>
 
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -87,6 +98,11 @@
             android:text="사진: 두 손가락 확대/축소 · 확대 후 한 손가락 이동"
             android:textColor="#486581"
             android:textSize="12sp"/>
+
+
+        <!-- =====================================================
+             STATUS
+             ===================================================== -->
 
         <TextView
             android:id="@+id/tvSealStatus"
@@ -103,7 +119,11 @@
             android:textStyle="bold"
             android:background="#FFFFFF"/>
 
-        <!-- SEAL 민감도 설정 -->
+
+        <!-- =====================================================
+             SENSITIVITY
+             ===================================================== -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -132,6 +152,7 @@
                 android:textColor="#102A43"
                 android:textSize="15sp"
                 android:textStyle="bold"/>
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -164,6 +185,7 @@
 
             </LinearLayout>
 
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -171,6 +193,7 @@
                 android:text="민감도를 높이면 Seal의 작은 선형 변화나 국부 변형도 더 많이 검출합니다."
                 android:textColor="#627D98"
                 android:textSize="11sp"/>
+
 
             <Button
                 android:id="@+id/btnSealSensitivityReset"
@@ -181,6 +204,11 @@
                 android:textSize="13sp"/>
 
         </LinearLayout>
+
+
+        <!-- =====================================================
+             GALLERY / INSPECTION
+             ===================================================== -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -210,6 +238,11 @@
 
         </LinearLayout>
 
+
+        <!-- =====================================================
+             ROI WIDTH
+             ===================================================== -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -237,6 +270,11 @@
                 android:textSize="13sp"/>
 
         </LinearLayout>
+
+
+        <!-- =====================================================
+             ROI HEIGHT
+             ===================================================== -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -266,6 +304,11 @@
 
         </LinearLayout>
 
+
+        <!-- =====================================================
+             RESET
+             ===================================================== -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -294,11 +337,16 @@
 
         </LinearLayout>
 
+
+        <!-- =====================================================
+             RESULT
+             ===================================================== -->
+
         <TextView
             android:id="@+id/tvSealMetrics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="170dp"
+            android:minHeight="190dp"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="10dp"
@@ -306,16 +354,28 @@
             android:background="#FFFFFF"
             android:textColor="#102A43"
             android:textSize="14sp"
-            android:text="
-Seal Uniformity : -
-Edge Density    : -
-Edge Strength   : -
-Seal Score      : -
+            android:text="Seal Uniformity : -&#10;Edge Density    : -&#10;Strong Edge     : -&#10;Edge Strength   : -&#10;Seal Score      : -&#10;&#10;판정 : -&#10;&#10;※ Seal Width(mm)는 기준 설정 후 적용"/>
 
-판정 : -
 
-※ Seal Width(mm)는 기준 설정 후 적용
-"/>
+        <!-- =====================================================
+             SAVE RESULT
+             ===================================================== -->
+
+        <Button
+            android:id="@+id/btnSealSaveResult"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="8dp"
+            android:text="검사 결과 저장"
+            android:textSize="14sp"/>
+
+
+        <!-- =====================================================
+             BACK
+             ===================================================== -->
 
         <Button
             android:id="@+id/btnSealBack"

@@ -17,6 +17,7 @@ import android.provider.MediaStore
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -38,34 +39,86 @@ class MainActivity : AppCompatActivity() {
 
     private var imageCapture: ImageCapture? = null
 
-    /*
-     * 분석용 원본 사진
-     */
     private var lastBitmap: Bitmap? = null
 
     /*
+     * =========================================================
+     * 민감도
+     * =========================================================
+     */
+
+    private val preferenceName =
+        "pouch_vision_settings"
+
+    private val sensitivityKey =
+        "bottom_corner_sensitivity"
+
+    private val defaultSensitivity =
+        60
+
+    private var sensitivity =
+        defaultSensitivity
+
+
+    /*
+     * =========================================================
      * 이미지 확대 / 이동
+     * =========================================================
      */
-    private val imageMatrixValue = Matrix()
 
-    private var zoomFactor = 1f
+    private val imageMatrixValue =
+        Matrix()
 
-    private var lastImageTouchX = 0f
-    private var lastImageTouchY = 0f
+    private var zoomFactor =
+        1f
 
-    private lateinit var scaleGestureDetector: ScaleGestureDetector
+    private var lastImageTouchX =
+        0f
+
+    private var lastImageTouchY =
+        0f
+
+    private lateinit var scaleGestureDetector:
+            ScaleGestureDetector
+
 
     /*
+     * =========================================================
      * ROI 이동
+     * =========================================================
      */
-    private var roiLastTouchX = 0f
-    private var roiLastTouchY = 0f
+
+    private var roiLastTouchX =
+        0f
+
+    private var roiLastTouchY =
+        0f
 
 
     /*
-     * 카메라 권한
+     * =========================================================
+     * 갤러리
+     * =========================================================
      */
-    private val requestCameraPermission =
+
+    private val galleryLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+
+            if (uri != null) {
+                loadGalleryImage(uri)
+            }
+        }
+
+
+    /*
+     * =========================================================
+     * 카메라 권한
+     * =========================================================
+     */
+
+    private val cameraPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { granted ->
@@ -78,21 +131,6 @@ class MainActivity : AppCompatActivity() {
 
                 binding.tvStatus.text =
                     "카메라 권한이 필요합니다."
-            }
-        }
-
-
-    /*
-     * 갤러리 선택
-     */
-    private val galleryLauncher =
-        registerForActivityResult(
-            ActivityResultContracts.GetContent()
-        ) { uri: Uri? ->
-
-            if (uri != null) {
-
-                loadGalleryImage(uri)
             }
         }
 
@@ -111,19 +149,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
 
-        binding.tvStatus.text =
-            "카메라 준비 중..."
+        setupSensitivity()
 
-
-        /*
-         * 이미지 줌 기능 준비
-         */
         setupImageZoom()
 
-
-        /*
-         * ROI 드래그 준비
-         */
         setupRoiDrag()
 
 
@@ -132,14 +161,12 @@ class MainActivity : AppCompatActivity() {
          */
         binding.btnCapture.setOnClickListener {
 
-            showCameraMode()
-
             takePhoto()
         }
 
 
         /*
-         * 갤러리 선택
+         * 갤러리
          */
         binding.btnGallery.setOnClickListener {
 
@@ -157,11 +184,15 @@ class MainActivity : AppCompatActivity() {
             val bitmap =
                 lastBitmap
 
-            if (bitmap == null) {
+            if (
+                bitmap == null ||
+                binding.imagePreview.visibility !=
+                View.VISIBLE
+            ) {
 
                 Toast.makeText(
                     this,
-                    "먼저 사진을 촬영하거나 갤러리에서 선택해주세요.",
+                    "먼저 사진을 촬영하거나 선택해주세요.",
                     Toast.LENGTH_LONG
                 ).show()
 
@@ -175,7 +206,7 @@ class MainActivity : AppCompatActivity() {
 
 
         /*
-         * ROI 가로 축소
+         * ROI 가로 -
          */
         binding.btnRoiWidthSmaller.setOnClickListener {
 
@@ -186,7 +217,7 @@ class MainActivity : AppCompatActivity() {
 
 
         /*
-         * ROI 가로 확대
+         * ROI 가로 +
          */
         binding.btnRoiWidthLarger.setOnClickListener {
 
@@ -197,7 +228,7 @@ class MainActivity : AppCompatActivity() {
 
 
         /*
-         * ROI 세로 축소
+         * ROI 세로 -
          */
         binding.btnRoiHeightSmaller.setOnClickListener {
 
@@ -208,7 +239,7 @@ class MainActivity : AppCompatActivity() {
 
 
         /*
-         * ROI 세로 확대
+         * ROI 세로 +
          */
         binding.btnRoiHeightLarger.setOnClickListener {
 
@@ -228,7 +259,7 @@ class MainActivity : AppCompatActivity() {
 
 
         /*
-         * 사진 확대 / 이동 초기화
+         * 사진 원래크기
          */
         binding.btnImageReset.setOnClickListener {
 
@@ -237,7 +268,7 @@ class MainActivity : AppCompatActivity() {
 
 
         /*
-         * 카메라 화면 복귀
+         * 카메라 화면
          */
         binding.btnCameraMode.setOnClickListener {
 
@@ -245,15 +276,153 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        checkCameraPermission()
+        /*
+         * 카메라 권한 확인
+         */
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+
+            startCamera()
+
+        } else {
+
+            cameraPermissionLauncher.launch(
+                Manifest.permission.CAMERA
+            )
+        }
     }
 
 
     /*
      * =========================================================
-     * 이미지 확대 / 축소 / 이동
+     * 민감도 설정
      * =========================================================
      */
+
+    private fun setupSensitivity() {
+
+        val prefs =
+            getSharedPreferences(
+                preferenceName,
+                MODE_PRIVATE
+            )
+
+
+        sensitivity =
+            prefs.getInt(
+                sensitivityKey,
+                defaultSensitivity
+            )
+                .coerceIn(
+                    0,
+                    100
+                )
+
+
+        binding.seekSensitivity.progress =
+            sensitivity
+
+
+        updateSensitivityText()
+
+
+        binding.seekSensitivity.setOnSeekBarChangeListener(
+            object :
+                SeekBar.OnSeekBarChangeListener {
+
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean
+                ) {
+
+                    sensitivity =
+                        progress
+
+                    updateSensitivityText()
+
+
+                    if (fromUser) {
+
+                        prefs.edit()
+                            .putInt(
+                                sensitivityKey,
+                                sensitivity
+                            )
+                            .apply()
+                    }
+                }
+
+
+                override fun onStartTrackingTouch(
+                    seekBar: SeekBar?
+                ) {
+                }
+
+
+                override fun onStopTrackingTouch(
+                    seekBar: SeekBar?
+                ) {
+
+                    prefs.edit()
+                        .putInt(
+                            sensitivityKey,
+                            sensitivity
+                        )
+                        .apply()
+                }
+            }
+        )
+
+
+        binding.btnSensitivityReset.setOnClickListener {
+
+            sensitivity =
+                defaultSensitivity
+
+
+            binding.seekSensitivity.progress =
+                defaultSensitivity
+
+
+            prefs.edit()
+                .putInt(
+                    sensitivityKey,
+                    defaultSensitivity
+                )
+                .apply()
+
+
+            updateSensitivityText()
+
+
+            Toast.makeText(
+                this,
+                "Bottom Corner 민감도를 60%로 복원했습니다.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+
+    private fun updateSensitivityText() {
+
+        binding.tvSensitivityValue.text =
+            "현재 민감도 : ${sensitivity}%"
+    }
+
+
+    /*
+     * =========================================================
+     * 이미지 줌 / 이동
+     * =========================================================
+     */
+
     private fun setupImageZoom() {
 
         scaleGestureDetector =
@@ -267,37 +436,40 @@ class MainActivity : AppCompatActivity() {
                         detector: ScaleGestureDetector
                     ): Boolean {
 
-                        val requestedScale =
-                            detector.scaleFactor
-
                         val oldZoom =
                             zoomFactor
+
 
                         val newZoom =
                             (
                                 zoomFactor *
-                                        requestedScale
+                                        detector.scaleFactor
                                 ).coerceIn(
                                 1f,
                                 8f
                             )
 
-                        val realScale =
+
+                        val actualScale =
                             newZoom /
                                     oldZoom
+
 
                         zoomFactor =
                             newZoom
 
+
                         imageMatrixValue.postScale(
-                            realScale,
-                            realScale,
+                            actualScale,
+                            actualScale,
                             detector.focusX,
                             detector.focusY
                         )
 
+
                         binding.imagePreview.imageMatrix =
                             imageMatrixValue
+
 
                         return true
                     }
@@ -309,21 +481,21 @@ class MainActivity : AppCompatActivity() {
                 view,
                 event ->
 
-            /*
-             * ScrollView가 사진 드래그를
-             * 빼앗지 않도록 처리
-             */
+
             view.parent
                 ?.requestDisallowInterceptTouchEvent(
                     true
                 )
+
 
             scaleGestureDetector.onTouchEvent(
                 event
             )
 
 
-            when (event.actionMasked) {
+            when (
+                event.actionMasked
+            ) {
 
                 MotionEvent.ACTION_DOWN -> {
 
@@ -339,10 +511,6 @@ class MainActivity : AppCompatActivity() {
 
                 MotionEvent.ACTION_MOVE -> {
 
-                    /*
-                     * 두 손가락 확대 중이 아닐 때만
-                     * 사진 이동
-                     */
                     if (
                         !scaleGestureDetector
                             .isInProgress &&
@@ -376,6 +544,7 @@ class MainActivity : AppCompatActivity() {
                     lastImageTouchY =
                         event.y
 
+
                     true
                 }
 
@@ -400,8 +569,11 @@ class MainActivity : AppCompatActivity() {
 
 
     /*
-     * 사진을 화면 안에 맞춤
+     * =========================================================
+     * 이미지 원래크기
+     * =========================================================
      */
+
     private fun resetImageMatrix() {
 
         val bitmap =
@@ -412,11 +584,15 @@ class MainActivity : AppCompatActivity() {
         binding.imagePreview.post {
 
             val viewWidth =
-                binding.imagePreview.width
+                binding
+                    .imagePreview
+                    .width
                     .toFloat()
 
             val viewHeight =
-                binding.imagePreview.height
+                binding
+                    .imagePreview
+                    .height
                     .toFloat()
 
 
@@ -470,10 +646,12 @@ class MainActivity : AppCompatActivity() {
 
             imageMatrixValue.reset()
 
+
             imageMatrixValue.postScale(
                 baseScale,
                 baseScale
             )
+
 
             imageMatrixValue.postTranslate(
                 dx,
@@ -493,31 +671,15 @@ class MainActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 카메라
+     * CameraX
      * =========================================================
      */
-    private fun checkCameraPermission() {
-
-        if (
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-            ) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-
-            startCamera()
-
-        } else {
-
-            requestCameraPermission.launch(
-                Manifest.permission.CAMERA
-            )
-        }
-    }
-
 
     private fun startCamera() {
+
+        binding.tvStatus.text =
+            "카메라 준비 중..."
+
 
         val cameraProviderFuture =
             ProcessCameraProvider.getInstance(
@@ -555,38 +717,33 @@ class MainActivity : AppCompatActivity() {
                         .build()
 
 
+                val cameraSelector =
+                    CameraSelector
+                        .DEFAULT_BACK_CAMERA
+
+
                 cameraProvider.unbindAll()
 
 
                 cameraProvider.bindToLifecycle(
                     this,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    cameraSelector,
                     preview,
                     imageCapture
                 )
 
 
                 binding.tvStatus.text =
-                    "카메라 준비 완료"
+                    "카메라 준비 완료 - Bottom Corner를 촬영해주세요."
 
 
             } catch (e: Exception) {
 
                 binding.tvStatus.text =
-                    "카메라 실행 오류"
-
-                Toast.makeText(
-                    this,
-                    "카메라 오류: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                    "카메라 시작 오류: ${e.message}"
             }
 
-        },
-            ContextCompat.getMainExecutor(
-                this
-            )
-        )
+        }, ContextCompat.getMainExecutor(this))
     }
 
 
@@ -595,10 +752,12 @@ class MainActivity : AppCompatActivity() {
      * 사진 촬영
      * =========================================================
      */
+
     private fun takePhoto() {
 
         val capture =
             imageCapture
+
 
         if (capture == null) {
 
@@ -612,35 +771,25 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        binding.tvStatus.text =
-            "사진 촬영 중..."
-
-
-        val fileName =
-            "Pouch_" +
-                    SimpleDateFormat(
-                        "yyyyMMdd_HHmmss",
-                        Locale.getDefault()
-                    ).format(
-                        System.currentTimeMillis()
-                    ) +
-                    ".jpg"
+        val name =
+            SimpleDateFormat(
+                "yyyyMMdd_HHmmss",
+                Locale.getDefault()
+            ).format(
+                System.currentTimeMillis()
+            )
 
 
         val contentValues =
             ContentValues().apply {
 
                 put(
-                    MediaStore
-                        .MediaColumns
-                        .DISPLAY_NAME,
-                    fileName
+                    MediaStore.MediaColumns.DISPLAY_NAME,
+                    "PouchVision_$name"
                 )
 
                 put(
-                    MediaStore
-                        .MediaColumns
-                        .MIME_TYPE,
+                    MediaStore.MediaColumns.MIME_TYPE,
                     "image/jpeg"
                 )
 
@@ -651,10 +800,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
 
                     put(
-                        MediaStore
-                            .Images
-                            .Media
-                            .RELATIVE_PATH,
+                        MediaStore.Images.Media.RELATIVE_PATH,
                         "Pictures/PouchVision"
                     )
                 }
@@ -662,36 +808,29 @@ class MainActivity : AppCompatActivity() {
 
 
         val outputOptions =
-            ImageCapture
-                .OutputFileOptions
+            ImageCapture.OutputFileOptions
                 .Builder(
                     contentResolver,
-                    MediaStore
-                        .Images
-                        .Media
-                        .EXTERNAL_CONTENT_URI,
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     contentValues
                 )
                 .build()
 
 
+        binding.tvStatus.text =
+            "사진 촬영 중..."
+
+
         capture.takePicture(
-
             outputOptions,
-
-            ContextCompat.getMainExecutor(
-                this
-            ),
+            ContextCompat.getMainExecutor(this),
 
             object :
-                ImageCapture
-                    .OnImageSavedCallback {
-
+                ImageCapture.OnImageSavedCallback {
 
                 override fun onImageSaved(
                     outputFileResults:
-                    ImageCapture
-                        .OutputFileResults
+                    ImageCapture.OutputFileResults
                 ) {
 
                     val uri =
@@ -700,28 +839,15 @@ class MainActivity : AppCompatActivity() {
 
                     if (uri != null) {
 
-                        val bitmap =
-                            decodeBitmapFromUri(
-                                uri
-                            )
+                        loadGalleryImage(
+                            uri
+                        )
 
+                    } else {
 
-                        if (bitmap != null) {
-
-                            lastBitmap =
-                                bitmap
-
-                            showSelectedImage(
-                                bitmap
-                            )
-
-                            resetRoiPosition()
-                        }
+                        binding.tvStatus.text =
+                            "사진은 저장되었지만 이미지를 다시 불러오지 못했습니다."
                     }
-
-
-                    binding.tvStatus.text =
-                        "촬영 완료 - ROI를 맞춘 후 검사하세요."
                 }
 
 
@@ -731,7 +857,7 @@ class MainActivity : AppCompatActivity() {
                 ) {
 
                     binding.tvStatus.text =
-                        "촬영 실패"
+                        "촬영 오류: ${exception.message}"
                 }
             }
         )
@@ -740,15 +866,16 @@ class MainActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 갤러리
+     * 갤러리 이미지
      * =========================================================
      */
+
     private fun loadGalleryImage(
         uri: Uri
     ) {
 
         binding.tvStatus.text =
-            "갤러리 사진 불러오는 중..."
+            "사진 불러오는 중..."
 
 
         try {
@@ -768,20 +895,13 @@ class MainActivity : AppCompatActivity() {
             }
 
 
-            lastBitmap =
-                bitmap
-
-
             showSelectedImage(
                 bitmap
             )
 
 
-            resetRoiPosition()
-
-
             binding.tvStatus.text =
-                "사진 선택 완료 - ROI를 검사 위치에 맞춰주세요."
+                "사진 선택 완료 - ROI를 Bottom Corner에 맞춰주세요."
 
 
         } catch (e: Exception) {
@@ -792,9 +912,6 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    /*
-     * 고해상도 사진 메모리 보호
-     */
     private fun decodeBitmapFromUri(
         uri: Uri
     ): Bitmap? {
@@ -831,7 +948,8 @@ class MainActivity : AppCompatActivity() {
 
 
         while (
-            maxSize / sampleSize >
+            maxSize /
+                    sampleSize >
             1600
         ) {
 
@@ -860,16 +978,16 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    /*
-     * 사진 화면 표시
-     */
     private fun showSelectedImage(
         bitmap: Bitmap
     ) {
 
+        lastBitmap =
+            bitmap
+
+
         binding.previewView.visibility =
             View.GONE
-
 
         binding.imagePreview.visibility =
             View.VISIBLE
@@ -881,24 +999,22 @@ class MainActivity : AppCompatActivity() {
 
 
         resetImageMatrix()
+
+        resetRoiPosition()
     }
 
 
-    /*
-     * 카메라 화면
-     */
     private fun showCameraMode() {
 
         binding.imagePreview.visibility =
             View.GONE
-
 
         binding.previewView.visibility =
             View.VISIBLE
 
 
         binding.tvStatus.text =
-            "카메라 모드"
+            "카메라 화면 - Bottom Corner를 촬영해주세요."
     }
 
 
@@ -907,6 +1023,7 @@ class MainActivity : AppCompatActivity() {
      * ROI 이동
      * =========================================================
      */
+
     private fun setupRoiDrag() {
 
         binding.roiGuide.setOnTouchListener {
@@ -920,7 +1037,9 @@ class MainActivity : AppCompatActivity() {
                 )
 
 
-            when (event.action) {
+            when (
+                event.action
+            ) {
 
                 MotionEvent.ACTION_DOWN -> {
 
@@ -970,14 +1089,18 @@ class MainActivity : AppCompatActivity() {
                     newX =
                         newX.coerceIn(
                             0f,
-                            maxX.toFloat()
+                            maxX
+                                .coerceAtLeast(0)
+                                .toFloat()
                         )
 
 
                     newY =
                         newY.coerceIn(
                             0f,
-                            maxY.toFloat()
+                            maxY
+                                .coerceAtLeast(0)
+                                .toFloat()
                         )
 
 
@@ -1020,9 +1143,10 @@ class MainActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * ROI 가로만 조절
+     * ROI 가로
      * =========================================================
      */
+
     private fun resizeRoiWidth(
         scale: Float
     ) {
@@ -1064,7 +1188,8 @@ class MainActivity : AppCompatActivity() {
 
         val centerX =
             roi.x +
-                    roi.width / 2f
+                    roi.width /
+                            2f
 
 
         val params =
@@ -1083,7 +1208,8 @@ class MainActivity : AppCompatActivity() {
 
             var newX =
                 centerX -
-                        roi.width / 2f
+                        roi.width /
+                                2f
 
 
             newX =
@@ -1092,9 +1218,9 @@ class MainActivity : AppCompatActivity() {
                     (
                         parent.width -
                                 roi.width
-                        ).coerceAtLeast(
-                        0
-                    ).toFloat()
+                        )
+                        .coerceAtLeast(0)
+                        .toFloat()
                 )
 
 
@@ -1106,9 +1232,10 @@ class MainActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * ROI 세로만 조절
+     * ROI 세로
      * =========================================================
      */
+
     private fun resizeRoiHeight(
         scale: Float
     ) {
@@ -1150,7 +1277,8 @@ class MainActivity : AppCompatActivity() {
 
         val centerY =
             roi.y +
-                    roi.height / 2f
+                    roi.height /
+                            2f
 
 
         val params =
@@ -1169,7 +1297,8 @@ class MainActivity : AppCompatActivity() {
 
             var newY =
                 centerY -
-                        roi.height / 2f
+                        roi.height /
+                                2f
 
 
             newY =
@@ -1178,9 +1307,9 @@ class MainActivity : AppCompatActivity() {
                     (
                         parent.height -
                                 roi.height
-                        ).coerceAtLeast(
-                        0
-                    ).toFloat()
+                        )
+                        .coerceAtLeast(0)
+                        .toFloat()
                 )
 
 
@@ -1190,9 +1319,6 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    /*
-     * ROI 중앙
-     */
     private fun resetRoiPosition() {
 
         binding.imageArea.post {
@@ -1222,40 +1348,18 @@ class MainActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * ROI → 실제 Bitmap 좌표 변환
-     *
-     * 핵심:
-     * 이미지가 확대되고 이동되어도
-     * Matrix 역변환을 사용하여
-     * ROI가 실제 가리키는 부분을 찾습니다.
+     * ROI → Bitmap 좌표 변환
      * =========================================================
      */
+
     private fun analyzeSelectedRoi(
         source: Bitmap
     ) {
 
-        if (
-            binding.imagePreview.visibility !=
-            View.VISIBLE
-        ) {
-
-            Toast.makeText(
-                this,
-                "촬영 또는 갤러리 사진을 먼저 선택해주세요.",
-                Toast.LENGTH_LONG
-            ).show()
-
-            return
-        }
-
-
         binding.tvStatus.text =
-            "ROI 분석 중..."
+            "Bottom Corner ROI 분석 중..."
 
 
-        /*
-         * 현재 ROI 화면 좌표
-         */
         val screenRect =
             RectF(
                 binding.roiGuide.x,
@@ -1267,9 +1371,6 @@ class MainActivity : AppCompatActivity() {
             )
 
 
-        /*
-         * 현재 이미지 Matrix 복사
-         */
         val currentMatrix =
             Matrix(
                 binding.imagePreview.imageMatrix
@@ -1280,10 +1381,6 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
-                /*
-                 * 화면 좌표 →
-                 * Bitmap 좌표 역변환
-                 */
                 val inverse =
                     Matrix()
 
@@ -1365,10 +1462,6 @@ class MainActivity : AppCompatActivity() {
                             top
 
 
-                /*
-                 * ROI가 사진 밖의 검은 부분에
-                 * 대부분 위치한 경우 방지
-                 */
                 if (
                     roiWidth < 10 ||
                     roiHeight < 10
@@ -1403,7 +1496,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
 
                     binding.tvStatus.text =
-                        "ROI 분석 오류: ${e.message}"
+                        "분석 오류: ${e.message}"
                 }
             }
 
@@ -1413,19 +1506,15 @@ class MainActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 실제 Bottom Corner 분석
+     * Bottom Corner 분석
      * =========================================================
      */
+
     private fun analyzeBitmapRoi(
-
         source: Bitmap,
-
         roi: Bitmap,
-
         roiStartX: Int,
-
         roiStartY: Int
-
     ) {
 
         val analysisWidth =
@@ -1442,6 +1531,49 @@ class MainActivity : AppCompatActivity() {
                 analysisHeight,
                 true
             )
+
+
+        /*
+         * 민감도 60%일 때
+         * 기존 값과 비슷하게 동작합니다.
+         *
+         * 민감도 ↑
+         * threshold ↓
+         * 작은 변화도 검출
+         */
+
+        val edgeThreshold =
+            (
+                75 -
+                        sensitivity *
+                        0.50
+                )
+                .toInt()
+                .coerceIn(
+                    20,
+                    70
+                )
+
+
+        val strongThreshold =
+            (
+                115 -
+                        sensitivity *
+                        0.67
+                )
+                .toInt()
+                .coerceIn(
+                    35,
+                    105
+                )
+
+
+        /*
+         * 60% 기준:
+         *
+         * edgeThreshold ≒ 45
+         * strongThreshold ≒ 75
+         */
 
 
         var edgeCount =
@@ -1497,7 +1629,7 @@ class MainActivity : AppCompatActivity() {
             max(
                 2f,
                 roi.width.toFloat() /
-                        170f
+                        180f
             )
 
 
@@ -1552,49 +1684,51 @@ class MainActivity : AppCompatActivity() {
                 totalStrength +=
                     gradient
 
-
                 pixelCount++
 
 
                 if (
-                    gradient > 45
+                    gradient >
+                    edgeThreshold
                 ) {
 
                     edgeCount++
                 }
 
 
-                /*
-                 * 강한 변화만 빨간색 표시
-                 */
                 if (
-                    gradient > 70 &&
-                    x % 4 == 0 &&
-                    y % 4 == 0
+                    gradient >
+                    strongThreshold
                 ) {
 
-                    val originalX =
-                        roiStartX +
-                                (
-                                    x *
-                                            xScale
-                                    ).toInt()
+                    if (
+                        x % 4 == 0 &&
+                        y % 4 == 0
+                    ) {
+
+                        val originalX =
+                            roiStartX +
+                                    (
+                                        x *
+                                                xScale
+                                        ).toInt()
 
 
-                    val originalY =
-                        roiStartY +
-                                (
-                                    y *
-                                            yScale
-                                    ).toInt()
+                        val originalY =
+                            roiStartY +
+                                    (
+                                        y *
+                                                yScale
+                                        ).toInt()
 
 
-                    canvas.drawCircle(
-                        originalX.toFloat(),
-                        originalY.toFloat(),
-                        markRadius,
-                        redPaint
-                    )
+                        canvas.drawCircle(
+                            originalX.toFloat(),
+                            originalY.toFloat(),
+                            markRadius,
+                            redPaint
+                        )
+                    }
                 }
             }
         }
@@ -1629,19 +1763,36 @@ class MainActivity : AppCompatActivity() {
             }
 
 
+        /*
+         * 민감도 보정 계수
+         *
+         * 60% = 1.00
+         * 낮추면 Score 영향 감소
+         * 높이면 Score 영향 증가
+         */
+
+        val sensitivityFactor =
+            0.55 +
+                    sensitivity /
+                    133.3
+
+
         val wrinkleIndex =
             (
-                edgeDensity *
-                        3.0 +
-                        edgeStrength *
-                        0.7
+                (
+                    edgeDensity *
+                            3.0 +
+                            edgeStrength *
+                            0.7
+                    ) *
+                        sensitivityFactor
                 ).coerceIn(
                 0.0,
                 100.0
             )
 
 
-        val level =
+        val judgment =
             when {
 
                 wrinkleIndex < 25 ->
@@ -1660,11 +1811,6 @@ class MainActivity : AppCompatActivity() {
 
         runOnUiThread {
 
-            /*
-             * 중요한 부분:
-             * 결과 사진으로 바꾸더라도
-             * 현재 확대 위치는 유지됩니다.
-             */
             binding.imagePreview.setImageBitmap(
                 markedBitmap
             )
@@ -1679,31 +1825,36 @@ class MainActivity : AppCompatActivity() {
                     Locale.getDefault(),
 
                     """
-Bottom Corner ROI 분석 결과
+Bottom Corner ROI 분석 완료
 
-Wrinkle Index : %.1f
-Edge Density : %.1f%%
+민감도       : %d%%
+Wrinkle Index : %.1f / 100
+Edge Density  : %.1f%%
 Edge Strength : %.1f
 
 판정 : %s
 
-빨간 표시 : 주름 의심 위치
-
-※ 현재는 기준 학습 전 임시 판정
+빨간 표시 : 국부 변화가 큰 위치 후보
+※ 민감도는 이미지 검출 수준이며 실제 품질 Spec과는 별도입니다.
+※ 현재 판정 기준은 기준 학습 전 임시값입니다.
                     """.trimIndent(),
 
+                    sensitivity,
                     wrinkleIndex,
                     edgeDensity,
                     edgeStrength,
-                    level
+                    judgment
                 )
         }
     }
 
 
     /*
+     * =========================================================
      * RGB → Gray
+     * =========================================================
      */
+
     private fun gray(
         color: Int
     ): Int {

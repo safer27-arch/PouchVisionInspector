@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F4F6F8"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 상단 헤더 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:background="#102A43">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pouch Vision Inspector"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Integrated Quality Inspection"
+                android:textColor="#D9E2EC"
+                android:textSize="14sp"/>
+
+        </LinearLayout>
+
+
+        <!-- 안내 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="22dp"
+            android:layout_marginEnd="20dp"
+            android:text="검사 항목을 선택해주세요"
+            android:textColor="#102A43"
+            android:textSize="20sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="16dp"
+            android:text="각 항목은 별도 알고리즘으로 검사하고 종합검사에서 결과를 통합합니다."
+            android:textColor="#627D98"
+            android:textSize="13sp"/>
+
+
+        <!-- 종합검사 -->
+        <Button
+            android:id="@+id/btnTotalInspection"
+            android:layout_width="match_parent"
+            android:layout_height="68dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="18dp"
+            android:text="종합검사"
+            android:textSize="19sp"
+            android:textStyle="bold"/>
+
+
+        <!-- 1열 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <Button
+                android:id="@+id/btnBottomCorner"
+                android:layout_width="0dp"
+                android:layout_height="82dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Bottom Corner&#10;주름 검사"
+                android:textSize="15sp"/>
+
+            <Button
+                android:id="@+id/btnSealInspection"
+                android:layout_width="0dp"
+                android:layout_height="82dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Seal&#10;검사"
+                android:textSize="15sp"/>
+
+        </LinearLayout>
+
+
+        <!-- 2열 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <Button
+                android:id="@+id/btnFormingInspection"
+                android:layout_width="0dp"
+                android:layout_height="82dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Forming&#10;검사"
+                android:textSize="15sp"/>
+
+            <Button
+                android:id="@+id/btnTabInspection"
+                android:layout_width="0dp"
+                android:layout_height="82dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Tab&#10;검사"
+                android:textSize="15sp"/>
+
+        </LinearLayout>
+
+
+        <!-- 분해검사 -->
+        <Button
+            android:id="@+id/btnDisassemblyInspection"
+            android:layout_width="match_parent"
+            android:layout_height="62dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="20dp"
+            android:text="분해 검사"
+            android:textSize="16sp"/>
+
+
+        <!-- 구분선 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="22dp"
+            android:layout_marginEnd="20dp"
+            android:background="#D9E2EC"/>
+
+
+        <!-- 향후 이력관리 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginEnd="20dp"
+            android:text="Inspection Management"
+            android:textColor="#102A43"
+            android:textSize="17sp"
+            android:textStyle="bold"/>
+
+        <Button
+            android:id="@+id/btnHistory"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="24dp"
+            android:text="검사 결과 / 이력"
+            android:textSize="15sp"/>
+
+    </LinearLayout>
+
+</ScrollView>

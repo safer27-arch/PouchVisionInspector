@@ -41,11 +41,11 @@
         </LinearLayout>
 
 
-        <!-- 이미지 표시 영역 -->
+        <!-- 이미지 영역 -->
         <FrameLayout
             android:id="@+id/sealImageArea"
             android:layout_width="match_parent"
-            android:layout_height="360dp"
+            android:layout_height="430dp"
             android:layout_margin="12dp"
             android:background="#000000">
 
@@ -53,8 +53,8 @@
                 android:id="@+id/sealImagePreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="fitCenter"
-                android:background="#000000"/>
+                android:background="#000000"
+                android:scaleType="matrix"/>
 
             <!-- Seal ROI -->
             <View
@@ -83,12 +83,25 @@
         </FrameLayout>
 
 
-        <!-- 현재 검사 상태 -->
+        <!-- 확대 안내 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="6dp"
+            android:gravity="center"
+            android:text="사진: 두 손가락 확대/축소 · 확대 후 한 손가락 이동"
+            android:textColor="#486581"
+            android:textSize="12sp"/>
+
+
+        <!-- 상태 -->
         <TextView
             android:id="@+id/tvSealStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="80dp"
+            android:minHeight="76dp"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="8dp"
@@ -100,7 +113,7 @@
             android:background="#FFFFFF"/>
 
 
-        <!-- 사진 / 검사 버튼 -->
+        <!-- 갤러리 / 검사 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -124,13 +137,73 @@
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:text="Seal 검사"
+                android:text="SEAL 검사"
                 android:textSize="14sp"/>
 
         </LinearLayout>
 
 
-        <!-- ROI 조절 -->
+        <!-- ROI 가로 조절 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="5dp">
+
+            <Button
+                android:id="@+id/btnSealRoiWidthSmaller"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="가로 -"
+                android:textSize="13sp"/>
+
+            <Button
+                android:id="@+id/btnSealRoiWidthLarger"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="가로 +"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
+
+
+        <!-- ROI 세로 조절 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="5dp">
+
+            <Button
+                android:id="@+id/btnSealRoiHeightSmaller"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="세로 -"
+                android:textSize="13sp"/>
+
+            <Button
+                android:id="@+id/btnSealRoiHeightLarger"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="세로 +"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
+
+
+        <!-- ROI / 이미지 초기화 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -140,37 +213,27 @@
             android:paddingBottom="8dp">
 
             <Button
-                android:id="@+id/btnSealRoiSmaller"
-                android:layout_width="0dp"
-                android:layout_height="46dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="3dp"
-                android:text="ROI 축소"
-                android:textSize="12sp"/>
-
-            <Button
                 android:id="@+id/btnSealRoiReset"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
-                android:layout_marginStart="3dp"
-                android:layout_marginEnd="3dp"
+                android:layout_marginEnd="4dp"
                 android:text="ROI 중앙"
-                android:textSize="12sp"/>
+                android:textSize="13sp"/>
 
             <Button
-                android:id="@+id/btnSealRoiLarger"
+                android:id="@+id/btnSealImageReset"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
-                android:layout_marginStart="3dp"
-                android:text="ROI 확대"
-                android:textSize="12sp"/>
+                android:layout_marginStart="4dp"
+                android:text="사진 원래크기"
+                android:textSize="13sp"/>
 
         </LinearLayout>
 
 
-        <!-- Seal 분석 항목 -->
+        <!-- 분석 결과 제목 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -183,6 +246,7 @@
             android:textStyle="bold"/>
 
 
+        <!-- 분석 결과 -->
         <TextView
             android:id="@+id/tvSealMetrics"
             android:layout_width="match_parent"

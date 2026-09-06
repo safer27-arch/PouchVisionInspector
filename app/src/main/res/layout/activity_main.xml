@@ -7,13 +7,14 @@
     android:orientation="vertical"
     android:background="#F4F6F8">
 
+    <!-- 상단 제목 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="76dp"
+        android:layout_height="72dp"
         android:orientation="vertical"
         android:gravity="center_vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
         android:background="#102A43">
 
         <TextView
@@ -21,30 +22,36 @@
             android:layout_height="wrap_content"
             android:text="Pouch Vision Inspector"
             android:textColor="#FFFFFF"
-            android:textSize="21sp"
+            android:textSize="20sp"
             android:textStyle="bold"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Bottom Corner / Forming / Seal Inspection"
+            android:text="Bottom Corner Wrinkle Inspection"
             android:textColor="#D9E2EC"
-            android:textSize="13sp"/>
+            android:textSize="12sp"/>
 
     </LinearLayout>
 
+
+    <!-- 카메라 / 선택 이미지 영역 -->
     <FrameLayout
+        android:id="@+id/imageArea"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_margin="12dp"
+        android:layout_margin="10dp"
         android:background="#000000">
 
+        <!-- 카메라 -->
         <androidx.camera.view.PreviewView
             android:id="@+id/previewView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
 
+
+        <!-- 갤러리 또는 촬영 이미지 -->
         <ImageView
             android:id="@+id/imagePreview"
             android:layout_width="match_parent"
@@ -53,86 +60,156 @@
             android:visibility="gone"
             android:background="#000000"/>
 
+
+        <!-- ROI 선택 박스 -->
         <View
             android:id="@+id/roiGuide"
-            android:layout_width="280dp"
-            android:layout_height="210dp"
+            android:layout_width="220dp"
+            android:layout_height="180dp"
             android:layout_gravity="center"
-            android:background="@drawable/roi_border"/>
+            android:background="@drawable/roi_border"
+            android:elevation="8dp"/>
 
+
+        <!-- ROI 안내 -->
         <TextView
+            android:id="@+id/tvRoiInfo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="16dp"
-            android:background="#88000000"
-            android:padding="8dp"
-            android:text="Bottom Corner 영역을 ROI 안에 맞춰주세요"
+            android:layout_marginTop="12dp"
+            android:background="#AA000000"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="ROI 박스를 Bottom Corner에 맞춰주세요"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"/>
+            android:textSize="12sp"/>
 
     </FrameLayout>
 
+
+    <!-- 분석 결과 -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="10dp"
-        android:padding="12dp"
+        android:minHeight="80dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="8dp"
+        android:padding="10dp"
         android:text="카메라 준비 중..."
         android:textColor="#102A43"
-        android:textSize="15sp"
+        android:textSize="14sp"
         android:textStyle="bold"
         android:background="#FFFFFF"/>
 
+
+    <!-- ROI 조절 안내 -->
+    <TextView
+        android:id="@+id/tvRoiMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="6dp"
+        android:gravity="center"
+        android:text="사진 선택 후 ROI 박스를 손가락으로 이동할 수 있습니다."
+        android:textColor="#486581"
+        android:textSize="12sp"/>
+
+
+    <!-- 주요 버튼 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp">
 
         <Button
             android:id="@+id/btnCapture"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="3dp"
             android:text="사진 촬영"
-            android:textSize="14sp"/>
+            android:textSize="13sp"/>
 
         <Button
             android:id="@+id/btnGallery"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp"
             android:text="갤러리 선택"
-            android:textSize="14sp"/>
+            android:textSize="13sp"/>
 
         <Button
             android:id="@+id/btnInspect"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="검사 시작"
-            android:textSize="14sp"/>
+            android:layout_marginStart="3dp"
+            android:text="ROI 검사"
+            android:textSize="13sp"/>
 
     </LinearLayout>
 
+
+    <!-- ROI 크기 조절 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp">
+
+        <Button
+            android:id="@+id/btnRoiSmaller"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:text="ROI 축소"
+            android:textSize="12sp"/>
+
+        <Button
+            android:id="@+id/btnRoiReset"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:layout_marginEnd="3dp"
+            android:text="ROI 중앙"
+            android:textSize="12sp"/>
+
+        <Button
+            android:id="@+id/btnRoiLarger"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:text="ROI 확대"
+            android:textSize="12sp"/>
+
+    </LinearLayout>
+
+
+    <!-- 카메라 복귀 -->
     <Button
         android:id="@+id/btnCameraMode"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="12dp"
-        android:layout_marginBottom="16dp"
+        android:layout_height="46dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="12dp"
         android:text="카메라 화면으로 돌아가기"
-        android:textSize="14sp"/>
+        android:textSize="13sp"/>
 
 </LinearLayout>

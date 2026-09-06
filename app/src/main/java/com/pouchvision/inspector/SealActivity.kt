@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -25,18 +26,65 @@ class SealActivity : AppCompatActivity() {
 
     private var lastBitmap: Bitmap? = null
 
-    private val imageMatrixValue = Matrix()
+    /*
+     * =========================================================
+     * SEAL 민감도
+     * =========================================================
+     */
 
-    private var zoomFactor = 1f
+    private val preferenceName =
+        "pouch_vision_settings"
 
-    private var lastImageTouchX = 0f
-    private var lastImageTouchY = 0f
+    private val sensitivityKey =
+        "seal_sensitivity"
 
-    private lateinit var scaleGestureDetector: ScaleGestureDetector
+    private val defaultSensitivity =
+        60
 
-    private var roiLastTouchX = 0f
-    private var roiLastTouchY = 0f
+    private var sensitivity =
+        defaultSensitivity
 
+
+    /*
+     * =========================================================
+     * 이미지 확대 / 이동
+     * =========================================================
+     */
+
+    private val imageMatrixValue =
+        Matrix()
+
+    private var zoomFactor =
+        1f
+
+    private var lastImageTouchX =
+        0f
+
+    private var lastImageTouchY =
+        0f
+
+    private lateinit var scaleGestureDetector:
+            ScaleGestureDetector
+
+
+    /*
+     * =========================================================
+     * ROI 이동
+     * =========================================================
+     */
+
+    private var roiLastTouchX =
+        0f
+
+    private var roiLastTouchY =
+        0f
+
+
+    /*
+     * =========================================================
+     * 갤러리
+     * =========================================================
+     */
 
     private val galleryLauncher =
         registerForActivityResult(
@@ -62,6 +110,9 @@ class SealActivity : AppCompatActivity() {
 
         setContentView(binding.root)
 
+
+        setupSensitivity()
+
         setupImageZoom()
 
         setupRoiDrag()
@@ -84,7 +135,7 @@ class SealActivity : AppCompatActivity() {
 
                 Toast.makeText(
                     this,
-                    "먼저 Seal 사진을 선택해주세요.",
+                    "먼저 SEAL 사진을 선택해주세요.",
                     Toast.LENGTH_LONG
                 ).show()
 
@@ -148,6 +199,134 @@ class SealActivity : AppCompatActivity() {
     }
 
 
+    /*
+     * =========================================================
+     * 민감도 설정
+     * =========================================================
+     */
+
+    private fun setupSensitivity() {
+
+        val prefs =
+            getSharedPreferences(
+                preferenceName,
+                MODE_PRIVATE
+            )
+
+
+        sensitivity =
+            prefs.getInt(
+                sensitivityKey,
+                defaultSensitivity
+            ).coerceIn(
+                0,
+                100
+            )
+
+
+        binding.seekSealSensitivity.progress =
+            sensitivity
+
+
+        updateSensitivityText()
+
+
+        binding.seekSealSensitivity
+            .setOnSeekBarChangeListener(
+
+                object :
+                    SeekBar.OnSeekBarChangeListener {
+
+                    override fun onProgressChanged(
+                        seekBar: SeekBar?,
+                        progress: Int,
+                        fromUser: Boolean
+                    ) {
+
+                        sensitivity =
+                            progress
+
+
+                        updateSensitivityText()
+
+
+                        if (fromUser) {
+
+                            prefs.edit()
+                                .putInt(
+                                    sensitivityKey,
+                                    sensitivity
+                                )
+                                .apply()
+                        }
+                    }
+
+
+                    override fun onStartTrackingTouch(
+                        seekBar: SeekBar?
+                    ) {
+                    }
+
+
+                    override fun onStopTrackingTouch(
+                        seekBar: SeekBar?
+                    ) {
+
+                        prefs.edit()
+                            .putInt(
+                                sensitivityKey,
+                                sensitivity
+                            )
+                            .apply()
+                    }
+                }
+            )
+
+
+        binding.btnSealSensitivityReset
+            .setOnClickListener {
+
+                sensitivity =
+                    defaultSensitivity
+
+
+                binding.seekSealSensitivity.progress =
+                    defaultSensitivity
+
+
+                prefs.edit()
+                    .putInt(
+                        sensitivityKey,
+                        defaultSensitivity
+                    )
+                    .apply()
+
+
+                updateSensitivityText()
+
+
+                Toast.makeText(
+                    this,
+                    "SEAL 민감도를 60%로 복원했습니다.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+    }
+
+
+    private fun updateSensitivityText() {
+
+        binding.tvSealSensitivityValue.text =
+            "현재 민감도 : ${sensitivity}%"
+    }
+
+
+    /*
+     * =========================================================
+     * 이미지 줌
+     * =========================================================
+     */
+
     private fun setupImageZoom() {
 
         scaleGestureDetector =
@@ -158,11 +337,13 @@ class SealActivity : AppCompatActivity() {
                         .SimpleOnScaleGestureListener() {
 
                     override fun onScale(
-                        detector: ScaleGestureDetector
+                        detector:
+                        ScaleGestureDetector
                     ): Boolean {
 
                         val oldZoom =
                             zoomFactor
+
 
                         val newZoom =
                             (
@@ -173,9 +354,11 @@ class SealActivity : AppCompatActivity() {
                                 8f
                             )
 
+
                         val actualScale =
                             newZoom /
                                     oldZoom
+
 
                         zoomFactor =
                             newZoom
@@ -189,9 +372,7 @@ class SealActivity : AppCompatActivity() {
                         )
 
 
-                        binding
-                            .sealImagePreview
-                            .imageMatrix =
+                        binding.sealImagePreview.imageMatrix =
                             imageMatrixValue
 
 
@@ -201,98 +382,100 @@ class SealActivity : AppCompatActivity() {
             )
 
 
-        binding.sealImagePreview.setOnTouchListener {
-                view,
-                event ->
+        binding.sealImagePreview
+            .setOnTouchListener { view, event ->
+
+                view.parent
+                    ?.requestDisallowInterceptTouchEvent(
+                        true
+                    )
 
 
-            view.parent
-                ?.requestDisallowInterceptTouchEvent(
-                    true
+                scaleGestureDetector.onTouchEvent(
+                    event
                 )
 
 
-            scaleGestureDetector.onTouchEvent(
-                event
-            )
+                when (
+                    event.actionMasked
+                ) {
 
+                    MotionEvent.ACTION_DOWN -> {
 
-            when (
-                event.actionMasked
-            ) {
+                        lastImageTouchX =
+                            event.x
 
-                MotionEvent.ACTION_DOWN -> {
+                        lastImageTouchY =
+                            event.y
 
-                    lastImageTouchX =
-                        event.x
-
-                    lastImageTouchY =
-                        event.y
-
-                    true
-                }
-
-
-                MotionEvent.ACTION_MOVE -> {
-
-                    if (
-                        !scaleGestureDetector
-                            .isInProgress &&
-                        event.pointerCount == 1 &&
-                        zoomFactor > 1f
-                    ) {
-
-                        val dx =
-                            event.x -
-                                    lastImageTouchX
-
-                        val dy =
-                            event.y -
-                                    lastImageTouchY
-
-
-                        imageMatrixValue.postTranslate(
-                            dx,
-                            dy
-                        )
-
-
-                        binding
-                            .sealImagePreview
-                            .imageMatrix =
-                            imageMatrixValue
+                        true
                     }
 
 
-                    lastImageTouchX =
-                        event.x
+                    MotionEvent.ACTION_MOVE -> {
 
-                    lastImageTouchY =
-                        event.y
+                        if (
+                            !scaleGestureDetector
+                                .isInProgress &&
+                            event.pointerCount == 1 &&
+                            zoomFactor > 1f
+                        ) {
+
+                            val dx =
+                                event.x -
+                                        lastImageTouchX
+
+                            val dy =
+                                event.y -
+                                        lastImageTouchY
 
 
-                    true
+                            imageMatrixValue.postTranslate(
+                                dx,
+                                dy
+                            )
+
+
+                            binding.sealImagePreview.imageMatrix =
+                                imageMatrixValue
+                        }
+
+
+                        lastImageTouchX =
+                            event.x
+
+                        lastImageTouchY =
+                            event.y
+
+
+                        true
+                    }
+
+
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL -> {
+
+                        view.parent
+                            ?.requestDisallowInterceptTouchEvent(
+                                false
+                            )
+
+                        true
+                    }
+
+
+                    else ->
+                        true
                 }
-
-
-                MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_CANCEL -> {
-
-                    view.parent
-                        ?.requestDisallowInterceptTouchEvent(
-                            false
-                        )
-
-                    true
-                }
-
-
-                else ->
-                    true
             }
-        }
     }
 
+
+    /*
+     * =========================================================
+     * 이미지 원래크기
+     * =========================================================
+     */
 
     private fun resetImageMatrix() {
 
@@ -308,6 +491,7 @@ class SealActivity : AppCompatActivity() {
                     .sealImagePreview
                     .width
                     .toFloat()
+
 
             val viewHeight =
                 binding
@@ -329,6 +513,7 @@ class SealActivity : AppCompatActivity() {
                 bitmap.width
                     .toFloat()
 
+
             val bitmapHeight =
                 bitmap.height
                     .toFloat()
@@ -348,6 +533,7 @@ class SealActivity : AppCompatActivity() {
                 bitmapWidth *
                         baseScale
 
+
             val displayedHeight =
                 bitmapHeight *
                         baseScale
@@ -359,6 +545,7 @@ class SealActivity : AppCompatActivity() {
                             displayedWidth
                     ) / 2f
 
+
             val dy =
                 (
                     viewHeight -
@@ -368,10 +555,12 @@ class SealActivity : AppCompatActivity() {
 
             imageMatrixValue.reset()
 
+
             imageMatrixValue.postScale(
                 baseScale,
                 baseScale
             )
+
 
             imageMatrixValue.postTranslate(
                 dx,
@@ -383,20 +572,24 @@ class SealActivity : AppCompatActivity() {
                 1f
 
 
-            binding
-                .sealImagePreview
-                .imageMatrix =
+            binding.sealImagePreview.imageMatrix =
                 imageMatrixValue
         }
     }
 
+
+    /*
+     * =========================================================
+     * 갤러리 이미지
+     * =========================================================
+     */
 
     private fun loadGalleryImage(
         uri: Uri
     ) {
 
         binding.tvSealStatus.text =
-            "사진 불러오는 중..."
+            "SEAL 사진 불러오는 중..."
 
 
         try {
@@ -420,11 +613,9 @@ class SealActivity : AppCompatActivity() {
                 bitmap
 
 
-            binding
-                .sealImagePreview
-                .setImageBitmap(
-                    bitmap
-                )
+            binding.sealImagePreview.setImageBitmap(
+                bitmap
+            )
 
 
             resetImageMatrix()
@@ -438,13 +629,14 @@ class SealActivity : AppCompatActivity() {
 
             binding.tvSealMetrics.text =
                 """
-Seal Width       : -
-Straightness    : -
-Wrinkle Level   : -
-Deformation     : -
+Seal Uniformity : -
+Edge Density    : -
+Edge Strength   : -
 Seal Score      : -
 
 판정 : -
+
+※ Seal Width(mm)는 기준 설정 후 적용
                 """.trimIndent()
 
 
@@ -522,117 +714,137 @@ Seal Score      : -
     }
 
 
+    /*
+     * =========================================================
+     * ROI 이동
+     * =========================================================
+     */
+
     private fun setupRoiDrag() {
 
-        binding.sealRoiGuide.setOnTouchListener {
-                view,
-                event ->
+        binding.sealRoiGuide
+            .setOnTouchListener { view, event ->
+
+                view.parent
+                    ?.requestDisallowInterceptTouchEvent(
+                        true
+                    )
 
 
-            view.parent
-                ?.requestDisallowInterceptTouchEvent(
-                    true
-                )
+                when (
+                    event.action
+                ) {
+
+                    MotionEvent.ACTION_DOWN -> {
+
+                        roiLastTouchX =
+                            event.rawX
+
+                        roiLastTouchY =
+                            event.rawY
+
+                        true
+                    }
 
 
-            when (
-                event.action
-            ) {
+                    MotionEvent.ACTION_MOVE -> {
 
-                MotionEvent.ACTION_DOWN -> {
+                        val dx =
+                            event.rawX -
+                                    roiLastTouchX
 
-                    roiLastTouchX =
-                        event.rawX
 
-                    roiLastTouchY =
-                        event.rawY
+                        val dy =
+                            event.rawY -
+                                    roiLastTouchY
 
-                    true
+
+                        var newX =
+                            view.x +
+                                    dx
+
+
+                        var newY =
+                            view.y +
+                                    dy
+
+
+                        val parent =
+                            binding.sealImageArea
+
+
+                        val maxX =
+                            parent.width -
+                                    view.width
+
+
+                        val maxY =
+                            parent.height -
+                                    view.height
+
+
+                        newX =
+                            newX.coerceIn(
+                                0f,
+                                maxX
+                                    .coerceAtLeast(0)
+                                    .toFloat()
+                            )
+
+
+                        newY =
+                            newY.coerceIn(
+                                0f,
+                                maxY
+                                    .coerceAtLeast(0)
+                                    .toFloat()
+                            )
+
+
+                        view.x =
+                            newX
+
+
+                        view.y =
+                            newY
+
+
+                        roiLastTouchX =
+                            event.rawX
+
+
+                        roiLastTouchY =
+                            event.rawY
+
+
+                        true
+                    }
+
+
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL -> {
+
+                        view.parent
+                            ?.requestDisallowInterceptTouchEvent(
+                                false
+                            )
+
+                        true
+                    }
+
+
+                    else ->
+                        true
                 }
-
-
-                MotionEvent.ACTION_MOVE -> {
-
-                    val dx =
-                        event.rawX -
-                                roiLastTouchX
-
-                    val dy =
-                        event.rawY -
-                                roiLastTouchY
-
-
-                    var newX =
-                        view.x +
-                                dx
-
-                    var newY =
-                        view.y +
-                                dy
-
-
-                    val parent =
-                        binding.sealImageArea
-
-
-                    val maxX =
-                        parent.width -
-                                view.width
-
-                    val maxY =
-                        parent.height -
-                                view.height
-
-
-                    newX =
-                        newX.coerceIn(
-                            0f,
-                            maxX.toFloat()
-                        )
-
-                    newY =
-                        newY.coerceIn(
-                            0f,
-                            maxY.toFloat()
-                        )
-
-
-                    view.x =
-                        newX
-
-                    view.y =
-                        newY
-
-
-                    roiLastTouchX =
-                        event.rawX
-
-                    roiLastTouchY =
-                        event.rawY
-
-
-                    true
-                }
-
-
-                MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_CANCEL -> {
-
-                    view.parent
-                        ?.requestDisallowInterceptTouchEvent(
-                            false
-                        )
-
-                    true
-                }
-
-
-                else ->
-                    true
             }
-        }
     }
 
+
+    /*
+     * =========================================================
+     * ROI 크기
+     * =========================================================
+     */
 
     private fun resizeRoiWidth(
         scale: Float
@@ -640,6 +852,7 @@ Seal Score      : -
 
         val roi =
             binding.sealRoiGuide
+
 
         val parent =
             binding.sealImageArea
@@ -706,9 +919,7 @@ Seal Score      : -
                         parent.width -
                                 roi.width
                         )
-                        .coerceAtLeast(
-                            0
-                        )
+                        .coerceAtLeast(0)
                         .toFloat()
                 )
 
@@ -725,6 +936,7 @@ Seal Score      : -
 
         val roi =
             binding.sealRoiGuide
+
 
         val parent =
             binding.sealImageArea
@@ -747,9 +959,9 @@ Seal Score      : -
 
         newHeight =
             newHeight.coerceIn(
-                40,
+                50,
                 max(
-                    40,
+                    50,
                     (
                         parent.height *
                                 0.95f
@@ -791,9 +1003,7 @@ Seal Score      : -
                         parent.height -
                                 roi.height
                         )
-                        .coerceAtLeast(
-                            0
-                        )
+                        .coerceAtLeast(0)
                         .toFloat()
                 )
 
@@ -810,6 +1020,7 @@ Seal Score      : -
 
             val roi =
                 binding.sealRoiGuide
+
 
             val parent =
                 binding.sealImageArea
@@ -831,12 +1042,18 @@ Seal Score      : -
     }
 
 
+    /*
+     * =========================================================
+     * ROI 좌표 변환
+     * =========================================================
+     */
+
     private fun analyzeSelectedSealRoi(
         source: Bitmap
     ) {
 
         binding.tvSealStatus.text =
-            "Seal ROI 분석 중..."
+            "SEAL ROI 분석 중..."
 
 
         val screenRect =
@@ -852,9 +1069,7 @@ Seal Score      : -
 
         val currentMatrix =
             Matrix(
-                binding
-                    .sealImagePreview
-                    .imageMatrix
+                binding.sealImagePreview.imageMatrix
             )
 
 
@@ -890,20 +1105,19 @@ Seal Score      : -
 
 
                 var left =
-                    bitmapRect.left
-                        .toInt()
+                    bitmapRect.left.toInt()
+
 
                 var top =
-                    bitmapRect.top
-                        .toInt()
+                    bitmapRect.top.toInt()
+
 
                 var right =
-                    bitmapRect.right
-                        .toInt()
+                    bitmapRect.right.toInt()
+
 
                 var bottom =
-                    bitmapRect.bottom
-                        .toInt()
+                    bitmapRect.bottom.toInt()
 
 
                 left =
@@ -937,6 +1151,7 @@ Seal Score      : -
                 val roiWidth =
                     right -
                             left
+
 
                 val roiHeight =
                     bottom -
@@ -977,7 +1192,7 @@ Seal Score      : -
                 runOnUiThread {
 
                     binding.tvSealStatus.text =
-                        "Seal 분석 오류: ${e.message}"
+                        "SEAL 분석 오류: ${e.message}"
                 }
             }
 
@@ -985,23 +1200,25 @@ Seal Score      : -
     }
 
 
+    /*
+     * =========================================================
+     * SEAL 분석
+     * =========================================================
+     */
+
     private fun analyzeSealBitmap(
-
         source: Bitmap,
-
         roi: Bitmap,
-
         roiStartX: Int,
-
         roiStartY: Int
-
     ) {
 
         val analysisWidth =
-            360
+            320
+
 
         val analysisHeight =
-            120
+            160
 
 
         val small =
@@ -1013,20 +1230,49 @@ Seal Score      : -
             )
 
 
+        /*
+         * 민감도 상승
+         * → 검출 Threshold 감소
+         * → 더 작은 변화 검출
+         */
+
+        val edgeThreshold =
+            (
+                75 -
+                        sensitivity *
+                        0.50
+                )
+                .toInt()
+                .coerceIn(
+                    20,
+                    70
+                )
+
+
+        val strongThreshold =
+            (
+                115 -
+                        sensitivity *
+                        0.67
+                )
+                .toInt()
+                .coerceIn(
+                    35,
+                    105
+                )
+
+
         var edgeCount =
             0L
 
-        var irregularCount =
+
+        var strongEdgeCount =
             0L
 
-        var totalStrength =
+
+        var totalGradient =
             0L
 
-        var horizontalChange =
-            0L
-
-        var verticalChange =
-            0L
 
         var pixelCount =
             0L
@@ -1135,20 +1381,16 @@ Seal Score      : -
                             verticalGradient
 
 
-                totalStrength +=
+                totalGradient +=
                     gradient
 
-                horizontalChange +=
-                    horizontalGradient
-
-                verticalChange +=
-                    verticalGradient
 
                 pixelCount++
 
 
                 if (
-                    gradient > 40
+                    gradient >
+                    edgeThreshold
                 ) {
 
                     edgeCount++
@@ -1156,10 +1398,11 @@ Seal Score      : -
 
 
                 if (
-                    gradient > 75
+                    gradient >
+                    strongThreshold
                 ) {
 
-                    irregularCount++
+                    strongEdgeCount++
 
 
                     if (
@@ -1210,12 +1453,12 @@ Seal Score      : -
             }
 
 
-        val irregularDensity =
+        val strongEdgeDensity =
             if (
                 pixelCount > 0
             ) {
 
-                irregularCount.toDouble() /
+                strongEdgeCount.toDouble() /
                         pixelCount.toDouble() *
                         100.0
 
@@ -1230,7 +1473,7 @@ Seal Score      : -
                 pixelCount > 0
             ) {
 
-                totalStrength.toDouble() /
+                totalGradient.toDouble() /
                         pixelCount.toDouble()
 
             } else {
@@ -1239,132 +1482,56 @@ Seal Score      : -
             }
 
 
-        val straightnessError =
+        val sensitivityFactor =
+            0.55 +
+                    sensitivity /
+                    133.3
+
+
+        val sealDefectLevel =
             (
-                irregularDensity *
-                        2.5 +
-                        averageStrength *
-                        0.25
-                ).coerceIn(
-                0.0,
-                100.0
-            )
-
-
-        val wrinkleScore =
-            (
-                irregularDensity *
-                        4.0 +
-                        edgeDensity *
-                        0.8
-                ).coerceIn(
-                0.0,
-                100.0
-            )
-
-
-        val directionalDifference =
-            if (
-                pixelCount > 0
-            ) {
-
-                abs(
-                    horizontalChange -
-                            verticalChange
-                ).toDouble() /
-                        pixelCount.toDouble()
-
-            } else {
-
-                0.0
-            }
-
-
-        val deformationScore =
-            (
-                directionalDifference *
-                        0.7 +
-                        irregularDensity *
-                        2.0
-                ).coerceIn(
-                0.0,
-                100.0
-            )
-
-
-        val defectScore =
-            (
-                straightnessError *
-                        0.35 +
-                        wrinkleScore *
-                        0.40 +
-                        deformationScore *
-                        0.25
-                ).coerceIn(
-                0.0,
-                100.0
-            )
+                (
+                    edgeDensity *
+                            2.0 +
+                            strongEdgeDensity *
+                            3.0 +
+                            averageStrength *
+                            0.45
+                    ) *
+                        sensitivityFactor
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
 
 
         val sealScore =
             (
                 100.0 -
-                        defectScore
-                ).coerceIn(
-                0.0,
-                100.0
-            )
+                        sealDefectLevel
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
 
 
-        val straightnessText =
-            when {
-
-                straightnessError < 20 ->
-                    "양호"
-
-                straightnessError < 40 ->
-                    "주의"
-
-                straightnessError < 60 ->
-                    "한계"
-
-                else ->
-                    "이상 후보"
-            }
-
-
-        val wrinkleText =
-            when {
-
-                wrinkleScore < 20 ->
-                    "낮음"
-
-                wrinkleScore < 40 ->
-                    "주의"
-
-                wrinkleScore < 60 ->
-                    "높음"
-
-                else ->
-                    "매우 높음"
-            }
-
-
-        val deformationText =
-            when {
-
-                deformationScore < 20 ->
-                    "낮음"
-
-                deformationScore < 40 ->
-                    "주의"
-
-                deformationScore < 60 ->
-                    "높음"
-
-                else ->
-                    "매우 높음"
-            }
+        val sealUniformity =
+            (
+                100.0 -
+                        (
+                            edgeDensity *
+                                    1.6 +
+                                    strongEdgeDensity *
+                                    2.0
+                            ) *
+                        sensitivityFactor
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
 
 
         val judgment =
@@ -1386,21 +1553,17 @@ Seal Score      : -
 
         runOnUiThread {
 
-            binding
-                .sealImagePreview
-                .setImageBitmap(
-                    markedBitmap
-                )
+            binding.sealImagePreview.setImageBitmap(
+                markedBitmap
+            )
 
 
-            binding
-                .sealImagePreview
-                .imageMatrix =
+            binding.sealImagePreview.imageMatrix =
                 imageMatrixValue
 
 
             binding.tvSealStatus.text =
-                "Seal ROI 분석 완료"
+                "SEAL ROI 분석 완료"
 
 
             binding.tvSealMetrics.text =
@@ -1408,34 +1571,39 @@ Seal Score      : -
                     Locale.getDefault(),
 
                     """
-Seal Width       : 기준 설정 필요
-Straightness    : %s  (%.1f)
-Wrinkle Level   : %s  (%.1f)
-Deformation     : %s  (%.1f)
+민감도          : %d%%
+Seal Uniformity : %.1f / 100
+Edge Density    : %.1f%%
+Strong Edge     : %.1f%%
+Edge Strength   : %.1f
 Seal Score      : %.1f / 100
 
 판정 : %s
 
-빨간 표시 : 국부 이상 후보
-※ 현재는 기준 학습 전 임시 판정
+빨간 표시 : 국부 변화가 큰 위치 후보
+
+※ 민감도는 이미지 검출 수준입니다.
+※ 실제 Seal Width(mm)는 기준 길이/캘리브레이션 설정 후 적용합니다.
+※ 현재 판정 기준은 기준 학습 전 임시값입니다.
                     """.trimIndent(),
 
-                    straightnessText,
-                    straightnessError,
-
-                    wrinkleText,
-                    wrinkleScore,
-
-                    deformationText,
-                    deformationScore,
-
+                    sensitivity,
+                    sealUniformity,
+                    edgeDensity,
+                    strongEdgeDensity,
+                    averageStrength,
                     sealScore,
-
                     judgment
                 )
         }
     }
 
+
+    /*
+     * =========================================================
+     * RGB → Gray
+     * =========================================================
+     */
 
     private fun gray(
         color: Int
@@ -1446,10 +1614,12 @@ Seal Score      : %.1f / 100
                 color
             )
 
+
         val g =
             Color.green(
                 color
             )
+
 
         val b =
             Color.blue(

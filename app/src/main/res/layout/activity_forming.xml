@@ -12,41 +12,37 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- 상단 헤더 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="92dp"
+            android:layout_height="72dp"
             android:orientation="vertical"
             android:gravity="center_vertical"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
             android:background="#102A43">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Forming Inspection"
+                android:text="Pouch Vision Inspector"
                 android:textColor="#FFFFFF"
-                android:textSize="23sp"
+                android:textSize="20sp"
                 android:textStyle="bold"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Shape / Deformation / Wrinkle / Symmetry"
+                android:text="Forming Inspection"
                 android:textColor="#D9E2EC"
                 android:textSize="12sp"/>
 
         </LinearLayout>
 
-
-        <!-- 이미지 영역 -->
         <FrameLayout
             android:id="@+id/formingImageArea"
             android:layout_width="match_parent"
             android:layout_height="430dp"
-            android:layout_margin="12dp"
+            android:layout_margin="10dp"
             android:background="#000000">
 
             <ImageView
@@ -56,7 +52,6 @@
                 android:background="#000000"
                 android:scaleType="matrix"/>
 
-            <!-- Forming ROI -->
             <View
                 android:id="@+id/formingRoiGuide"
                 android:layout_width="260dp"
@@ -76,14 +71,12 @@
                 android:paddingEnd="10dp"
                 android:paddingTop="6dp"
                 android:paddingBottom="6dp"
-                android:text="Forming 검사 영역에 ROI를 맞춰주세요"
+                android:text="FORMING 검사 영역에 ROI를 맞춰주세요"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"/>
 
         </FrameLayout>
 
-
-        <!-- 확대 안내 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -95,25 +88,100 @@
             android:textColor="#486581"
             android:textSize="12sp"/>
 
-
-        <!-- 상태 -->
         <TextView
             android:id="@+id/tvFormingStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="76dp"
+            android:minHeight="70dp"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="8dp"
             android:padding="12dp"
-            android:text="갤러리에서 Forming 사진을 선택해주세요."
+            android:text="FORMING 사진을 선택해주세요."
             android:textColor="#102A43"
             android:textSize="14sp"
             android:textStyle="bold"
             android:background="#FFFFFF"/>
 
+        <!-- FORMING 민감도 설정 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="10dp"
+            android:padding="14dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
 
-        <!-- 갤러리 / 검사 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FORMING 민감도 설정"
+                android:textColor="#102A43"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvFormingSensitivityValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="현재 민감도 : 60%"
+                android:textColor="#102A43"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="낮음"
+                    android:textColor="#486581"
+                    android:textSize="12sp"/>
+
+                <SeekBar
+                    android:id="@+id/seekFormingSensitivity"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="60"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="높음"
+                    android:textColor="#486581"
+                    android:textSize="12sp"/>
+
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="민감도를 높이면 미세한 형상 변화, 주름, 비대칭 후보를 더 많이 검출합니다."
+                android:textColor="#627D98"
+                android:textSize="11sp"/>
+
+            <Button
+                android:id="@+id/btnFormingSensitivityReset"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:text="기본값 60%로 복원"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -129,7 +197,7 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
                 android:text="갤러리 선택"
-                android:textSize="14sp"/>
+                android:textSize="13sp"/>
 
             <Button
                 android:id="@+id/btnFormingInspect"
@@ -138,12 +206,10 @@
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
                 android:text="FORMING 검사"
-                android:textSize="14sp"/>
+                android:textSize="13sp"/>
 
         </LinearLayout>
 
-
-        <!-- ROI 가로 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -172,8 +238,6 @@
 
         </LinearLayout>
 
-
-        <!-- ROI 세로 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -202,8 +266,6 @@
 
         </LinearLayout>
 
-
-        <!-- 초기화 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -232,46 +294,37 @@
 
         </LinearLayout>
 
-
-        <!-- 결과 제목 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:text="Forming Analysis"
-            android:textColor="#102A43"
-            android:textSize="18sp"
-            android:textStyle="bold"/>
-
-
-        <!-- 분석 결과 -->
         <TextView
             android:id="@+id/tvFormingMetrics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:minHeight="190dp"
             android:layout_marginStart="12dp"
-            android:layout_marginTop="8dp"
             android:layout_marginEnd="12dp"
+            android:layout_marginBottom="10dp"
             android:padding="14dp"
             android:background="#FFFFFF"
-            android:text="Shape Uniformity : -&#10;Wrinkle Level   : -&#10;Deformation     : -&#10;Symmetry Error  : -&#10;Forming Score   : -&#10;&#10;판정 : -"
             android:textColor="#102A43"
-            android:textSize="15sp"/>
+            android:textSize="14sp"
+            android:text="
+Shape Uniformity : -
+Wrinkle Level    : -
+Deformation      : -
+Symmetry Error   : -
+Forming Score    : -
 
+판정 : -
+"/>
 
-        <!-- 뒤로가기 -->
         <Button
             android:id="@+id/btnFormingBack"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginBottom="20dp"
-            android:text="메인 메뉴로 돌아가기"
-            android:textSize="14sp"/>
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="18dp"
+            android:text="메뉴로 돌아가기"
+            android:textSize="13sp"/>
 
     </LinearLayout>
 

@@ -18,18 +18,7 @@ class MenuActivity : AppCompatActivity() {
 
         setContentView(binding.root)
 
-
-        /*
-         * =====================================
-         * 종합검사
-         * =====================================
-         *
-         * Bottom Corner / Seal / Forming /
-         * Tab / 분해검사가 완성된 후
-         * 하나의 검사 흐름으로 통합할 예정
-         */
         binding.btnTotalInspection.setOnClickListener {
-
             Toast.makeText(
                 this,
                 "종합검사는 개별 검사 완성 후 연결합니다.",
@@ -37,14 +26,7 @@ class MenuActivity : AppCompatActivity() {
             ).show()
         }
 
-
-        /*
-         * =====================================
-         * Bottom Corner 주름 검사
-         * =====================================
-         */
         binding.btnBottomCorner.setOnClickListener {
-
             val intent =
                 Intent(
                     this,
@@ -54,16 +36,7 @@ class MenuActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-
-        /*
-         * =====================================
-         * Seal 검사
-         * =====================================
-         *
-         * 새로 만든 SealActivity 실행
-         */
         binding.btnSealInspection.setOnClickListener {
-
             val intent =
                 Intent(
                     this,
@@ -73,29 +46,17 @@ class MenuActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-
-        /*
-         * =====================================
-         * Forming 검사
-         * =====================================
-         */
         binding.btnFormingInspection.setOnClickListener {
+            val intent =
+                Intent(
+                    this,
+                    FormingActivity::class.java
+                )
 
-            Toast.makeText(
-                this,
-                "Forming 검사 기능은 다음 단계에서 추가합니다.",
-                Toast.LENGTH_SHORT
-            ).show()
+            startActivity(intent)
         }
 
-
-        /*
-         * =====================================
-         * Tab 검사
-         * =====================================
-         */
         binding.btnTabInspection.setOnClickListener {
-
             Toast.makeText(
                 this,
                 "Tab 검사 기능은 준비 중입니다.",
@@ -103,14 +64,7 @@ class MenuActivity : AppCompatActivity() {
             ).show()
         }
 
-
-        /*
-         * =====================================
-         * 분해 검사
-         * =====================================
-         */
         binding.btnDisassemblyInspection.setOnClickListener {
-
             Toast.makeText(
                 this,
                 "분해 검사 기능은 준비 중입니다.",
@@ -118,14 +72,7 @@ class MenuActivity : AppCompatActivity() {
             ).show()
         }
 
-
-        /*
-         * =====================================
-         * 검사 결과 / 이력
-         * =====================================
-         */
         binding.btnHistory.setOnClickListener {
-
             Toast.makeText(
                 this,
                 "검사 결과 및 이력관리 기능은 준비 중입니다.",

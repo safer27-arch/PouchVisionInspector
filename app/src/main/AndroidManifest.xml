@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.CAMERA" />
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 카메라 사용 권한 -->
+    <uses-permission
+        android:name="android.permission.CAMERA" />
 
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="true" />
+
 
     <application
         android:allowBackup="true"
@@ -13,10 +18,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PouchVisionInspector">
 
-        <!--
-            앱 시작 화면
-            MenuActivity가 가장 먼저 실행됩니다.
-        -->
+
+        <!-- ================================= -->
+        <!-- 앱 시작 메인 메뉴 -->
+        <!-- ================================= -->
+
         <activity
             android:name=".MenuActivity"
             android:screenOrientation="portrait"
@@ -35,13 +41,25 @@
         </activity>
 
 
-        <!--
-            기존 Bottom Corner 검사 화면
-        -->
+        <!-- ================================= -->
+        <!-- Bottom Corner 검사 -->
+        <!-- ================================= -->
+
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
             android:exported="false" />
+
+
+        <!-- ================================= -->
+        <!-- Seal 검사 -->
+        <!-- ================================= -->
+
+        <activity
+            android:name=".SealActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
+
 
     </application>
 

@@ -57,11 +57,13 @@ class MenuActivity : AppCompatActivity() {
         }
 
         binding.btnTabInspection.setOnClickListener {
-            Toast.makeText(
-                this,
-                "Tab 검사 기능은 준비 중입니다.",
-                Toast.LENGTH_SHORT
-            ).show()
+            val intent =
+                Intent(
+                    this,
+                    TabActivity::class.java
+                )
+
+            startActivity(intent)
         }
 
         binding.btnDisassemblyInspection.setOnClickListener {

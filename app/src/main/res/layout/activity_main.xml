@@ -12,7 +12,6 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- 상단 제목 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="72dp"
@@ -39,8 +38,6 @@
 
         </LinearLayout>
 
-
-        <!-- 이미지 / 카메라 영역 -->
         <FrameLayout
             android:id="@+id/imageArea"
             android:layout_width="match_parent"
@@ -48,14 +45,11 @@
             android:layout_margin="10dp"
             android:background="#000000">
 
-            <!-- 카메라 -->
             <androidx.camera.view.PreviewView
                 android:id="@+id/previewView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>
 
-
-            <!-- 선택 또는 촬영 이미지 -->
             <ImageView
                 android:id="@+id/imagePreview"
                 android:layout_width="match_parent"
@@ -64,8 +58,6 @@
                 android:scaleType="matrix"
                 android:visibility="gone"/>
 
-
-            <!-- ROI -->
             <View
                 android:id="@+id/roiGuide"
                 android:layout_width="220dp"
@@ -74,8 +66,6 @@
                 android:background="@drawable/roi_border"
                 android:elevation="8dp"/>
 
-
-            <!-- 안내 -->
             <TextView
                 android:id="@+id/tvRoiInfo"
                 android:layout_width="wrap_content"
@@ -93,8 +83,6 @@
 
         </FrameLayout>
 
-
-        <!-- 확대 안내 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -106,8 +94,6 @@
             android:textColor="#486581"
             android:textSize="12sp"/>
 
-
-        <!-- 결과 -->
         <TextView
             android:id="@+id/tvStatus"
             android:layout_width="match_parent"
@@ -123,8 +109,85 @@
             android:textStyle="bold"
             android:background="#FFFFFF"/>
 
+        <!-- 민감도 설정 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="10dp"
+            android:padding="14dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
 
-        <!-- 사진 / 갤러리 / 검사 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="민감도 설정"
+                android:textColor="#102A43"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvSensitivityValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="현재 민감도 : 60%"
+                android:textColor="#102A43"
+                android:textSize="15sp"
+                android:textStyle="bold"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="낮음"
+                    android:textColor="#486581"
+                    android:textSize="12sp"/>
+
+                <SeekBar
+                    android:id="@+id/seekSensitivity"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="60"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="높음"
+                    android:textColor="#486581"
+                    android:textSize="12sp"/>
+
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="민감도를 높이면 작은 변화도 더 많이 검출합니다."
+                android:textColor="#627D98"
+                android:textSize="11sp"/>
+
+            <Button
+                android:id="@+id/btnSensitivityReset"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:text="기본값 60%로 복원"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -163,8 +226,6 @@
 
         </LinearLayout>
 
-
-        <!-- ROI 가로 조절 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -193,8 +254,6 @@
 
         </LinearLayout>
 
-
-        <!-- ROI 세로 조절 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -223,8 +282,6 @@
 
         </LinearLayout>
 
-
-        <!-- ROI 중앙 / 사진 원래크기 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -253,8 +310,6 @@
 
         </LinearLayout>
 
-
-        <!-- 카메라 복귀 -->
         <Button
             android:id="@+id/btnCameraMode"
             android:layout_width="match_parent"

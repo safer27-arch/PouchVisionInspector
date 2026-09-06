@@ -5,7 +5,9 @@ import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -32,56 +34,101 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     private var imageCapture: ImageCapture? = null
+
+    /*
+     * 분석용 원본 이미지
+     *
+     * 빨간 표시가 추가되어도
+     * 원본 분석 데이터는 유지합니다.
+     */
     private var lastBitmap: Bitmap? = null
 
     private var roiLastTouchX = 0f
     private var roiLastTouchY = 0f
 
+
+    /*
+     * 카메라 권한
+     */
     private val requestCameraPermission =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { granted ->
 
             if (granted) {
+
                 startCamera()
+
             } else {
-                binding.tvStatus.text = "카메라 권한이 필요합니다."
+
+                binding.tvStatus.text =
+                    "카메라 권한이 필요합니다."
             }
         }
 
+
+    /*
+     * 갤러리 선택
+     */
     private val galleryLauncher =
         registerForActivityResult(
             ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
 
             if (uri != null) {
+
                 loadGalleryImage(uri)
             }
         }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
 
         super.onCreate(savedInstanceState)
 
         binding =
-            ActivityMainBinding.inflate(layoutInflater)
+            ActivityMainBinding.inflate(
+                layoutInflater
+            )
 
         setContentView(binding.root)
 
-        binding.tvStatus.text = "카메라 준비 중..."
 
+        binding.tvStatus.text =
+            "카메라 준비 중..."
+
+
+        /*
+         * 사진 촬영
+         */
         binding.btnCapture.setOnClickListener {
+
             showCameraMode()
+
             takePhoto()
         }
 
+
+        /*
+         * 갤러리
+         */
         binding.btnGallery.setOnClickListener {
-            galleryLauncher.launch("image/*")
+
+            galleryLauncher.launch(
+                "image/*"
+            )
         }
 
+
+        /*
+         * ROI 검사
+         */
         binding.btnInspect.setOnClickListener {
 
-            val bitmap = lastBitmap
+            val bitmap =
+                lastBitmap
 
             if (bitmap == null) {
 
@@ -93,51 +140,92 @@ class MainActivity : AppCompatActivity() {
 
             } else {
 
-                analyzeSelectedRoi(bitmap)
+                analyzeSelectedRoi(
+                    bitmap
+                )
             }
         }
 
+
+        /*
+         * ROI 축소
+         */
         binding.btnRoiSmaller.setOnClickListener {
-            resizeRoi(0.85f)
+
+            resizeRoi(
+                0.85f
+            )
         }
 
+
+        /*
+         * ROI 확대
+         */
         binding.btnRoiLarger.setOnClickListener {
-            resizeRoi(1.15f)
+
+            resizeRoi(
+                1.15f
+            )
         }
 
+
+        /*
+         * ROI 중앙 복귀
+         */
         binding.btnRoiReset.setOnClickListener {
+
             resetRoiPosition()
         }
 
+
+        /*
+         * 카메라 복귀
+         */
         binding.btnCameraMode.setOnClickListener {
+
             showCameraMode()
         }
+
 
         setupRoiDrag()
 
         checkCameraPermission()
     }
 
+
+    /*
+     * 카메라 권한 확인
+     */
     private fun checkCameraPermission() {
 
         if (
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
+            ) ==
+            PackageManager.PERMISSION_GRANTED
         ) {
+
             startCamera()
+
         } else {
+
             requestCameraPermission.launch(
                 Manifest.permission.CAMERA
             )
         }
     }
 
+
+    /*
+     * 카메라 시작
+     */
     private fun startCamera() {
 
         val cameraProviderFuture =
-            ProcessCameraProvider.getInstance(this)
+            ProcessCameraProvider.getInstance(
+                this
+            )
 
         cameraProviderFuture.addListener({
 
@@ -146,24 +234,31 @@ class MainActivity : AppCompatActivity() {
                 val cameraProvider =
                     cameraProviderFuture.get()
 
+
                 val preview =
                     Preview.Builder()
                         .build()
                         .also {
 
                             it.setSurfaceProvider(
-                                binding.previewView.surfaceProvider
+                                binding
+                                    .previewView
+                                    .surfaceProvider
                             )
                         }
+
 
                 imageCapture =
                     ImageCapture.Builder()
                         .setCaptureMode(
-                            ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
+                            ImageCapture
+                                .CAPTURE_MODE_MINIMIZE_LATENCY
                         )
                         .build()
 
+
                 cameraProvider.unbindAll()
+
 
                 cameraProvider.bindToLifecycle(
                     this,
@@ -172,8 +267,10 @@ class MainActivity : AppCompatActivity() {
                     imageCapture
                 )
 
+
                 binding.tvStatus.text =
                     "카메라 준비 완료"
+
 
             } catch (e: Exception) {
 
@@ -187,12 +284,21 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             }
 
-        }, ContextCompat.getMainExecutor(this))
+        },
+            ContextCompat.getMainExecutor(
+                this
+            )
+        )
     }
 
+
+    /*
+     * 사진 촬영
+     */
     private fun takePhoto() {
 
-        val capture = imageCapture
+        val capture =
+            imageCapture
 
         if (capture == null) {
 
@@ -205,29 +311,39 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+
         binding.tvStatus.text =
             "사진 촬영 중..."
+
 
         val fileName =
             "Pouch_" +
                     SimpleDateFormat(
                         "yyyyMMdd_HHmmss",
                         Locale.getDefault()
-                    ).format(System.currentTimeMillis()) +
+                    ).format(
+                        System.currentTimeMillis()
+                    ) +
                     ".jpg"
+
 
         val contentValues =
             ContentValues().apply {
 
                 put(
-                    MediaStore.MediaColumns.DISPLAY_NAME,
+                    MediaStore
+                        .MediaColumns
+                        .DISPLAY_NAME,
                     fileName
                 )
 
                 put(
-                    MediaStore.MediaColumns.MIME_TYPE,
+                    MediaStore
+                        .MediaColumns
+                        .MIME_TYPE,
                     "image/jpeg"
                 )
+
 
                 if (
                     Build.VERSION.SDK_INT >=
@@ -235,52 +351,78 @@ class MainActivity : AppCompatActivity() {
                 ) {
 
                     put(
-                        MediaStore.Images.Media.RELATIVE_PATH,
+                        MediaStore
+                            .Images
+                            .Media
+                            .RELATIVE_PATH,
                         "Pictures/PouchVision"
                     )
                 }
             }
 
+
         val outputOptions =
-            ImageCapture.OutputFileOptions.Builder(
-                contentResolver,
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
-            ).build()
+            ImageCapture
+                .OutputFileOptions
+                .Builder(
+                    contentResolver,
+                    MediaStore
+                        .Images
+                        .Media
+                        .EXTERNAL_CONTENT_URI,
+                    contentValues
+                )
+                .build()
+
 
         capture.takePicture(
+
             outputOptions,
-            ContextCompat.getMainExecutor(this),
+
+            ContextCompat.getMainExecutor(
+                this
+            ),
 
             object :
-                ImageCapture.OnImageSavedCallback {
+                ImageCapture
+                    .OnImageSavedCallback {
+
 
                 override fun onImageSaved(
                     outputFileResults:
-                    ImageCapture.OutputFileResults
+                    ImageCapture
+                        .OutputFileResults
                 ) {
 
                     val uri =
                         outputFileResults.savedUri
 
+
                     if (uri != null) {
 
                         val bitmap =
-                            decodeBitmapFromUri(uri)
+                            decodeBitmapFromUri(
+                                uri
+                            )
 
                         if (bitmap != null) {
 
-                            lastBitmap = bitmap
+                            lastBitmap =
+                                bitmap
 
-                            showSelectedImage(bitmap)
+                            showSelectedImage(
+                                bitmap
+                            )
 
                             resetRoiPosition()
                         }
                     }
 
+
                     binding.tvStatus.text =
                         "촬영 완료 - ROI를 맞춘 후 검사하세요."
                 }
+
 
                 override fun onError(
                     exception:
@@ -289,11 +431,21 @@ class MainActivity : AppCompatActivity() {
 
                     binding.tvStatus.text =
                         "촬영 실패"
+
+                    Toast.makeText(
+                        this@MainActivity,
+                        "촬영 실패: ${exception.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         )
     }
 
+
+    /*
+     * 갤러리 이미지 읽기
+     */
     private fun loadGalleryImage(
         uri: Uri
     ) {
@@ -301,10 +453,14 @@ class MainActivity : AppCompatActivity() {
         binding.tvStatus.text =
             "갤러리 사진 불러오는 중..."
 
+
         try {
 
             val bitmap =
-                decodeBitmapFromUri(uri)
+                decodeBitmapFromUri(
+                    uri
+                )
+
 
             if (bitmap == null) {
 
@@ -314,22 +470,44 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            lastBitmap = bitmap
 
-            showSelectedImage(bitmap)
+            /*
+             * 새로운 사진을 선택하면
+             * 빨간 표시 없는 원본으로 초기화
+             */
+            lastBitmap =
+                bitmap
+
+
+            showSelectedImage(
+                bitmap
+            )
+
 
             resetRoiPosition()
 
+
             binding.tvStatus.text =
                 "사진 선택 완료 - ROI를 Bottom Corner에 맞춰주세요."
+
 
         } catch (e: Exception) {
 
             binding.tvStatus.text =
                 "사진 불러오기 오류"
+
+            Toast.makeText(
+                this,
+                "사진 오류: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
+
+    /*
+     * 고해상도 사진 메모리 보호
+     */
     private fun decodeBitmapFromUri(
         uri: Uri
     ): Bitmap? {
@@ -337,7 +515,9 @@ class MainActivity : AppCompatActivity() {
         val options =
             BitmapFactory.Options()
 
-        options.inJustDecodeBounds = true
+        options.inJustDecodeBounds =
+            true
+
 
         contentResolver
             .openInputStream(uri)
@@ -350,13 +530,17 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
+
         val maxSize =
             max(
                 options.outWidth,
                 options.outHeight
             )
 
-        var sampleSize = 1
+
+        var sampleSize =
+            1
+
 
         while (
             maxSize / sampleSize >
@@ -366,11 +550,13 @@ class MainActivity : AppCompatActivity() {
             sampleSize *= 2
         }
 
+
         val decodeOptions =
             BitmapFactory.Options()
 
         decodeOptions.inSampleSize =
             sampleSize
+
 
         return contentResolver
             .openInputStream(uri)
@@ -384,6 +570,10 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
+
+    /*
+     * 사진 화면 표시
+     */
     private fun showSelectedImage(
         bitmap: Bitmap
     ) {
@@ -394,9 +584,15 @@ class MainActivity : AppCompatActivity() {
         binding.imagePreview.visibility =
             View.VISIBLE
 
-        binding.imagePreview.setImageBitmap(bitmap)
+        binding.imagePreview.setImageBitmap(
+            bitmap
+        )
     }
 
+
+    /*
+     * 카메라 모드
+     */
     private fun showCameraMode() {
 
         binding.imagePreview.visibility =
@@ -409,14 +605,21 @@ class MainActivity : AppCompatActivity() {
             "카메라 모드"
     }
 
+
     /*
      * ROI 손가락 이동
      */
     private fun setupRoiDrag() {
 
-        binding.roiGuide.setOnTouchListener { view, event ->
+        binding.roiGuide.setOnTouchListener {
 
-            when (event.action) {
+                view,
+                event ->
+
+
+            when (
+                event.action
+            ) {
 
                 MotionEvent.ACTION_DOWN -> {
 
@@ -429,6 +632,7 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
 
+
                 MotionEvent.ACTION_MOVE -> {
 
                     val dx =
@@ -439,14 +643,19 @@ class MainActivity : AppCompatActivity() {
                         event.rawY -
                                 roiLastTouchY
 
+
                     var newX =
-                        view.x + dx
+                        view.x +
+                                dx
 
                     var newY =
-                        view.y + dy
+                        view.y +
+                                dy
+
 
                     val parent =
                         binding.imageArea
+
 
                     val maxX =
                         parent.width -
@@ -455,6 +664,7 @@ class MainActivity : AppCompatActivity() {
                     val maxY =
                         parent.height -
                                 view.height
+
 
                     newX =
                         newX.coerceIn(
@@ -468,11 +678,13 @@ class MainActivity : AppCompatActivity() {
                             maxY.toFloat()
                         )
 
+
                     view.x =
                         newX
 
                     view.y =
                         newY
+
 
                     roiLastTouchX =
                         event.rawX
@@ -480,13 +692,17 @@ class MainActivity : AppCompatActivity() {
                     roiLastTouchY =
                         event.rawY
 
+
                     true
                 }
 
-                else -> true
+
+                else ->
+                    true
             }
         }
     }
+
 
     /*
      * ROI 크기 변경
@@ -501,26 +717,58 @@ class MainActivity : AppCompatActivity() {
         val parent =
             binding.imageArea
 
+
+        if (
+            parent.width <= 0 ||
+            parent.height <= 0
+        ) {
+
+            return
+        }
+
+
         var newWidth =
-            (view.width * scale).toInt()
+            (
+                view.width *
+                        scale
+                ).toInt()
 
         var newHeight =
-            (view.height * scale).toInt()
+            (
+                view.height *
+                        scale
+                ).toInt()
+
 
         newWidth =
             newWidth.coerceIn(
                 100,
-                (parent.width * 0.9).toInt()
+                max(
+                    100,
+                    (
+                        parent.width *
+                                0.9f
+                        ).toInt()
+                )
             )
+
 
         newHeight =
             newHeight.coerceIn(
                 80,
-                (parent.height * 0.9).toInt()
+                max(
+                    80,
+                    (
+                        parent.height *
+                                0.9f
+                        ).toInt()
+                )
             )
+
 
         val params =
             view.layoutParams
+
 
         params.width =
             newWidth
@@ -528,14 +776,17 @@ class MainActivity : AppCompatActivity() {
         params.height =
             newHeight
 
+
         view.layoutParams =
             params
+
 
         resetRoiPosition()
     }
 
+
     /*
-     * ROI 중앙 이동
+     * ROI 중앙
      */
     private fun resetRoiPosition() {
 
@@ -547,11 +798,13 @@ class MainActivity : AppCompatActivity() {
             val parent =
                 binding.imageArea
 
+
             roi.x =
                 (
                     parent.width -
                             roi.width
                     ) / 2f
+
 
             roi.y =
                 (
@@ -561,9 +814,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
     /*
-     * 현재 화면의 ROI 위치를
-     * 실제 Bitmap 좌표로 변환
+     * ROI 좌표 계산
      */
     private fun analyzeSelectedRoi(
         source: Bitmap
@@ -583,24 +836,41 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+
+        /*
+         * View 좌표는 UI Thread에서 먼저 읽습니다.
+         */
+        val imageViewWidth =
+            binding.imagePreview.width
+                .toFloat()
+
+        val imageViewHeight =
+            binding.imagePreview.height
+                .toFloat()
+
+
+        val roiLeft =
+            binding.roiGuide.x
+
+        val roiTop =
+            binding.roiGuide.y
+
+        val roiRight =
+            roiLeft +
+                    binding.roiGuide.width
+
+        val roiBottom =
+            roiTop +
+                    binding.roiGuide.height
+
+
         binding.tvStatus.text =
             "선택 ROI 분석 중..."
+
 
         Thread {
 
             try {
-
-                val imageView =
-                    binding.imagePreview
-
-                val roiView =
-                    binding.roiGuide
-
-                val imageViewWidth =
-                    imageView.width.toFloat()
-
-                val imageViewHeight =
-                    imageView.height.toFloat()
 
                 val bitmapWidth =
                     source.width.toFloat()
@@ -608,9 +878,9 @@ class MainActivity : AppCompatActivity() {
                 val bitmapHeight =
                     source.height.toFloat()
 
+
                 /*
-                 * ImageView가 fitCenter이므로
-                 * 실제 이미지 표시 크기 계산
+                 * ImageView scaleType = fitCenter
                  */
                 val scale =
                     minOf(
@@ -621,6 +891,7 @@ class MainActivity : AppCompatActivity() {
                                 bitmapHeight
                     )
 
+
                 val displayedWidth =
                     bitmapWidth *
                             scale
@@ -628,6 +899,7 @@ class MainActivity : AppCompatActivity() {
                 val displayedHeight =
                     bitmapHeight *
                             scale
+
 
                 val offsetX =
                     (
@@ -641,55 +913,50 @@ class MainActivity : AppCompatActivity() {
                                 displayedHeight
                         ) / 2f
 
-                /*
-                 * roiGuide는 imageArea 기준 위치
-                 * imagePreview도 imageArea 전체 크기이므로
-                 * 좌표를 바로 사용할 수 있습니다.
-                 */
-                val roiLeft =
-                    roiView.x
-
-                val roiTop =
-                    roiView.y
-
-                val roiRight =
-                    roiLeft +
-                            roiView.width
-
-                val roiBottom =
-                    roiTop +
-                            roiView.height
 
                 /*
-                 * Bitmap 좌표 변환
+                 * 화면 ROI →
+                 * 실제 이미지 좌표 변환
                  */
                 var bitmapLeft =
                     (
-                        (roiLeft -
-                                offsetX) /
+                        (
+                            roiLeft -
+                                    offsetX
+                            ) /
                                 scale
                         ).toInt()
+
 
                 var bitmapTop =
                     (
-                        (roiTop -
-                                offsetY) /
+                        (
+                            roiTop -
+                                    offsetY
+                            ) /
                                 scale
                         ).toInt()
+
 
                 var bitmapRight =
                     (
-                        (roiRight -
-                                offsetX) /
+                        (
+                            roiRight -
+                                    offsetX
+                            ) /
                                 scale
                         ).toInt()
 
+
                 var bitmapBottom =
                     (
-                        (roiBottom -
-                                offsetY) /
+                        (
+                            roiBottom -
+                                    offsetY
+                            ) /
                                 scale
                         ).toInt()
+
 
                 bitmapLeft =
                     bitmapLeft.coerceIn(
@@ -697,11 +964,13 @@ class MainActivity : AppCompatActivity() {
                         source.width - 1
                     )
 
+
                 bitmapTop =
                     bitmapTop.coerceIn(
                         0,
                         source.height - 1
                     )
+
 
                 bitmapRight =
                     bitmapRight.coerceIn(
@@ -709,11 +978,13 @@ class MainActivity : AppCompatActivity() {
                         source.width
                     )
 
+
                 bitmapBottom =
                     bitmapBottom.coerceIn(
                         bitmapTop + 1,
                         source.height
                     )
+
 
                 val roiWidth =
                     bitmapRight -
@@ -722,6 +993,7 @@ class MainActivity : AppCompatActivity() {
                 val roiHeight =
                     bitmapBottom -
                             bitmapTop
+
 
                 val roiBitmap =
                     Bitmap.createBitmap(
@@ -732,9 +1004,26 @@ class MainActivity : AppCompatActivity() {
                         roiHeight
                     )
 
+
+                /*
+                 * ROI 분석 +
+                 * 빨간 위치 표시
+                 */
                 analyzeBitmapRoi(
-                    roiBitmap
+
+                    source =
+                    source,
+
+                    roi =
+                    roiBitmap,
+
+                    roiStartX =
+                    bitmapLeft,
+
+                    roiStartY =
+                    bitmapTop
                 )
+
 
             } catch (e: Exception) {
 
@@ -748,20 +1037,40 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+
     /*
-     * 실제 ROI 이미지 분석
+     * ROI 실제 분석
+     *
+     * 강한 밝기 변화 위치는
+     * 빨간색으로 표시
      */
     private fun analyzeBitmapRoi(
-        roi: Bitmap
+
+        source: Bitmap,
+
+        roi: Bitmap,
+
+        roiStartX: Int,
+
+        roiStartY: Int
+
     ) {
+
+        val analysisWidth =
+            320
+
+        val analysisHeight =
+            240
+
 
         val small =
             Bitmap.createScaledBitmap(
                 roi,
-                320,
-                240,
+                analysisWidth,
+                analysisHeight,
                 true
             )
+
 
         var edgeCount =
             0L
@@ -772,6 +1081,68 @@ class MainActivity : AppCompatActivity() {
         var pixelCount =
             0L
 
+
+        /*
+         * 원본 사진 복사
+         *
+         * 여기에 빨간 표시를 그립니다.
+         */
+        val markedBitmap =
+            source.copy(
+                Bitmap.Config.ARGB_8888,
+                true
+            )
+
+
+        val canvas =
+            Canvas(
+                markedBitmap
+            )
+
+
+        val redPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.RED
+
+                style =
+                    Paint.Style.FILL
+
+                alpha =
+                    210
+            }
+
+
+        /*
+         * 작은 분석 이미지 좌표를
+         * 실제 ROI 좌표로 환산하기 위한 비율
+         */
+        val xScale =
+            roi.width.toFloat() /
+                    analysisWidth.toFloat()
+
+        val yScale =
+            roi.height.toFloat() /
+                    analysisHeight.toFloat()
+
+
+        /*
+         * 표시 점 크기
+         */
+        val markRadius =
+            max(
+                2f,
+                roi.width.toFloat() /
+                        170f
+            )
+
+
+        /*
+         * Edge 분석
+         */
         for (
             y in 1 until
             small.height - 1
@@ -790,6 +1161,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     )
 
+
                 val right =
                     gray(
                         small.getPixel(
@@ -798,6 +1170,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     )
 
+
                 val bottom =
                     gray(
                         small.getPixel(
@@ -805,6 +1178,7 @@ class MainActivity : AppCompatActivity() {
                             y + 1
                         )
                     )
+
 
                 val gradient =
                     abs(
@@ -816,19 +1190,62 @@ class MainActivity : AppCompatActivity() {
                                         bottom
                             )
 
+
                 totalStrength +=
                     gradient
 
                 pixelCount++
 
+
+                /*
+                 * Wrinkle Index용 Edge
+                 */
                 if (
                     gradient > 45
                 ) {
 
                     edgeCount++
                 }
+
+
+                /*
+                 * 빨간 표시용 Threshold
+                 *
+                 * 점이 너무 많아지지 않도록
+                 * 분석 점보다 높은 기준 사용
+                 */
+                if (
+                    gradient > 70 &&
+                    x % 4 == 0 &&
+                    y % 4 == 0
+                ) {
+
+                    val originalX =
+                        roiStartX +
+                                (
+                                    x *
+                                            xScale
+                                    ).toInt()
+
+
+                    val originalY =
+                        roiStartY +
+                                (
+                                    y *
+                                            yScale
+                                    ).toInt()
+
+
+                    canvas.drawCircle(
+                        originalX.toFloat(),
+                        originalY.toFloat(),
+                        markRadius,
+                        redPaint
+                    )
+                }
             }
         }
+
 
         val edgeDensity =
             if (
@@ -844,6 +1261,7 @@ class MainActivity : AppCompatActivity() {
                 0.0
             }
 
+
         val edgeStrength =
             if (
                 pixelCount > 0
@@ -857,6 +1275,10 @@ class MainActivity : AppCompatActivity() {
                 0.0
             }
 
+
+        /*
+         * 현재 임시 Wrinkle Index
+         */
         val wrinkleIndex =
             (
                 edgeDensity *
@@ -868,6 +1290,10 @@ class MainActivity : AppCompatActivity() {
                 100.0
             )
 
+
+        /*
+         * 아직 임시 판정
+         */
         val level =
             when {
 
@@ -884,7 +1310,16 @@ class MainActivity : AppCompatActivity() {
                     "불량 후보"
             }
 
+
         runOnUiThread {
+
+            /*
+             * 빨간 표시 사진 출력
+             */
+            binding.imagePreview.setImageBitmap(
+                markedBitmap
+            )
+
 
             binding.tvStatus.text =
                 String.format(
@@ -899,6 +1334,8 @@ Edge Strength : %.1f
 
 판정 : %s
 
+빨간 표시 : 주름 의심 위치
+
 ※ 현재는 기준 학습 전 임시 판정
                     """.trimIndent(),
 
@@ -910,18 +1347,29 @@ Edge Strength : %.1f
         }
     }
 
+
+    /*
+     * RGB → Gray
+     */
     private fun gray(
         color: Int
     ): Int {
 
         val r =
-            Color.red(color)
+            Color.red(
+                color
+            )
 
         val g =
-            Color.green(color)
+            Color.green(
+                color
+            )
 
         val b =
-            Color.blue(color)
+            Color.blue(
+                color
+            )
+
 
         return (
             0.299 * r +

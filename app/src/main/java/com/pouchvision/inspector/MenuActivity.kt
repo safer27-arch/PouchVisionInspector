@@ -18,6 +18,7 @@ class MenuActivity : AppCompatActivity() {
 
         setContentView(binding.root)
 
+
         /*
          * =========================================================
          * 종합 검사
@@ -49,7 +50,6 @@ class MenuActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-
         binding.btnBottomCornerGuide.setOnClickListener {
 
             openGuide(
@@ -73,7 +73,6 @@ class MenuActivity : AppCompatActivity() {
 
             startActivity(intent)
         }
-
 
         binding.btnSealGuide.setOnClickListener {
 
@@ -99,7 +98,6 @@ class MenuActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-
         binding.btnFormingGuide.setOnClickListener {
 
             openGuide(
@@ -123,7 +121,6 @@ class MenuActivity : AppCompatActivity() {
 
             startActivity(intent)
         }
-
 
         binding.btnTabGuide.setOnClickListener {
 
@@ -155,11 +152,13 @@ class MenuActivity : AppCompatActivity() {
          */
         binding.btnHistory.setOnClickListener {
 
-            Toast.makeText(
-                this,
-                "검사 결과 및 이력관리 기능은 준비 중입니다.",
-                Toast.LENGTH_SHORT
-            ).show()
+            val intent =
+                Intent(
+                    this,
+                    HistoryActivity::class.java
+                )
+
+            startActivity(intent)
         }
     }
 

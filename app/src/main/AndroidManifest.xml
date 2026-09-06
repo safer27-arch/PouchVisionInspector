@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 카메라 사용 권한 -->
     <uses-permission android:name="android.permission.CAMERA" />
 
     <uses-feature
-        android:name="android.hardware.camera"
+        android:name="android.hardware.camera.any"
         android:required="true" />
 
     <application
@@ -14,17 +13,35 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PouchVisionInspector">
 
+        <!--
+            앱 시작 화면
+            MenuActivity가 가장 먼저 실행됩니다.
+        -->
         <activity
-            android:name=".MainActivity"
+            android:name=".MenuActivity"
             android:screenOrientation="portrait"
             android:exported="true">
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+
+                <action
+                    android:name="android.intent.action.MAIN" />
+
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
+
             </intent-filter>
 
         </activity>
+
+
+        <!--
+            기존 Bottom Corner 검사 화면
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
 
     </application>
 

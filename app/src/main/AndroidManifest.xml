@@ -3,7 +3,6 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 카메라 사용 권한 -->
     <uses-permission
         android:name="android.permission.CAMERA" />
 
@@ -11,17 +10,11 @@
         android:name="android.hardware.camera.any"
         android:required="true" />
 
-
     <application
         android:allowBackup="true"
         android:label="Pouch Vision Inspector"
         android:supportsRtl="true"
         android:theme="@style/Theme.PouchVisionInspector">
-
-
-        <!-- ================================= -->
-        <!-- 앱 시작 메인 메뉴 -->
-        <!-- ================================= -->
 
         <activity
             android:name=".MenuActivity"
@@ -29,37 +22,29 @@
             android:exported="true">
 
             <intent-filter>
-
                 <action
                     android:name="android.intent.action.MAIN" />
 
                 <category
                     android:name="android.intent.category.LAUNCHER" />
-
             </intent-filter>
 
         </activity>
-
-
-        <!-- ================================= -->
-        <!-- Bottom Corner 검사 -->
-        <!-- ================================= -->
 
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
             android:exported="false" />
 
-
-        <!-- ================================= -->
-        <!-- Seal 검사 -->
-        <!-- ================================= -->
-
         <activity
             android:name=".SealActivity"
             android:screenOrientation="portrait"
             android:exported="false" />
 
+        <activity
+            android:name=".FormingActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
 
     </application>
 

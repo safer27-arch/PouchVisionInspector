@@ -31,15 +31,14 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Forming Shape Inspection"
+                android:text="Disassembly Inspection"
                 android:textColor="#D9E2EC"
                 android:textSize="12sp"/>
 
         </LinearLayout>
 
-        <!-- 카메라 / 이미지 -->
         <FrameLayout
-            android:id="@+id/formingImageArea"
+            android:id="@+id/disassemblyImageArea"
             android:layout_width="match_parent"
             android:layout_height="430dp"
             android:layout_marginStart="10dp"
@@ -48,31 +47,31 @@
             android:background="#000000">
 
             <androidx.camera.view.PreviewView
-                android:id="@+id/formingPreviewView"
+                android:id="@+id/disassemblyPreviewView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 app:implementationMode="compatible"
                 app:scaleType="fitCenter"/>
 
             <ImageView
-                android:id="@+id/formingImagePreview"
+                android:id="@+id/disassemblyImagePreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="#000000"
-                android:contentDescription="FORMING 검사 이미지"
+                android:contentDescription="분해 검사 이미지"
                 android:scaleType="matrix"
                 android:visibility="gone"/>
 
             <View
-                android:id="@+id/formingRoiGuide"
+                android:id="@+id/disassemblyRoiGuide"
                 android:layout_width="260dp"
-                android:layout_height="180dp"
+                android:layout_height="190dp"
                 android:layout_gravity="center"
                 android:background="@drawable/roi_border"
                 android:elevation="8dp"/>
 
             <TextView
-                android:id="@+id/tvFormingGuide"
+                android:id="@+id/tvDisassemblyGuide"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|center_horizontal"
@@ -82,13 +81,12 @@
                 android:paddingTop="6dp"
                 android:paddingEnd="10dp"
                 android:paddingBottom="6dp"
-                android:text="Forming Cup 영역에 ROI를 맞춰주세요"
+                android:text="확인할 분해 영역에 ROI를 맞춰주세요"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"/>
 
         </FrameLayout>
 
-        <!-- ROI 조절 : 이미지 바로 아래 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -98,7 +96,7 @@
             android:paddingEnd="10dp">
 
             <Button
-                android:id="@+id/btnFormingRoiWidthSmaller"
+                android:id="@+id/btnDisassemblyRoiWidthSmaller"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -107,7 +105,7 @@
                 android:textSize="12sp"/>
 
             <Button
-                android:id="@+id/btnFormingRoiWidthLarger"
+                android:id="@+id/btnDisassemblyRoiWidthLarger"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -117,7 +115,7 @@
                 android:textSize="12sp"/>
 
             <Button
-                android:id="@+id/btnFormingRoiHeightSmaller"
+                android:id="@+id/btnDisassemblyRoiHeightSmaller"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -127,7 +125,7 @@
                 android:textSize="12sp"/>
 
             <Button
-                android:id="@+id/btnFormingRoiHeightLarger"
+                android:id="@+id/btnDisassemblyRoiHeightLarger"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -146,7 +144,7 @@
             android:paddingEnd="10dp">
 
             <Button
-                android:id="@+id/btnFormingRoiReset"
+                android:id="@+id/btnDisassemblyRoiReset"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -155,7 +153,7 @@
                 android:textSize="12sp"/>
 
             <Button
-                android:id="@+id/btnFormingImageReset"
+                android:id="@+id/btnDisassemblyImageReset"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -175,7 +173,6 @@
             android:textColor="#627D98"
             android:textSize="11sp"/>
 
-        <!-- 촬영 / 갤러리 / 검사 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -185,7 +182,7 @@
             android:paddingBottom="6dp">
 
             <Button
-                android:id="@+id/btnFormingCapture"
+                android:id="@+id/btnDisassemblyCapture"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
@@ -194,7 +191,7 @@
                 android:textSize="12sp"/>
 
             <Button
-                android:id="@+id/btnFormingGallery"
+                android:id="@+id/btnDisassemblyGallery"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
@@ -204,18 +201,18 @@
                 android:textSize="12sp"/>
 
             <Button
-                android:id="@+id/btnFormingInspect"
+                android:id="@+id/btnDisassemblyInspect"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginStart="3dp"
-                android:text="FORMING 검사"
+                android:text="분해 검사"
                 android:textSize="12sp"/>
 
         </LinearLayout>
 
         <Button
-            android:id="@+id/btnFormingCameraMode"
+            android:id="@+id/btnDisassemblyCameraMode"
             android:layout_width="match_parent"
             android:layout_height="44dp"
             android:layout_marginStart="10dp"
@@ -224,7 +221,6 @@
             android:text="카메라 화면으로 돌아가기"
             android:textSize="12sp"/>
 
-        <!-- 민감도 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -238,13 +234,13 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="FORMING 민감도 설정"
+                android:text="분해 검사 민감도"
                 android:textColor="#102A43"
                 android:textSize="16sp"
                 android:textStyle="bold"/>
 
             <TextView
-                android:id="@+id/tvFormingSensitivityValue"
+                android:id="@+id/tvDisassemblySensitivityValue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
@@ -268,7 +264,7 @@
                     android:textSize="12sp"/>
 
                 <SeekBar
-                    android:id="@+id/seekFormingSensitivity"
+                    android:id="@+id/seekDisassemblySensitivity"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -288,12 +284,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="민감도를 높이면 작은 주름과 형상 변화도 더 많이 검출합니다."
+                android:text="민감도를 높이면 작은 표면 변화와 국부 Edge도 더 많이 검출합니다."
                 android:textColor="#627D98"
                 android:textSize="11sp"/>
 
             <Button
-                android:id="@+id/btnFormingSensitivityReset"
+                android:id="@+id/btnDisassemblySensitivityReset"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="6dp"
@@ -302,9 +298,8 @@
 
         </LinearLayout>
 
-        <!-- 상태 -->
         <TextView
-            android:id="@+id/tvFormingStatus"
+            android:id="@+id/tvDisassemblyStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="70dp"
@@ -318,23 +313,50 @@
             android:textSize="14sp"
             android:textStyle="bold"/>
 
-        <!-- 검사 결과 -->
-        <TextView
-            android:id="@+id/tvFormingMetrics"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="210dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="10dp"
+            android:background="#FFFFFF"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="분해 검사 확인 항목"
+                android:textColor="#102A43"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="• 전극 / 분리막 표면의 국부 변화&#10;• 주름 및 찢김 의심 영역&#10;• 비정상 Edge / 손상 흔적&#10;• 표면 균일도 변화"
+                android:textColor="#486581"
+                android:textSize="13sp"/>
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvDisassemblyMetrics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="220dp"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="10dp"
             android:background="#FFFFFF"
             android:padding="14dp"
-            android:text="Wrinkle       : -&#10;Deformation   : -&#10;Symmetry      : -&#10;Shape Error   : -&#10;Forming Score : -&#10;&#10;판정 : -"
+            android:text="Surface Uniformity : -&#10;Edge Density       : -&#10;Strong Edge        : -&#10;Local Change       : -&#10;Quality Score      : -&#10;&#10;판정 : -"
             android:textColor="#102A43"
             android:textSize="14sp"/>
 
         <Button
-            android:id="@+id/btnFormingSaveResult"
+            android:id="@+id/btnDisassemblySaveResult"
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginStart="10dp"
@@ -344,7 +366,7 @@
             android:textSize="14sp"/>
 
         <Button
-            android:id="@+id/btnFormingBack"
+            android:id="@+id/btnDisassemblyBack"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_marginStart="10dp"

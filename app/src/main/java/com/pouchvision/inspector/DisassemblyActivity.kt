@@ -4,10 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
@@ -36,28 +34,16 @@ class DisassemblyActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDisassemblyBinding
 
-    /*
-     * =========================================================
-     * CameraX
-     * =========================================================
-     */
-
     private var imageCapture: ImageCapture? = null
 
     /*
-     * =========================================================
-     * 현재 이미지
-     * =========================================================
+     * 항상 깨끗한 원본 사진을 보관합니다.
      */
-
     private var lastBitmap: Bitmap? = null
 
     /*
-     * =========================================================
      * 검사 결과
-     * =========================================================
      */
-
     private var hasInspectionResult = false
 
     private var lastQualityScore = 0.0
@@ -65,15 +51,13 @@ class DisassemblyActivity : AppCompatActivity() {
     private var lastEdgeDensity = 0.0
     private var lastStrongEdgeDensity = 0.0
     private var lastLocalChange = 0.0
+
     private var lastJudgment = ""
     private var lastDetails = ""
 
     /*
-     * =========================================================
      * 민감도
-     * =========================================================
      */
-
     private val preferenceName =
         "pouch_vision_settings"
 
@@ -87,11 +71,8 @@ class DisassemblyActivity : AppCompatActivity() {
         defaultSensitivity
 
     /*
-     * =========================================================
      * 이미지 확대 / 이동
-     * =========================================================
      */
-
     private val imageMatrixValue =
         Matrix()
 
@@ -105,14 +86,11 @@ class DisassemblyActivity : AppCompatActivity() {
         0f
 
     private lateinit var scaleGestureDetector:
-            ScaleGestureDetector
+        ScaleGestureDetector
 
     /*
-     * =========================================================
      * ROI 이동
-     * =========================================================
      */
-
     private var roiLastTouchX =
         0f
 
@@ -120,28 +98,21 @@ class DisassemblyActivity : AppCompatActivity() {
         0f
 
     /*
-     * =========================================================
      * 갤러리
-     * =========================================================
      */
-
     private val galleryLauncher =
         registerForActivityResult(
             ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
 
             if (uri != null) {
-
                 loadGalleryImage(uri)
             }
         }
 
     /*
-     * =========================================================
      * 카메라 권한
-     * =========================================================
      */
-
     private val cameraPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -157,12 +128,6 @@ class DisassemblyActivity : AppCompatActivity() {
                     "카메라 권한이 필요합니다."
             }
         }
-
-    /*
-     * =========================================================
-     * onCreate
-     * =========================================================
-     */
 
     override fun onCreate(
         savedInstanceState: Bundle?
@@ -184,7 +149,6 @@ class DisassemblyActivity : AppCompatActivity() {
         /*
          * 사진 촬영
          */
-
         binding.btnDisassemblyCapture
             .setOnClickListener {
 
@@ -194,7 +158,6 @@ class DisassemblyActivity : AppCompatActivity() {
         /*
          * 갤러리
          */
-
         binding.btnDisassemblyGallery
             .setOnClickListener {
 
@@ -206,7 +169,6 @@ class DisassemblyActivity : AppCompatActivity() {
         /*
          * 검사
          */
-
         binding.btnDisassemblyInspect
             .setOnClickListener {
 
@@ -227,14 +189,15 @@ class DisassemblyActivity : AppCompatActivity() {
 
                 } else {
 
-                    analyzeSelectedRoi(bitmap)
+                    analyzeSelectedRoi(
+                        bitmap
+                    )
                 }
             }
 
         /*
          * 결과 저장
          */
-
         binding.btnDisassemblySaveResult
             .setOnClickListener {
 
@@ -242,41 +205,52 @@ class DisassemblyActivity : AppCompatActivity() {
             }
 
         /*
-         * ROI 가로
+         * ROI 가로 -
          */
-
         binding.btnDisassemblyRoiWidthSmaller
             .setOnClickListener {
 
-                resizeRoiWidth(0.85f)
-            }
-
-        binding.btnDisassemblyRoiWidthLarger
-            .setOnClickListener {
-
-                resizeRoiWidth(1.15f)
+                resizeRoiWidth(
+                    0.85f
+                )
             }
 
         /*
-         * ROI 세로
+         * ROI 가로 +
          */
+        binding.btnDisassemblyRoiWidthLarger
+            .setOnClickListener {
 
+                resizeRoiWidth(
+                    1.15f
+                )
+            }
+
+        /*
+         * ROI 세로 -
+         */
         binding.btnDisassemblyRoiHeightSmaller
             .setOnClickListener {
 
-                resizeRoiHeight(0.85f)
+                resizeRoiHeight(
+                    0.85f
+                )
             }
 
+        /*
+         * ROI 세로 +
+         */
         binding.btnDisassemblyRoiHeightLarger
             .setOnClickListener {
 
-                resizeRoiHeight(1.15f)
+                resizeRoiHeight(
+                    1.15f
+                )
             }
 
         /*
          * ROI 중앙
          */
-
         binding.btnDisassemblyRoiReset
             .setOnClickListener {
 
@@ -284,9 +258,8 @@ class DisassemblyActivity : AppCompatActivity() {
             }
 
         /*
-         * 사진 원래크기
+         * 사진 원래 크기
          */
-
         binding.btnDisassemblyImageReset
             .setOnClickListener {
 
@@ -294,9 +267,8 @@ class DisassemblyActivity : AppCompatActivity() {
             }
 
         /*
-         * 카메라 복귀
+         * 카메라 화면
          */
-
         binding.btnDisassemblyCameraMode
             .setOnClickListener {
 
@@ -304,9 +276,8 @@ class DisassemblyActivity : AppCompatActivity() {
             }
 
         /*
-         * 메뉴 복귀
+         * 뒤로가기
          */
-
         binding.btnDisassemblyBack
             .setOnClickListener {
 
@@ -314,9 +285,8 @@ class DisassemblyActivity : AppCompatActivity() {
             }
 
         /*
-         * 카메라 시작
+         * 카메라 권한
          */
-
         if (
             ContextCompat.checkSelfPermission(
                 this,
@@ -337,7 +307,7 @@ class DisassemblyActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * CameraX 시작
+     * CameraX
      * =========================================================
      */
 
@@ -353,7 +323,9 @@ class DisassemblyActivity : AppCompatActivity() {
             View.GONE
 
         val cameraProviderFuture =
-            ProcessCameraProvider.getInstance(this)
+            ProcessCameraProvider.getInstance(
+                this
+            )
 
         cameraProviderFuture.addListener({
 
@@ -383,7 +355,8 @@ class DisassemblyActivity : AppCompatActivity() {
                         .build()
 
                 val cameraSelector =
-                    CameraSelector.DEFAULT_BACK_CAMERA
+                    CameraSelector
+                        .DEFAULT_BACK_CAMERA
 
                 cameraProvider.unbindAll()
 
@@ -445,7 +418,9 @@ class DisassemblyActivity : AppCompatActivity() {
         val outputOptions =
             ImageCapture
                 .OutputFileOptions
-                .Builder(photoFile)
+                .Builder(
+                    photoFile
+                )
                 .build()
 
         binding.tvDisassemblyStatus.text =
@@ -453,7 +428,9 @@ class DisassemblyActivity : AppCompatActivity() {
 
         capture.takePicture(
             outputOptions,
-            ContextCompat.getMainExecutor(this),
+            ContextCompat.getMainExecutor(
+                this
+            ),
 
             object :
                 ImageCapture.OnImageSavedCallback {
@@ -478,7 +455,9 @@ class DisassemblyActivity : AppCompatActivity() {
                             return
                         }
 
-                        showSelectedImage(bitmap)
+                        showSelectedImage(
+                            bitmap
+                        )
 
                         binding.tvDisassemblyStatus.text =
                             "촬영 완료 - 확인할 분해 영역에 ROI를 맞춰주세요."
@@ -504,7 +483,7 @@ class DisassemblyActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 촬영 파일 -> Bitmap
+     * 사진 읽기
      * =========================================================
      */
 
@@ -554,78 +533,6 @@ class DisassemblyActivity : AppCompatActivity() {
         )
     }
 
-    /*
-     * =========================================================
-     * 카메라 화면으로 복귀
-     * =========================================================
-     */
-
-    private fun showCameraMode() {
-
-        hasInspectionResult =
-            false
-
-        binding.disassemblyImagePreview.visibility =
-            View.GONE
-
-        binding.disassemblyPreviewView.visibility =
-            View.VISIBLE
-
-        binding.tvDisassemblyStatus.text =
-            "카메라 화면 - 확인할 분해 영역을 맞춘 뒤 촬영해주세요."
-
-        resetRoiPosition()
-
-        if (imageCapture == null) {
-
-            startCamera()
-        }
-    }
-
-    /*
-     * =========================================================
-     * 갤러리
-     * =========================================================
-     */
-
-    private fun loadGalleryImage(
-        uri: Uri
-    ) {
-
-        binding.tvDisassemblyStatus.text =
-            "분해 검사 사진 불러오는 중..."
-
-        try {
-
-            val bitmap =
-                decodeBitmapFromUri(uri)
-
-            if (bitmap == null) {
-
-                binding.tvDisassemblyStatus.text =
-                    "사진을 불러올 수 없습니다."
-
-                return
-            }
-
-            showSelectedImage(bitmap)
-
-            binding.tvDisassemblyStatus.text =
-                "사진 선택 완료 - 확인할 분해 영역에 ROI를 맞춰주세요."
-
-        } catch (e: Exception) {
-
-            binding.tvDisassemblyStatus.text =
-                "사진 불러오기 오류: ${e.message}"
-        }
-    }
-
-    /*
-     * =========================================================
-     * URI -> Bitmap
-     * =========================================================
-     */
-
     private fun decodeBitmapFromUri(
         uri: Uri
     ): Bitmap? {
@@ -637,7 +544,9 @@ class DisassemblyActivity : AppCompatActivity() {
             true
 
         contentResolver
-            .openInputStream(uri)
+            .openInputStream(
+                uri
+            )
             ?.use {
 
                 BitmapFactory.decodeStream(
@@ -673,7 +582,9 @@ class DisassemblyActivity : AppCompatActivity() {
             sampleSize
 
         return contentResolver
-            .openInputStream(uri)
+            .openInputStream(
+                uri
+            )
             ?.use {
 
                 BitmapFactory.decodeStream(
@@ -686,7 +597,49 @@ class DisassemblyActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 선택된 사진 표시
+     * 갤러리
+     * =========================================================
+     */
+
+    private fun loadGalleryImage(
+        uri: Uri
+    ) {
+
+        binding.tvDisassemblyStatus.text =
+            "분해 검사 사진 불러오는 중..."
+
+        try {
+
+            val bitmap =
+                decodeBitmapFromUri(
+                    uri
+                )
+
+            if (bitmap == null) {
+
+                binding.tvDisassemblyStatus.text =
+                    "사진을 불러올 수 없습니다."
+
+                return
+            }
+
+            showSelectedImage(
+                bitmap
+            )
+
+            binding.tvDisassemblyStatus.text =
+                "사진 선택 완료 - 확인할 분해 영역에 ROI를 맞춰주세요."
+
+        } catch (e: Exception) {
+
+            binding.tvDisassemblyStatus.text =
+                "사진 불러오기 오류: ${e.message}"
+        }
+    }
+
+    /*
+     * =========================================================
+     * 선택 이미지 표시
      * =========================================================
      */
 
@@ -694,6 +647,9 @@ class DisassemblyActivity : AppCompatActivity() {
         bitmap: Bitmap
     ) {
 
+        /*
+         * 깨끗한 원본만 저장
+         */
         lastBitmap =
             bitmap
 
@@ -706,19 +662,58 @@ class DisassemblyActivity : AppCompatActivity() {
         binding.disassemblyImagePreview.visibility =
             View.VISIBLE
 
-        binding.disassemblyImagePreview
-            .setImageBitmap(bitmap)
+        binding.disassemblyImagePreview.setImageBitmap(
+            bitmap
+        )
 
         resetImageMatrix()
         resetRoiPosition()
         resetResultDisplay()
     }
 
-    /*
-     * =========================================================
-     * 결과 표시 초기화
-     * =========================================================
-     */
+    private fun showCameraMode() {
+
+        hasInspectionResult =
+            false
+
+        binding.disassemblyImagePreview.visibility =
+            View.GONE
+
+        binding.disassemblyPreviewView.visibility =
+            View.VISIBLE
+
+        binding.tvDisassemblyStatus.text =
+            "카메라 화면 - 분해 검사 영역을 맞춘 뒤 촬영해주세요."
+
+        resetRoiPosition()
+
+        if (
+            imageCapture == null
+        ) {
+
+            startCamera()
+        }
+    }
+
+    private fun restoreOriginalImage() {
+
+        val bitmap =
+            lastBitmap
+                ?: return
+
+        if (
+            binding.disassemblyImagePreview.visibility ==
+            View.VISIBLE
+        ) {
+
+            binding.disassemblyImagePreview.setImageBitmap(
+                bitmap
+            )
+
+            binding.disassemblyImagePreview.imageMatrix =
+                imageMatrixValue
+        }
+    }
 
     private fun resetResultDisplay() {
 
@@ -731,59 +726,9 @@ Local Change       : -
 Quality Score      : -
 
 판정 : -
+
+NG 후보 영역 : -
             """.trimIndent()
-    }
-
-    /*
-     * =========================================================
-     * 검사 결과 저장
-     * =========================================================
-     */
-
-    private fun saveCurrentInspectionResult() {
-
-        if (!hasInspectionResult) {
-
-            Toast.makeText(
-                this,
-                "먼저 분해 검사를 실행해주세요.",
-                Toast.LENGTH_LONG
-            ).show()
-
-            return
-        }
-
-        val success =
-            InspectionHistoryStore.save(
-                context = this,
-                inspectionType = "DISASSEMBLY",
-                score = lastQualityScore,
-                judgment = lastJudgment,
-                sensitivity = sensitivity,
-                details = lastDetails
-            )
-
-        if (success) {
-
-            Toast.makeText(
-                this,
-                String.format(
-                    Locale.getDefault(),
-                    "분해 검사 결과 저장 완료\nQuality Score %.1f / 100\n%s",
-                    lastQualityScore,
-                    lastJudgment
-                ),
-                Toast.LENGTH_LONG
-            ).show()
-
-        } else {
-
-            Toast.makeText(
-                this,
-                "검사 결과 저장에 실패했습니다.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
     }
 
     /*
@@ -837,6 +782,8 @@ Quality Score      : -
                             hasInspectionResult =
                                 false
 
+                            restoreOriginalImage()
+
                             prefs.edit()
                                 .putInt(
                                     sensitivityKey,
@@ -884,6 +831,8 @@ Quality Score      : -
                 hasInspectionResult =
                     false
 
+                restoreOriginalImage()
+
                 updateSensitivityText()
 
                 Toast.makeText(
@@ -927,8 +876,8 @@ Quality Score      : -
                         val newZoom =
                             (
                                 zoomFactor *
-                                    detector.scaleFactor
-                                )
+                                detector.scaleFactor
+                            )
                                 .coerceIn(
                                     1f,
                                     8f
@@ -936,7 +885,7 @@ Quality Score      : -
 
                         val actualScale =
                             newZoom /
-                                oldZoom
+                            oldZoom
 
                         zoomFactor =
                             newZoom
@@ -948,13 +897,13 @@ Quality Score      : -
                             detector.focusY
                         )
 
-                        binding
-                            .disassemblyImagePreview
-                            .imageMatrix =
+                        binding.disassemblyImagePreview.imageMatrix =
                             imageMatrixValue
 
                         hasInspectionResult =
                             false
+
+                        restoreOriginalImage()
 
                         return true
                     }
@@ -971,10 +920,13 @@ Quality Score      : -
                         true
                     )
 
-                scaleGestureDetector
-                    .onTouchEvent(event)
+                scaleGestureDetector.onTouchEvent(
+                    event
+                )
 
-                when (event.actionMasked) {
+                when (
+                    event.actionMasked
+                ) {
 
                     MotionEvent.ACTION_DOWN -> {
 
@@ -997,24 +949,24 @@ Quality Score      : -
 
                             val dx =
                                 event.x -
-                                    lastImageTouchX
+                                lastImageTouchX
 
                             val dy =
                                 event.y -
-                                    lastImageTouchY
+                                lastImageTouchY
 
                             imageMatrixValue.postTranslate(
                                 dx,
                                 dy
                             )
 
-                            binding
-                                .disassemblyImagePreview
-                                .imageMatrix =
+                            binding.disassemblyImagePreview.imageMatrix =
                                 imageMatrixValue
 
                             hasInspectionResult =
                                 false
+
+                            restoreOriginalImage()
                         }
 
                         lastImageTouchX =
@@ -1063,17 +1015,19 @@ Quality Score      : -
             return
         }
 
+        binding.disassemblyImagePreview.setImageBitmap(
+            bitmap
+        )
+
         binding.disassemblyImagePreview.post {
 
             val viewWidth =
-                binding
-                    .disassemblyImagePreview
+                binding.disassemblyImagePreview
                     .width
                     .toFloat()
 
             val viewHeight =
-                binding
-                    .disassemblyImagePreview
+                binding.disassemblyImagePreview
                     .height
                     .toFloat()
 
@@ -1086,41 +1040,43 @@ Quality Score      : -
             }
 
             val bitmapWidth =
-                bitmap.width.toFloat()
+                bitmap.width
+                    .toFloat()
 
             val bitmapHeight =
-                bitmap.height.toFloat()
+                bitmap.height
+                    .toFloat()
 
             val baseScale =
                 minOf(
                     viewWidth /
-                        bitmapWidth,
+                    bitmapWidth,
 
                     viewHeight /
-                        bitmapHeight
+                    bitmapHeight
                 )
 
             val displayedWidth =
                 bitmapWidth *
-                    baseScale
+                baseScale
 
             val displayedHeight =
                 bitmapHeight *
-                    baseScale
+                baseScale
 
             val dx =
                 (
                     viewWidth -
-                        displayedWidth
-                    ) /
-                    2f
+                    displayedWidth
+                ) /
+                2f
 
             val dy =
                 (
                     viewHeight -
-                        displayedHeight
-                    ) /
-                    2f
+                    displayedHeight
+                ) /
+                2f
 
             imageMatrixValue.reset()
 
@@ -1137,9 +1093,7 @@ Quality Score      : -
             zoomFactor =
                 1f
 
-            binding
-                .disassemblyImagePreview
-                .imageMatrix =
+            binding.disassemblyImagePreview.imageMatrix =
                 imageMatrixValue
 
             hasInspectionResult =
@@ -1165,7 +1119,9 @@ Quality Score      : -
                         true
                     )
 
-                when (event.action) {
+                when (
+                    event.action
+                ) {
 
                     MotionEvent.ACTION_DOWN -> {
 
@@ -1182,36 +1138,38 @@ Quality Score      : -
 
                         val dx =
                             event.rawX -
-                                roiLastTouchX
+                            roiLastTouchX
 
                         val dy =
                             event.rawY -
-                                roiLastTouchY
+                            roiLastTouchY
 
                         var newX =
                             view.x +
-                                dx
+                            dx
 
                         var newY =
                             view.y +
-                                dy
+                            dy
 
                         val parent =
                             binding.disassemblyImageArea
 
                         val maxX =
                             parent.width -
-                                view.width
+                            view.width
 
                         val maxY =
                             parent.height -
-                                view.height
+                            view.height
 
                         newX =
                             newX.coerceIn(
                                 0f,
                                 maxX
-                                    .coerceAtLeast(0)
+                                    .coerceAtLeast(
+                                        0
+                                    )
                                     .toFloat()
                             )
 
@@ -1219,7 +1177,9 @@ Quality Score      : -
                             newY.coerceIn(
                                 0f,
                                 maxY
-                                    .coerceAtLeast(0)
+                                    .coerceAtLeast(
+                                        0
+                                    )
                                     .toFloat()
                             )
 
@@ -1237,6 +1197,8 @@ Quality Score      : -
 
                         hasInspectionResult =
                             false
+
+                        restoreOriginalImage()
 
                         true
                     }
@@ -1258,12 +1220,6 @@ Quality Score      : -
             }
     }
 
-    /*
-     * =========================================================
-     * ROI 가로
-     * =========================================================
-     */
-
     private fun resizeRoiWidth(
         scale: Float
     ) {
@@ -1274,7 +1230,9 @@ Quality Score      : -
         val parent =
             binding.disassemblyImageArea
 
-        if (parent.width <= 0) {
+        if (
+            parent.width <= 0
+        ) {
 
             return
         }
@@ -1282,9 +1240,8 @@ Quality Score      : -
         var newWidth =
             (
                 roi.width *
-                    scale
-                )
-                .toInt()
+                scale
+            ).toInt()
 
         newWidth =
             newWidth.coerceIn(
@@ -1293,9 +1250,8 @@ Quality Score      : -
                     80,
                     (
                         parent.width *
-                            0.95f
-                        )
-                        .toInt()
+                        0.95f
+                    ).toInt()
                 )
             )
 
@@ -1316,6 +1272,8 @@ Quality Score      : -
         hasInspectionResult =
             false
 
+        restoreOriginalImage()
+
         roi.post {
 
             var newX =
@@ -1328,9 +1286,11 @@ Quality Score      : -
                     0f,
                     (
                         parent.width -
-                            roi.width
+                        roi.width
+                    )
+                        .coerceAtLeast(
+                            0
                         )
-                        .coerceAtLeast(0)
                         .toFloat()
                 )
 
@@ -1338,12 +1298,6 @@ Quality Score      : -
                 newX
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 세로
-     * =========================================================
-     */
 
     private fun resizeRoiHeight(
         scale: Float
@@ -1355,7 +1309,9 @@ Quality Score      : -
         val parent =
             binding.disassemblyImageArea
 
-        if (parent.height <= 0) {
+        if (
+            parent.height <= 0
+        ) {
 
             return
         }
@@ -1363,9 +1319,8 @@ Quality Score      : -
         var newHeight =
             (
                 roi.height *
-                    scale
-                )
-                .toInt()
+                scale
+            ).toInt()
 
         newHeight =
             newHeight.coerceIn(
@@ -1374,9 +1329,8 @@ Quality Score      : -
                     60,
                     (
                         parent.height *
-                            0.95f
-                        )
-                        .toInt()
+                        0.95f
+                    ).toInt()
                 )
             )
 
@@ -1397,6 +1351,8 @@ Quality Score      : -
         hasInspectionResult =
             false
 
+        restoreOriginalImage()
+
         roi.post {
 
             var newY =
@@ -1409,9 +1365,11 @@ Quality Score      : -
                     0f,
                     (
                         parent.height -
-                            roi.height
+                        roi.height
+                    )
+                        .coerceAtLeast(
+                            0
                         )
-                        .coerceAtLeast(0)
                         .toFloat()
                 )
 
@@ -1419,12 +1377,6 @@ Quality Score      : -
                 newY
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 중앙
-     * =========================================================
-     */
 
     private fun resetRoiPosition() {
 
@@ -1439,19 +1391,21 @@ Quality Score      : -
             roi.x =
                 (
                     parent.width -
-                        roi.width
-                    ) /
-                    2f
+                    roi.width
+                ) /
+                2f
 
             roi.y =
                 (
                     parent.height -
-                        roi.height
-                    ) /
-                    2f
+                    roi.height
+                ) /
+                2f
 
             hasInspectionResult =
                 false
+
+            restoreOriginalImage()
         }
     }
 
@@ -1471,6 +1425,8 @@ Quality Score      : -
         hasInspectionResult =
             false
 
+        restoreOriginalImage()
+
         val screenRect =
             RectF(
                 binding.disassemblyRoiGuide.x,
@@ -1483,9 +1439,7 @@ Quality Score      : -
 
         val currentMatrix =
             Matrix(
-                binding
-                    .disassemblyImagePreview
-                    .imageMatrix
+                binding.disassemblyImagePreview.imageMatrix
             )
 
         Thread {
@@ -1507,23 +1461,29 @@ Quality Score      : -
                 }
 
                 val bitmapRect =
-                    RectF(screenRect)
+                    RectF(
+                        screenRect
+                    )
 
                 inverse.mapRect(
                     bitmapRect
                 )
 
                 var left =
-                    bitmapRect.left.toInt()
+                    bitmapRect.left
+                        .toInt()
 
                 var top =
-                    bitmapRect.top.toInt()
+                    bitmapRect.top
+                        .toInt()
 
                 var right =
-                    bitmapRect.right.toInt()
+                    bitmapRect.right
+                        .toInt()
 
                 var bottom =
-                    bitmapRect.bottom.toInt()
+                    bitmapRect.bottom
+                        .toInt()
 
                 left =
                     left.coerceIn(
@@ -1577,10 +1537,10 @@ Quality Score      : -
                     )
 
                 analyzeDisassemblyRoi(
-                    source,
-                    roiBitmap,
-                    left,
-                    top
+                    source = source,
+                    roi = roiBitmap,
+                    roiStartX = left,
+                    roiStartY = top
                 )
 
             } catch (e: Exception) {
@@ -1597,8 +1557,7 @@ Quality Score      : -
 
     /*
      * =========================================================
-     * 분해 검사 분석
-     * 기존 계산 공식 유지
+     * 분해 검사 알고리즘
      * =========================================================
      */
 
@@ -1628,7 +1587,7 @@ Quality Score      : -
                 72 -
                     sensitivity *
                     0.50
-                )
+            )
                 .toInt()
                 .coerceIn(
                     18,
@@ -1640,7 +1599,7 @@ Quality Score      : -
                 115 -
                     sensitivity *
                     0.67
-                )
+            )
                 .toInt()
                 .coerceIn(
                     35,
@@ -1660,58 +1619,19 @@ Quality Score      : -
             0L
 
         var graySum =
-            0L
+            0.0
 
         var graySquareSum =
             0.0
 
-        val markedBitmap =
-            source.copy(
-                Bitmap.Config.ARGB_8888,
-                true
-            )
-
-        val canvas =
-            Canvas(markedBitmap)
-
-        val redPaint =
-            Paint(
-                Paint.ANTI_ALIAS_FLAG
-            ).apply {
-
-                color =
-                    Color.RED
-
-                style =
-                    Paint.Style.FILL
-
-                alpha =
-                    220
-            }
-
-        val xScale =
-            roi.width.toFloat() /
-                analysisWidth.toFloat()
-
-        val yScale =
-            roi.height.toFloat() /
-                analysisHeight.toFloat()
-
-        val markRadius =
-            max(
-                2f,
-                roi.width.toFloat() /
-                    200f
-            )
-
         for (
             y in 1 until
-            small.height - 1
+                small.height - 1
         ) {
 
             for (
                 x in 1 until
-                small.width - 1
+                    small.width - 1
             ) {
 
                 val center =
@@ -1722,7 +1642,7 @@ Quality Score      : -
                         )
                     )
 
-                val rightPixel =
+                val right =
                     gray(
                         small.getPixel(
                             x + 1,
@@ -1730,7 +1650,7 @@ Quality Score      : -
                         )
                     )
 
-                val bottomPixel =
+                val bottom =
                     gray(
                         small.getPixel(
                             x,
@@ -1741,20 +1661,20 @@ Quality Score      : -
                 val gradient =
                     abs(
                         center -
-                            rightPixel
+                            right
                     ) +
                         abs(
                             center -
-                                bottomPixel
+                                bottom
                         )
-
-                pixelCount++
 
                 totalGradient +=
                     gradient
 
+                pixelCount++
+
                 graySum +=
-                    center
+                    center.toDouble()
 
                 graySquareSum +=
                     center.toDouble() *
@@ -1774,45 +1694,19 @@ Quality Score      : -
                 ) {
 
                     strongEdgeCount++
-
-                    if (
-                        x % 4 == 0 &&
-                        y % 4 == 0
-                    ) {
-
-                        val originalX =
-                            roiStartX +
-                                (
-                                    x *
-                                        xScale
-                                    )
-                                    .toInt()
-
-                        val originalY =
-                            roiStartY +
-                                (
-                                    y *
-                                        yScale
-                                    )
-                                    .toInt()
-
-                        canvas.drawCircle(
-                            originalX.toFloat(),
-                            originalY.toFloat(),
-                            markRadius,
-                            redPaint
-                        )
-                    }
                 }
             }
         }
 
         val edgeDensity =
-            if (pixelCount > 0) {
+            if (
+                pixelCount > 0
+            ) {
 
                 edgeCount
                     .toDouble() /
-                    pixelCount.toDouble() *
+                    pixelCount
+                        .toDouble() *
                     100.0
 
             } else {
@@ -1821,11 +1715,14 @@ Quality Score      : -
             }
 
         val strongEdgeDensity =
-            if (pixelCount > 0) {
+            if (
+                pixelCount > 0
+            ) {
 
                 strongEdgeCount
                     .toDouble() /
-                    pixelCount.toDouble() *
+                    pixelCount
+                        .toDouble() *
                     100.0
 
             } else {
@@ -1834,23 +1731,31 @@ Quality Score      : -
             }
 
         val averageGradient =
-            if (pixelCount > 0) {
+            if (
+                pixelCount > 0
+            ) {
 
                 totalGradient
                     .toDouble() /
-                    pixelCount.toDouble()
+                    pixelCount
+                        .toDouble()
 
             } else {
 
                 0.0
             }
 
-        val grayMean =
-            if (pixelCount > 0) {
+        /*
+         * 표면 밝기 편차
+         */
+        val averageGray =
+            if (
+                pixelCount > 0
+            ) {
 
-                graySum
-                    .toDouble() /
-                    pixelCount.toDouble()
+                graySum /
+                    pixelCount
+                        .toDouble()
 
             } else {
 
@@ -1858,16 +1763,18 @@ Quality Score      : -
             }
 
         val variance =
-            if (pixelCount > 0) {
+            if (
+                pixelCount > 0
+            ) {
 
                 (
                     graySquareSum /
                         pixelCount.toDouble()
                     ) -
                     (
-                        grayMean *
-                            grayMean
-                    )
+                        averageGray *
+                            averageGray
+                        )
 
             } else {
 
@@ -1876,11 +1783,15 @@ Quality Score      : -
 
         val textureVariation =
             sqrt(
-                variance.coerceAtLeast(
-                    0.0
+                max(
+                    0.0,
+                    variance
                 )
             )
 
+        /*
+         * 민감도 보정
+         */
         val sensitivityFactor =
             0.55 +
                 sensitivity /
@@ -1889,7 +1800,6 @@ Quality Score      : -
         /*
          * 국부 변화
          */
-
         val localChange =
             (
                 edgeDensity *
@@ -1904,7 +1814,6 @@ Quality Score      : -
         /*
          * 표면 균일도
          */
-
         val surfacePenalty =
             (
                 textureVariation *
@@ -1927,7 +1836,6 @@ Quality Score      : -
         /*
          * 종합 결함량
          */
-
         val defectLevel =
             (
                 localChange *
@@ -1936,7 +1844,7 @@ Quality Score      : -
                         100.0 -
                             surfaceUniformity
                         ) *
-                        0.40
+                    0.40
                 )
                 .coerceIn(
                     0.0,
@@ -1956,19 +1864,47 @@ Quality Score      : -
         val judgment =
             when {
 
-                qualityScore >= 85 ->
+                qualityScore >= 85.0 ->
                     "정상 후보"
 
-                qualityScore >= 70 ->
+                qualityScore >= 70.0 ->
                     "주의 후보"
 
-                qualityScore >= 50 ->
+                qualityScore >= 50.0 ->
                     "한계정상 후보"
 
                 else ->
                     "불량 후보"
             }
 
+        /*
+         * =====================================================
+         * NG 후보 큰 원 / 박스
+         * =====================================================
+         */
+
+        val markerResult =
+            DefectMarker.markDefectRegions(
+                sourceBitmap = source,
+                roiLeft = roiStartX,
+                roiTop = roiStartY,
+                roiWidth = roi.width,
+                roiHeight = roi.height,
+                sensitivity = sensitivity,
+                maxRegions = 5
+            )
+
+        val regionCount =
+            markerResult.regions.size
+
+        val regionSummary =
+            DefectMarker.buildRegionSummary(
+                markerResult.regions
+            )
+
+        /*
+         * 결과 저장
+         */
         lastQualityScore =
             qualityScore
 
@@ -1998,6 +1934,9 @@ Strong Edge : %.1f%%
 Local Change : %.1f
 Quality Score : %.1f / 100
 Sensitivity : %d%%
+NG 후보 영역 : %d개
+
+%s
                 """.trimIndent(),
 
                 surfaceUniformity,
@@ -2005,7 +1944,9 @@ Sensitivity : %d%%
                 strongEdgeDensity,
                 localChange,
                 qualityScore,
-                sensitivity
+                sensitivity,
+                regionCount,
+                regionSummary
             )
 
         hasInspectionResult =
@@ -2014,16 +1955,11 @@ Sensitivity : %d%%
         runOnUiThread {
 
             /*
-             * 빨간 후보점이 포함된 분석 이미지 표시
+             * 원본 lastBitmap은 절대 변경하지 않습니다.
              */
-
-            lastBitmap =
-                markedBitmap
-
-            binding.disassemblyImagePreview
-                .setImageBitmap(
-                    markedBitmap
-                )
+            binding.disassemblyImagePreview.setImageBitmap(
+                markerResult.bitmap
+            )
 
             binding.disassemblyImagePreview.imageMatrix =
                 imageMatrixValue
@@ -2036,19 +1972,22 @@ Sensitivity : %d%%
                     Locale.getDefault(),
 
                     """
-민감도            : %d%%
-Surface Uniformity: %.1f / 100
-Edge Density      : %.1f%%
-Strong Edge       : %.1f%%
-Local Change      : %.1f
-Quality Score     : %.1f / 100
+민감도             : %d%%
+Surface Uniformity : %.1f / 100
+Edge Density       : %.1f%%
+Strong Edge        : %.1f%%
+Local Change       : %.1f
+Quality Score      : %.1f / 100
 
 판정 : %s
 
-빨간 표시 : 표면 변화가 큰 위치 후보
+NG 후보 영역 : %d개
+%s
 
-※ 빨간 표시는 실제 불량 확정이 아니라 확인 필요 위치입니다.
-※ 전극 패턴, 분리막 무늬, 문자, 조명 반사도 Edge로 검출될 수 있습니다.
+빨간 원/박스 = 국부 표면 변화가 큰 검사 후보 영역
+
+※ 빨간 표시는 확정 NG가 아닙니다.
+※ 전극 패턴, 분리막 무늬, 문자, 조명 반사도 후보로 검출될 수 있습니다.
 ※ 현재 수치는 영상 변화 기반 보조 지표입니다.
 ※ 실제 양산 판정에는 정상 Master Sample과 실제 불량품 검증이 필요합니다.
                     """.trimIndent(),
@@ -2059,14 +1998,70 @@ Quality Score     : %.1f / 100
                     strongEdgeDensity,
                     localChange,
                     qualityScore,
-                    judgment
+                    judgment,
+                    regionCount,
+                    regionSummary
                 )
         }
     }
 
     /*
      * =========================================================
-     * Gray 변환
+     * 결과 저장
+     * =========================================================
+     */
+
+    private fun saveCurrentInspectionResult() {
+
+        if (
+            !hasInspectionResult
+        ) {
+
+            Toast.makeText(
+                this,
+                "먼저 분해 검사를 실행해주세요.",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        val success =
+            InspectionHistoryStore.save(
+                context = this,
+                inspectionType = "DISASSEMBLY",
+                score = lastQualityScore,
+                judgment = lastJudgment,
+                sensitivity = sensitivity,
+                details = lastDetails
+            )
+
+        if (success) {
+
+            Toast.makeText(
+                this,
+                String.format(
+                    Locale.getDefault(),
+                    "분해 검사 결과 저장 완료\nQuality Score %.1f / 100\n%s",
+                    lastQualityScore,
+                    lastJudgment
+                ),
+                Toast.LENGTH_LONG
+            ).show()
+
+        } else {
+
+            Toast.makeText(
+                this,
+                "검사 결과 저장에 실패했습니다.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /*
+     * =========================================================
+     * RGB → Gray
      * =========================================================
      */
 
@@ -2075,21 +2070,24 @@ Quality Score     : %.1f / 100
     ): Int {
 
         val r =
-            Color.red(color)
+            Color.red(
+                color
+            )
 
         val g =
-            Color.green(color)
+            Color.green(
+                color
+            )
 
         val b =
-            Color.blue(color)
+            Color.blue(
+                color
+            )
 
         return (
-            0.299 *
-                r +
-                0.587 *
-                g +
-                0.114 *
-                b
+            0.299 * r +
+                0.587 * g +
+                0.114 * b
             )
             .toInt()
     }

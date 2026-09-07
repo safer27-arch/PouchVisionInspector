@@ -1,5 +1,7 @@
 package com.pouchvision.inspector
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -16,27 +18,77 @@ import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.content.ContextCompat
 import com.pouchvision.inspector.databinding.ActivityTabBinding
+import java.io.File
+import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 
 class TabActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityTabBinding
+    private lateinit var binding:
+            ActivityTabBinding
 
-    private var lastBitmap: Bitmap? = null
+    /*
+     * =========================================================
+     * CameraX
+     * =========================================================
+     */
 
-    private var hasInspectionResult = false
+    private var imageCapture:
+            ImageCapture? = null
 
-    private var lastTabScore = 0.0
-    private var lastPositionError = 0.0
-    private var lastTiltError = 0.0
-    private var lastSpacingError = 0.0
-    private var lastLocalDeformation = 0.0
+    /*
+     * =========================================================
+     * 현재 이미지
+     * =========================================================
+     */
 
-    private var lastJudgment = ""
-    private var lastDetails = ""
+    private var lastBitmap:
+            Bitmap? = null
+
+    /*
+     * =========================================================
+     * 검사 결과
+     * =========================================================
+     */
+
+    private var hasInspectionResult =
+        false
+
+    private var lastTabScore =
+        0.0
+
+    private var lastPositionError =
+        0.0
+
+    private var lastTiltError =
+        0.0
+
+    private var lastSpacingError =
+        0.0
+
+    private var lastLocalDeformation =
+        0.0
+
+    private var lastJudgment =
+        ""
+
+    private var lastDetails =
+        ""
+
+    /*
+     * =========================================================
+     * 민감도
+     * =========================================================
+     */
 
     private val preferenceName =
         "pouch_vision_settings"
@@ -49,6 +101,12 @@ class TabActivity : AppCompatActivity() {
 
     private var sensitivity =
         defaultSensitivity
+
+    /*
+     * =========================================================
+     * 이미지 확대 / 이동
+     * =========================================================
+     */
 
     private val imageMatrixValue =
         Matrix()
@@ -65,11 +123,23 @@ class TabActivity : AppCompatActivity() {
     private lateinit var scaleGestureDetector:
             ScaleGestureDetector
 
+    /*
+     * =========================================================
+     * ROI 이동
+     * =========================================================
+     */
+
     private var roiLastTouchX =
         0f
 
     private var roiLastTouchY =
         0f
+
+    /*
+     * =========================================================
+     * 갤러리
+     * =========================================================
+     */
 
     private val galleryLauncher =
         registerForActivityResult(
@@ -77,26 +147,67 @@ class TabActivity : AppCompatActivity() {
         ) { uri: Uri? ->
 
             if (uri != null) {
-                loadGalleryImage(uri)
+
+                loadGalleryImage(
+                    uri
+                )
             }
         }
+
+    /*
+     * =========================================================
+     * 카메라 권한
+     * =========================================================
+     */
+
+    private val cameraPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+
+            if (granted) {
+
+                startCamera()
+
+            } else {
+
+                binding.tvTabStatus.text =
+                    "카메라 권한이 필요합니다."
+            }
+        }
+
+    /*
+     * =========================================================
+     * onCreate
+     * =========================================================
+     */
 
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
 
-        super.onCreate(savedInstanceState)
+        super.onCreate(
+            savedInstanceState
+        )
 
         binding =
             ActivityTabBinding.inflate(
                 layoutInflater
             )
 
-        setContentView(binding.root)
+        setContentView(
+            binding.root
+        )
 
         setupSensitivity()
         setupImageZoom()
         setupRoiDrag()
+
+        binding.btnTabCapture
+            .setOnClickListener {
+
+                takePhoto()
+            }
 
         binding.btnTabGallery
             .setOnClickListener {
@@ -112,11 +223,15 @@ class TabActivity : AppCompatActivity() {
                 val bitmap =
                     lastBitmap
 
-                if (bitmap == null) {
+                if (
+                    bitmap == null ||
+                    binding.tabImagePreview.visibility !=
+                    View.VISIBLE
+                ) {
 
                     Toast.makeText(
                         this,
-                        "먼저 TAB 사진을 선택해주세요.",
+                        "먼저 사진을 촬영하거나 선택해주세요.",
                         Toast.LENGTH_LONG
                     ).show()
 
@@ -178,16 +293,467 @@ class TabActivity : AppCompatActivity() {
                 resetImageMatrix()
             }
 
+        binding.btnTabCameraMode
+            .setOnClickListener {
+
+                showCameraMode()
+            }
+
         binding.btnTabBack
             .setOnClickListener {
 
                 finish()
             }
+
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+
+            startCamera()
+
+        } else {
+
+            cameraPermissionLauncher.launch(
+                Manifest.permission.CAMERA
+            )
+        }
     }
+
+    /*
+     * =========================================================
+     * CameraX 시작
+     * =========================================================
+     */
+
+    private fun startCamera() {
+
+        binding.tvTabStatus.text =
+            "카메라 준비 중..."
+
+        binding.tabPreviewView.visibility =
+            View.VISIBLE
+
+        binding.tabImagePreview.visibility =
+            View.GONE
+
+        val cameraProviderFuture =
+            ProcessCameraProvider.getInstance(
+                this
+            )
+
+        cameraProviderFuture.addListener({
+
+            try {
+
+                val cameraProvider =
+                    cameraProviderFuture.get()
+
+                val preview =
+                    Preview.Builder()
+                        .build()
+                        .also {
+
+                            it.setSurfaceProvider(
+                                binding
+                                    .tabPreviewView
+                                    .surfaceProvider
+                            )
+                        }
+
+                imageCapture =
+                    ImageCapture.Builder()
+                        .setCaptureMode(
+                            ImageCapture
+                                .CAPTURE_MODE_MINIMIZE_LATENCY
+                        )
+                        .build()
+
+                val cameraSelector =
+                    CameraSelector
+                        .DEFAULT_BACK_CAMERA
+
+                cameraProvider.unbindAll()
+
+                cameraProvider.bindToLifecycle(
+                    this,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
+
+                binding.tvTabStatus.text =
+                    "카메라 준비 완료 - Tab 영역을 촬영해주세요."
+
+            } catch (e: Exception) {
+
+                binding.tvTabStatus.text =
+                    "카메라 시작 오류: ${e.message}"
+            }
+
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    /*
+     * =========================================================
+     * 사진 촬영
+     * =========================================================
+     */
+
+    private fun takePhoto() {
+
+        val capture =
+            imageCapture
+
+        if (capture == null) {
+
+            Toast.makeText(
+                this,
+                "카메라가 아직 준비되지 않았습니다.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val name =
+            SimpleDateFormat(
+                "yyyyMMdd_HHmmss",
+                Locale.getDefault()
+            ).format(
+                System.currentTimeMillis()
+            )
+
+        val photoFile =
+            File(
+                cacheDir,
+                "Tab_$name.jpg"
+            )
+
+        val outputOptions =
+            ImageCapture
+                .OutputFileOptions
+                .Builder(
+                    photoFile
+                )
+                .build()
+
+        binding.tvTabStatus.text =
+            "TAB 사진 촬영 중..."
+
+        capture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(
+                this
+            ),
+
+            object :
+                ImageCapture.OnImageSavedCallback {
+
+                override fun onImageSaved(
+                    outputFileResults:
+                    ImageCapture.OutputFileResults
+                ) {
+
+                    try {
+
+                        val bitmap =
+                            decodeBitmapFromFile(
+                                photoFile
+                            )
+
+                        if (bitmap == null) {
+
+                            binding.tvTabStatus.text =
+                                "촬영된 사진을 불러올 수 없습니다."
+
+                            return
+                        }
+
+                        showSelectedImage(
+                            bitmap
+                        )
+
+                        binding.tvTabStatus.text =
+                            "촬영 완료 - Tab과 주변 Seal이 ROI에 들어오도록 맞춰주세요."
+
+                    } catch (e: Exception) {
+
+                        binding.tvTabStatus.text =
+                            "촬영 사진 처리 오류: ${e.message}"
+                    }
+                }
+
+                override fun onError(
+                    exception:
+                    ImageCaptureException
+                ) {
+
+                    binding.tvTabStatus.text =
+                        "촬영 오류: ${exception.message}"
+                }
+            }
+        )
+    }
+
+    /*
+     * =========================================================
+     * 촬영 파일 -> Bitmap
+     * =========================================================
+     */
+
+    private fun decodeBitmapFromFile(
+        file: File
+    ): Bitmap? {
+
+        val options =
+            BitmapFactory.Options()
+
+        options.inJustDecodeBounds =
+            true
+
+        BitmapFactory.decodeFile(
+            file.absolutePath,
+            options
+        )
+
+        val maxSize =
+            max(
+                options.outWidth,
+                options.outHeight
+            )
+
+        var sampleSize =
+            1
+
+        while (
+            maxSize /
+            sampleSize >
+            1600
+        ) {
+
+            sampleSize *=
+                2
+        }
+
+        val decodeOptions =
+            BitmapFactory.Options()
+
+        decodeOptions.inSampleSize =
+            sampleSize
+
+        return BitmapFactory.decodeFile(
+            file.absolutePath,
+            decodeOptions
+        )
+    }
+
+    /*
+     * =========================================================
+     * 카메라 화면 복귀
+     * =========================================================
+     */
+
+    private fun showCameraMode() {
+
+        hasInspectionResult =
+            false
+
+        binding.tabImagePreview.visibility =
+            View.GONE
+
+        binding.tabPreviewView.visibility =
+            View.VISIBLE
+
+        binding.tvTabStatus.text =
+            "카메라 화면 - Tab 영역을 맞춘 뒤 사진을 촬영해주세요."
+
+        resetRoiPosition()
+
+        if (
+            imageCapture == null
+        ) {
+
+            startCamera()
+        }
+    }
+
+    /*
+     * =========================================================
+     * 갤러리 사진
+     * =========================================================
+     */
+
+    private fun loadGalleryImage(
+        uri: Uri
+    ) {
+
+        binding.tvTabStatus.text =
+            "TAB 사진 불러오는 중..."
+
+        try {
+
+            val bitmap =
+                decodeBitmapFromUri(
+                    uri
+                )
+
+            if (bitmap == null) {
+
+                binding.tvTabStatus.text =
+                    "사진을 불러올 수 없습니다."
+
+                return
+            }
+
+            showSelectedImage(
+                bitmap
+            )
+
+            binding.tvTabStatus.text =
+                "사진 선택 완료 - Tab과 주변 Seal이 ROI에 들어오도록 맞춰주세요."
+
+        } catch (e: Exception) {
+
+            binding.tvTabStatus.text =
+                "사진 불러오기 오류: ${e.message}"
+        }
+    }
+
+    /*
+     * =========================================================
+     * URI -> Bitmap
+     * =========================================================
+     */
+
+    private fun decodeBitmapFromUri(
+        uri: Uri
+    ): Bitmap? {
+
+        val options =
+            BitmapFactory.Options()
+
+        options.inJustDecodeBounds =
+            true
+
+        contentResolver
+            .openInputStream(
+                uri
+            )
+            ?.use {
+
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    options
+                )
+            }
+
+        val maxSize =
+            max(
+                options.outWidth,
+                options.outHeight
+            )
+
+        var sampleSize =
+            1
+
+        while (
+            maxSize /
+            sampleSize >
+            1600
+        ) {
+
+            sampleSize *=
+                2
+        }
+
+        val decodeOptions =
+            BitmapFactory.Options()
+
+        decodeOptions.inSampleSize =
+            sampleSize
+
+        return contentResolver
+            .openInputStream(
+                uri
+            )
+            ?.use {
+
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    decodeOptions
+                )
+            }
+    }
+
+    /*
+     * =========================================================
+     * 이미지 표시
+     * =========================================================
+     */
+
+    private fun showSelectedImage(
+        bitmap: Bitmap
+    ) {
+
+        lastBitmap =
+            bitmap
+
+        hasInspectionResult =
+            false
+
+        binding.tabPreviewView.visibility =
+            View.GONE
+
+        binding.tabImagePreview.visibility =
+            View.VISIBLE
+
+        binding.tabImagePreview
+            .setImageBitmap(
+                bitmap
+            )
+
+        resetImageMatrix()
+        resetRoiPosition()
+        resetResultDisplay()
+    }
+
+    /*
+     * =========================================================
+     * 결과 초기화
+     * =========================================================
+     */
+
+    private fun resetResultDisplay() {
+
+        binding.tvTabMetrics.text =
+            """
+Position Error    : -
+Tilt Error        : -
+Spacing Error     : -
+Local Deformation : -
+Tab Score         : -
+
+판정 : -
+            """.trimIndent()
+    }
+
+    /*
+     * =========================================================
+     * 결과 저장
+     * =========================================================
+     */
 
     private fun saveCurrentInspectionResult() {
 
-        if (!hasInspectionResult) {
+        if (
+            !hasInspectionResult
+        ) {
 
             Toast.makeText(
                 this,
@@ -200,12 +766,23 @@ class TabActivity : AppCompatActivity() {
 
         val success =
             InspectionHistoryStore.save(
-                context = this,
-                inspectionType = "TAB",
-                score = lastTabScore,
-                judgment = lastJudgment,
-                sensitivity = sensitivity,
-                details = lastDetails
+                context =
+                    this,
+
+                inspectionType =
+                    "TAB",
+
+                score =
+                    lastTabScore,
+
+                judgment =
+                    lastJudgment,
+
+                sensitivity =
+                    sensitivity,
+
+                details =
+                    lastDetails
             )
 
         if (success) {
@@ -230,6 +807,12 @@ class TabActivity : AppCompatActivity() {
             ).show()
         }
     }
+
+    /*
+     * =========================================================
+     * 민감도
+     * =========================================================
+     */
 
     private fun setupSensitivity() {
 
@@ -339,6 +922,12 @@ class TabActivity : AppCompatActivity() {
             "현재 민감도 : ${sensitivity}%"
     }
 
+    /*
+     * =========================================================
+     * 이미지 확대 / 이동
+     * =========================================================
+     */
+
     private fun setupImageZoom() {
 
         scaleGestureDetector =
@@ -350,7 +939,8 @@ class TabActivity : AppCompatActivity() {
                         .SimpleOnScaleGestureListener() {
 
                     override fun onScale(
-                        detector: ScaleGestureDetector
+                        detector:
+                        ScaleGestureDetector
                     ): Boolean {
 
                         val oldZoom =
@@ -406,7 +996,9 @@ class TabActivity : AppCompatActivity() {
                         event
                     )
 
-                when (event.actionMasked) {
+                when (
+                    event.actionMasked
+                ) {
 
                     MotionEvent.ACTION_DOWN -> {
 
@@ -473,128 +1065,25 @@ class TabActivity : AppCompatActivity() {
             }
     }
 
-    private fun loadGalleryImage(
-        uri: Uri
-    ) {
-
-        binding.tvTabStatus.text =
-            "TAB 사진 불러오는 중..."
-
-        try {
-
-            val bitmap =
-                decodeBitmapFromUri(
-                    uri
-                )
-
-            if (bitmap == null) {
-
-                binding.tvTabStatus.text =
-                    "사진을 불러올 수 없습니다."
-
-                return
-            }
-
-            lastBitmap =
-                bitmap
-
-            hasInspectionResult =
-                false
-
-            binding.tabImagePreview.visibility =
-                View.VISIBLE
-
-            binding.tabImagePreview.setImageBitmap(
-                bitmap
-            )
-
-            resetImageMatrix()
-            resetRoiPosition()
-
-            binding.tvTabStatus.text =
-                "사진 선택 완료 - Tab과 주변 Seal이 ROI에 들어오도록 맞춰주세요."
-
-            binding.tvTabMetrics.text =
-                """
-Position Error    : -
-Tilt Error        : -
-Spacing Error     : -
-Local Deformation : -
-Tab Score         : -
-
-판정 : -
-                """.trimIndent()
-
-        } catch (e: Exception) {
-
-            binding.tvTabStatus.text =
-                "사진 불러오기 오류: ${e.message}"
-        }
-    }
-
-    private fun decodeBitmapFromUri(
-        uri: Uri
-    ): Bitmap? {
-
-        val options =
-            BitmapFactory.Options()
-
-        options.inJustDecodeBounds =
-            true
-
-        contentResolver
-            .openInputStream(uri)
-            ?.use {
-
-                BitmapFactory.decodeStream(
-                    it,
-                    null,
-                    options
-                )
-            }
-
-        val maxSize =
-            max(
-                options.outWidth,
-                options.outHeight
-            )
-
-        var sampleSize =
-            1
-
-        while (
-            maxSize /
-                sampleSize >
-            1600
-        ) {
-
-            sampleSize *=
-                2
-        }
-
-        val decodeOptions =
-            BitmapFactory.Options()
-
-        decodeOptions.inSampleSize =
-            sampleSize
-
-        return contentResolver
-            .openInputStream(uri)
-            ?.use {
-
-                BitmapFactory.decodeStream(
-                    it,
-                    null,
-                    decodeOptions
-                )
-            }
-    }
+    /*
+     * =========================================================
+     * 이미지 원래크기
+     * =========================================================
+     */
 
     private fun resetImageMatrix() {
 
         val bitmap =
             lastBitmap
                 ?: return
+
+        if (
+            binding.tabImagePreview.visibility !=
+            View.VISIBLE
+        ) {
+
+            return
+        }
 
         binding.tabImagePreview.post {
 
@@ -609,9 +1098,12 @@ Tab Score         : -
                     .toFloat()
 
             if (
-                viewWidth <= 0f ||
-                viewHeight <= 0f
+                viewWidth <=
+                0f ||
+                viewHeight <=
+                0f
             ) {
+
                 return@post
             }
 
@@ -627,6 +1119,7 @@ Tab Score         : -
                 minOf(
                     viewWidth /
                         bitmapWidth,
+
                     viewHeight /
                         bitmapHeight
                 )
@@ -643,13 +1136,15 @@ Tab Score         : -
                 (
                     viewWidth -
                         displayedWidth
-                    ) / 2f
+                    ) /
+                    2f
 
             val dy =
                 (
                     viewHeight -
                         displayedHeight
-                    ) / 2f
+                    ) /
+                    2f
 
             imageMatrixValue.reset()
 
@@ -674,6 +1169,12 @@ Tab Score         : -
         }
     }
 
+    /*
+     * =========================================================
+     * ROI 이동
+     * =========================================================
+     */
+
     private fun setupRoiDrag() {
 
         binding.tabRoiGuide
@@ -686,7 +1187,9 @@ Tab Score         : -
                         true
                     )
 
-                when (event.action) {
+                when (
+                    event.action
+                ) {
 
                     MotionEvent.ACTION_DOWN -> {
 
@@ -732,7 +1235,9 @@ Tab Score         : -
                             newX.coerceIn(
                                 0f,
                                 maxX
-                                    .coerceAtLeast(0)
+                                    .coerceAtLeast(
+                                        0
+                                    )
                                     .toFloat()
                             )
 
@@ -740,7 +1245,9 @@ Tab Score         : -
                             newY.coerceIn(
                                 0f,
                                 maxY
-                                    .coerceAtLeast(0)
+                                    .coerceAtLeast(
+                                        0
+                                    )
                                     .toFloat()
                             )
 
@@ -779,6 +1286,12 @@ Tab Score         : -
             }
     }
 
+    /*
+     * =========================================================
+     * ROI 가로
+     * =========================================================
+     */
+
     private fun resizeRoiWidth(
         scale: Float
     ) {
@@ -789,7 +1302,11 @@ Tab Score         : -
         val parent =
             binding.tabImageArea
 
-        if (parent.width <= 0) {
+        if (
+            parent.width <=
+            0
+        ) {
+
             return
         }
 
@@ -797,7 +1314,8 @@ Tab Score         : -
             (
                 roi.width *
                     scale
-                ).toInt()
+                )
+                .toInt()
 
         newWidth =
             newWidth.coerceIn(
@@ -807,7 +1325,8 @@ Tab Score         : -
                     (
                         parent.width *
                             0.95f
-                        ).toInt()
+                        )
+                        .toInt()
                 )
             )
 
@@ -842,7 +1361,9 @@ Tab Score         : -
                         parent.width -
                             roi.width
                         )
-                        .coerceAtLeast(0)
+                        .coerceAtLeast(
+                            0
+                        )
                         .toFloat()
                 )
 
@@ -850,6 +1371,12 @@ Tab Score         : -
                 newX
         }
     }
+
+    /*
+     * =========================================================
+     * ROI 세로
+     * =========================================================
+     */
 
     private fun resizeRoiHeight(
         scale: Float
@@ -861,7 +1388,11 @@ Tab Score         : -
         val parent =
             binding.tabImageArea
 
-        if (parent.height <= 0) {
+        if (
+            parent.height <=
+            0
+        ) {
+
             return
         }
 
@@ -869,7 +1400,8 @@ Tab Score         : -
             (
                 roi.height *
                     scale
-                ).toInt()
+                )
+                .toInt()
 
         newHeight =
             newHeight.coerceIn(
@@ -879,7 +1411,8 @@ Tab Score         : -
                     (
                         parent.height *
                             0.95f
-                        ).toInt()
+                        )
+                        .toInt()
                 )
             )
 
@@ -914,7 +1447,9 @@ Tab Score         : -
                         parent.height -
                             roi.height
                         )
-                        .coerceAtLeast(0)
+                        .coerceAtLeast(
+                            0
+                        )
                         .toFloat()
                 )
 
@@ -922,6 +1457,12 @@ Tab Score         : -
                 newY
         }
     }
+
+    /*
+     * =========================================================
+     * ROI 중앙
+     * =========================================================
+     */
 
     private fun resetRoiPosition() {
 
@@ -937,18 +1478,26 @@ Tab Score         : -
                 (
                     parent.width -
                         roi.width
-                    ) / 2f
+                    ) /
+                    2f
 
             roi.y =
                 (
                     parent.height -
                         roi.height
-                    ) / 2f
+                    ) /
+                    2f
 
             hasInspectionResult =
                 false
         }
     }
+
+    /*
+     * =========================================================
+     * ROI 분석 시작
+     * =========================================================
+     */
 
     private fun analyzeSelectedRoi(
         source: Bitmap
@@ -1047,8 +1596,10 @@ Tab Score         : -
                         top
 
                 if (
-                    roiWidth < 10 ||
-                    roiHeight < 10
+                    roiWidth <
+                    10 ||
+                    roiHeight <
+                    10
                 ) {
 
                     throw Exception(
@@ -1083,6 +1634,13 @@ Tab Score         : -
 
         }.start()
     }
+
+    /*
+     * =========================================================
+     * TAB 분석
+     * 기존 공식 유지
+     * =========================================================
+     */
 
     private fun analyzeTabRoi(
         source: Bitmap,
@@ -1152,28 +1710,29 @@ Tab Score         : -
         val redPaint =
             Paint(
                 Paint.ANTI_ALIAS_FLAG
-            )
-                .apply {
+            ).apply {
 
-                    color =
-                        Color.RED
+                color =
+                    Color.RED
 
-                    style =
-                        Paint.Style.FILL
+                style =
+                    Paint.Style.FILL
 
-                    alpha =
-                        220
-                }
+                alpha =
+                    220
+            }
 
         val xScale =
             roi.width
                 .toFloat() /
-                analysisWidth.toFloat()
+                analysisWidth
+                    .toFloat()
 
         val yScale =
             roi.height
                 .toFloat() /
-                analysisHeight.toFloat()
+                analysisHeight
+                    .toFloat()
 
         val markRadius =
             max(
@@ -1234,7 +1793,8 @@ Tab Score         : -
 
                 if (
                     x <
-                    small.width / 2
+                    small.width /
+                        2
                 ) {
 
                     leftGradient +=
@@ -1248,7 +1808,8 @@ Tab Score         : -
 
                 if (
                     y <
-                    small.height / 2
+                    small.height /
+                        2
                 ) {
 
                     topGradient +=
@@ -1268,8 +1829,10 @@ Tab Score         : -
                     strongEdgeCount++
 
                     if (
-                        x % 4 == 0 &&
-                        y % 4 == 0
+                        x % 4 ==
+                        0 &&
+                        y % 4 ==
+                        0
                     ) {
 
                         val originalX =
@@ -1277,18 +1840,22 @@ Tab Score         : -
                                 (
                                     x *
                                         xScale
-                                    ).toInt()
+                                    )
+                                    .toInt()
 
                         val originalY =
                             roiStartY +
                                 (
                                     y *
                                         yScale
-                                    ).toInt()
+                                    )
+                                    .toInt()
 
                         canvas.drawCircle(
-                            originalX.toFloat(),
-                            originalY.toFloat(),
+                            originalX
+                                .toFloat(),
+                            originalY
+                                .toFloat(),
                             markRadius,
                             redPaint
                         )
@@ -1299,12 +1866,14 @@ Tab Score         : -
 
         val averageGradient =
             if (
-                pixelCount > 0
+                pixelCount >
+                0
             ) {
 
                 totalGradient
                     .toDouble() /
-                    pixelCount.toDouble()
+                    pixelCount
+                        .toDouble()
 
             } else {
 
@@ -1313,12 +1882,14 @@ Tab Score         : -
 
         val strongEdgeDensity =
             if (
-                pixelCount > 0
+                pixelCount >
+                0
             ) {
 
                 strongEdgeCount
                     .toDouble() /
-                    pixelCount.toDouble() *
+                    pixelCount
+                        .toDouble() *
                     100.0
 
             } else {
@@ -1328,7 +1899,8 @@ Tab Score         : -
 
         val horizontalBalance =
             if (
-                totalGradient > 0
+                totalGradient >
+                0
             ) {
 
                 abs(
@@ -1336,7 +1908,8 @@ Tab Score         : -
                         rightGradient
                 )
                     .toDouble() /
-                    totalGradient.toDouble() *
+                    totalGradient
+                        .toDouble() *
                     100.0
 
             } else {
@@ -1346,7 +1919,8 @@ Tab Score         : -
 
         val verticalBalance =
             if (
-                totalGradient > 0
+                totalGradient >
+                0
             ) {
 
                 abs(
@@ -1354,7 +1928,8 @@ Tab Score         : -
                         bottomGradient
                 )
                     .toDouble() /
-                    totalGradient.toDouble() *
+                    totalGradient
+                        .toDouble() *
                     100.0
 
             } else {
@@ -1428,13 +2003,16 @@ Tab Score         : -
         val judgment =
             when {
 
-                tabScore >= 85 ->
+                tabScore >=
+                    85 ->
                     "정상 후보"
 
-                tabScore >= 70 ->
+                tabScore >=
+                    70 ->
                     "주의 후보"
 
-                tabScore >= 50 ->
+                tabScore >=
+                    50 ->
                     "한계정상 후보"
 
                 else ->
@@ -1485,15 +2063,19 @@ Sensitivity : %d%%
 
         runOnUiThread {
 
-            binding.tabImagePreview.setImageBitmap(
+            lastBitmap =
                 markedBitmap
-            )
+
+            binding.tabImagePreview
+                .setImageBitmap(
+                    markedBitmap
+                )
 
             binding.tabImagePreview.imageMatrix =
                 imageMatrixValue
 
             binding.tvTabStatus.text =
-                "TAB ROI 분석 완료"
+                "TAB ROI 분석 완료 - $judgment"
 
             binding.tvTabMetrics.text =
                 String.format(
@@ -1512,6 +2094,7 @@ Tab Score        : %.1f / 100
 빨간 표시 : 국부 변화가 큰 위치 후보
 
 ※ 현재 Position / Tilt / Spacing 값은 Edge 분포 기반 보조 지표입니다.
+※ 빨간 표시 자체가 실제 불량 확정 위치를 의미하지 않습니다.
 ※ 실제 Tab 위치·각도·간격의 치수 판정에는 기준 형상과 Calibration이 필요합니다.
 ※ 현재 판정 기준은 기준 학습 전 임시값입니다.
                     """.trimIndent(),
@@ -1526,6 +2109,12 @@ Tab Score        : %.1f / 100
                 )
         }
     }
+
+    /*
+     * =========================================================
+     * Gray
+     * =========================================================
+     */
 
     private fun gray(
         color: Int
@@ -1547,9 +2136,12 @@ Tab Score        : %.1f / 100
             )
 
         return (
-            0.299 * r +
-                0.587 * g +
-                0.114 * b
+            0.299 *
+                r +
+                0.587 *
+                g +
+                0.114 *
+                b
             )
             .toInt()
     }

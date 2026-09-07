@@ -1,12 +1,10 @@
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission
-        android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <uses-feature
-        android:name="android.hardware.camera.any"
-        android:required="true" />
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -14,57 +12,69 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PouchVisionInspector">
 
+        <!-- 메인 메뉴 -->
         <activity
             android:name=".MenuActivity"
-            android:screenOrientation="portrait"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait">
 
             <intent-filter>
 
-                <action
-                    android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.MAIN" />
 
-                <category
-                    android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
 
             </intent-filter>
 
         </activity>
 
+        <!-- 종합검사 -->
+        <activity
+            android:name=".TotalInspectionActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Bottom Corner -->
         <activity
             android:name=".MainActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
+        <!-- Seal -->
         <activity
             android:name=".SealActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
+        <!-- Forming -->
         <activity
             android:name=".FormingActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
+        <!-- Tab -->
         <activity
             android:name=".TabActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
+        <!-- Disassembly -->
         <activity
             android:name=".DisassemblyActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
+        <!-- 검사 안내 -->
         <activity
             android:name=".GuideActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
+        <!-- 검사 이력 -->
         <activity
             android:name=".HistoryActivity"
-            android:screenOrientation="portrait"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
     </application>
 

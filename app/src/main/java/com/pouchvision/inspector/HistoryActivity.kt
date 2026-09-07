@@ -22,7 +22,8 @@ class HistoryActivity : AppCompatActivity() {
             "BOTTOM CORNER",
             "SEAL",
             "FORMING",
-            "TAB"
+            "TAB",
+            "DISASSEMBLY"
         )
 
     override fun onCreate(
@@ -58,13 +59,6 @@ class HistoryActivity : AppCompatActivity() {
 
         loadHistory()
     }
-
-
-    /*
-     * =========================================================
-     * 필터 Spinner
-     * =========================================================
-     */
 
     private fun setupSpinner() {
 
@@ -109,13 +103,6 @@ class HistoryActivity : AppCompatActivity() {
             }
     }
 
-
-    /*
-     * =========================================================
-     * 저장 이력 불러오기
-     * =========================================================
-     */
-
     private fun loadHistory() {
 
         val allRecords =
@@ -128,7 +115,6 @@ class HistoryActivity : AppCompatActivity() {
                 .selectedItem
                 ?.toString()
                 ?: "전체 검사"
-
 
         val filteredRecords =
             if (
@@ -147,24 +133,15 @@ class HistoryActivity : AppCompatActivity() {
                 }
             }
 
-
         updateSummary(
             selectedType,
             filteredRecords
         )
 
-
         showHistoryItems(
             filteredRecords
         )
     }
-
-
-    /*
-     * =========================================================
-     * 요약
-     * =========================================================
-     */
 
     private fun updateSummary(
         selectedType: String,
@@ -187,7 +164,6 @@ class HistoryActivity : AppCompatActivity() {
         var ngCount =
             0
 
-
         for (
             record in records
         ) {
@@ -202,7 +178,6 @@ class HistoryActivity : AppCompatActivity() {
                     limitCount++
                 }
 
-
                 record.judgment
                     .contains(
                         "불량"
@@ -211,7 +186,6 @@ class HistoryActivity : AppCompatActivity() {
                     ngCount++
                 }
 
-
                 record.judgment
                     .contains(
                         "주의"
@@ -219,7 +193,6 @@ class HistoryActivity : AppCompatActivity() {
 
                     warningCount++
                 }
-
 
                 record.judgment
                     .contains(
@@ -230,7 +203,6 @@ class HistoryActivity : AppCompatActivity() {
                 }
             }
         }
-
 
         val averageScore =
             if (
@@ -248,14 +220,12 @@ class HistoryActivity : AppCompatActivity() {
                 0.0
             }
 
-
         binding.tvHistorySummary.text =
             String.format(
                 Locale.getDefault(),
 
                 """
 현재 필터 : %s
-
 저장된 검사 결과 : %d건
 
 정상 : %d건
@@ -276,13 +246,6 @@ class HistoryActivity : AppCompatActivity() {
             )
     }
 
-
-    /*
-     * =========================================================
-     * 개별 검사 이력 표시
-     * =========================================================
-     */
-
     private fun showHistoryItems(
         records:
         List<
@@ -293,7 +256,6 @@ class HistoryActivity : AppCompatActivity() {
 
         binding.historyContainer
             .removeAllViews()
-
 
         if (
             records.isEmpty()
@@ -307,11 +269,9 @@ class HistoryActivity : AppCompatActivity() {
             emptyText.text =
                 """
 아직 저장된 검사 결과가 없습니다.
-
 검사 화면에서 ROI 검사를 실행한 뒤
 '검사 결과 저장' 버튼을 눌러주세요.
                 """.trimIndent()
-
 
             emptyText.textSize =
                 14f
@@ -326,20 +286,11 @@ class HistoryActivity : AppCompatActivity() {
                 Gravity.CENTER
 
             emptyText.setPadding(
-                dp(
-                    16
-                ),
-                dp(
-                    28
-                ),
-                dp(
-                    16
-                ),
-                dp(
-                    28
-                )
+                dp(16),
+                dp(28),
+                dp(16),
+                dp(28)
             )
-
 
             binding.historyContainer
                 .addView(
@@ -348,7 +299,6 @@ class HistoryActivity : AppCompatActivity() {
 
             return
         }
-
 
         for (
             record in records
@@ -359,13 +309,6 @@ class HistoryActivity : AppCompatActivity() {
             )
         }
     }
-
-
-    /*
-     * =========================================================
-     * 검사 카드
-     * =========================================================
-     */
 
     private fun addHistoryCard(
         record:
@@ -382,20 +325,11 @@ class HistoryActivity : AppCompatActivity() {
             LinearLayout.VERTICAL
 
         card.setPadding(
-            dp(
-                14
-            ),
-            dp(
-                14
-            ),
-            dp(
-                14
-            ),
-            dp(
-                14
-            )
+            dp(14),
+            dp(14),
+            dp(14),
+            dp(14)
         )
-
 
         val cardParams =
             LinearLayout
@@ -403,32 +337,22 @@ class HistoryActivity : AppCompatActivity() {
                     LinearLayout
                         .LayoutParams
                         .MATCH_PARENT,
-
                     LinearLayout
                         .LayoutParams
                         .WRAP_CONTENT
                 )
 
         cardParams.bottomMargin =
-            dp(
-                10
-            )
-
+            dp(10)
 
         card.layoutParams =
             cardParams
-
 
         card.setBackgroundColor(
             Color.parseColor(
                 "#F8FAFC"
             )
         )
-
-
-        /*
-         * 검사 종류
-         */
 
         val typeText =
             TextView(
@@ -453,11 +377,6 @@ class HistoryActivity : AppCompatActivity() {
                 .Typeface.BOLD
         )
 
-
-        /*
-         * 판정
-         */
-
         val judgmentText =
             TextView(
                 this
@@ -480,11 +399,6 @@ class HistoryActivity : AppCompatActivity() {
                 record.judgment
             )
         )
-
-
-        /*
-         * 주요 정보
-         */
 
         val infoText =
             TextView(
@@ -520,11 +434,6 @@ Quality Score : %.1f / 100
             1.15f
         )
 
-
-        /*
-         * 상세 결과
-         */
-
         val detailText =
             TextView(
                 this
@@ -544,17 +453,10 @@ Quality Score : %.1f / 100
 
         detailText.setPadding(
             0,
-            dp(
-                8
-            ),
+            dp(8),
             0,
             0
         )
-
-
-        /*
-         * 카드에 추가
-         */
 
         card.addView(
             typeText
@@ -572,19 +474,11 @@ Quality Score : %.1f / 100
             detailText
         )
 
-
         binding.historyContainer
             .addView(
                 card
             )
     }
-
-
-    /*
-     * =========================================================
-     * 판정 색상
-     * =========================================================
-     */
 
     private fun judgmentColor(
         judgment: String
@@ -601,7 +495,6 @@ Quality Score : %.1f / 100
                 )
             }
 
-
             judgment.contains(
                 "한계"
             ) -> {
@@ -610,7 +503,6 @@ Quality Score : %.1f / 100
                     "#EF6C00"
                 )
             }
-
 
             judgment.contains(
                 "주의"
@@ -621,7 +513,6 @@ Quality Score : %.1f / 100
                 )
             }
 
-
             else -> {
 
                 Color.parseColor(
@@ -630,13 +521,6 @@ Quality Score : %.1f / 100
             }
         }
     }
-
-
-    /*
-     * =========================================================
-     * dp 변환
-     * =========================================================
-     */
 
     private fun dp(
         value: Int

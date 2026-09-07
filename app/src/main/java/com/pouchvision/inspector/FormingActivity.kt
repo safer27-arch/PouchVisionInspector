@@ -4,10 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Paint
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
@@ -33,62 +31,27 @@ import kotlin.math.max
 
 class FormingActivity : AppCompatActivity() {
 
-    private lateinit var binding:
-            ActivityFormingBinding
+    private lateinit var binding: ActivityFormingBinding
+
+    private var imageCapture: ImageCapture? = null
 
     /*
-     * =========================================================
-     * CameraX
-     * =========================================================
+     * 원본 사진
+     * NG 표시 이미지는 화면에만 사용하고,
+     * lastBitmap에는 항상 깨끗한 원본을 유지합니다.
      */
+    private var lastBitmap: Bitmap? = null
 
-    private var imageCapture:
-            ImageCapture? = null
+    private var hasInspectionResult = false
 
-    /*
-     * =========================================================
-     * 현재 이미지
-     * =========================================================
-     */
+    private var lastFormingScore = 0.0
+    private var lastWrinkle = 0.0
+    private var lastDeformation = 0.0
+    private var lastSymmetry = 0.0
+    private var lastShapeError = 0.0
 
-    private var lastBitmap:
-            Bitmap? = null
-
-    /*
-     * =========================================================
-     * 검사 결과
-     * =========================================================
-     */
-
-    private var hasInspectionResult =
-        false
-
-    private var lastFormingScore =
-        0.0
-
-    private var lastWrinkle =
-        0.0
-
-    private var lastDeformation =
-        0.0
-
-    private var lastSymmetry =
-        0.0
-
-    private var lastShapeError =
-        0.0
-
-    private var lastJudgment =
-        ""
-
-    private var lastDetails =
-        ""
-
-    /*
-     * =========================================================
-     * 민감도
-     * =========================================================
-     */
+    private var lastJudgment = ""
+    private var lastDetails = ""
 
     private val preferenceName =
         "pouch_vision_settings"
@@ -101,12 +64,6 @@ class FormingActivity : AppCompatActivity() {
 
     private var sensitivity =
         defaultSensitivity
-
-    /*
-     * =========================================================
-     * 이미지 확대 / 이동
-     * =========================================================
-     */
 
     private val imageMatrixValue =
         Matrix()
@@ -121,13 +78,7 @@ class FormingActivity : AppCompatActivity() {
         0f
 
     private lateinit var scaleGestureDetector:
-            ScaleGestureDetector
-
-    /*
-     * =========================================================
-     * ROI 이동
-     * =========================================================
-     */
+        ScaleGestureDetector
 
     private var roiLastTouchX =
         0f
@@ -135,30 +86,15 @@ class FormingActivity : AppCompatActivity() {
     private var roiLastTouchY =
         0f
 
-    /*
-     * =========================================================
-     * 갤러리
-     * =========================================================
-     */
-
     private val galleryLauncher =
         registerForActivityResult(
             ActivityResultContracts.GetContent()
         ) { uri: Uri? ->
 
             if (uri != null) {
-
-                loadGalleryImage(
-                    uri
-                )
+                loadGalleryImage(uri)
             }
         }
-
-    /*
-     * =========================================================
-     * 카메라 권한
-     * =========================================================
-     */
 
     private val cameraPermissionLauncher =
         registerForActivityResult(
@@ -176,48 +112,27 @@ class FormingActivity : AppCompatActivity() {
             }
         }
 
-    /*
-     * =========================================================
-     * onCreate
-     * =========================================================
-     */
-
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
 
-        super.onCreate(
-            savedInstanceState
-        )
+        super.onCreate(savedInstanceState)
 
         binding =
             ActivityFormingBinding.inflate(
                 layoutInflater
             )
 
-        setContentView(
-            binding.root
-        )
+        setContentView(binding.root)
 
         setupSensitivity()
-
         setupImageZoom()
-
         setupRoiDrag()
-
-        /*
-         * 사진 촬영
-         */
 
         binding.btnFormingCapture
             .setOnClickListener {
-
                 takePhoto()
             }
-
-        /*
-         * 갤러리 선택
-         */
 
         binding.btnFormingGallery
             .setOnClickListener {
@@ -226,10 +141,6 @@ class FormingActivity : AppCompatActivity() {
                     "image/*"
                 )
             }
-
-        /*
-         * FORMING 검사
-         */
 
         binding.btnFormingInspect
             .setOnClickListener {
@@ -257,19 +168,11 @@ class FormingActivity : AppCompatActivity() {
                 }
             }
 
-        /*
-         * 검사 결과 저장
-         */
-
         binding.btnFormingSaveResult
             .setOnClickListener {
 
                 saveCurrentInspectionResult()
             }
-
-        /*
-         * ROI 가로
-         */
 
         binding.btnFormingRoiWidthSmaller
             .setOnClickListener {
@@ -287,10 +190,6 @@ class FormingActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * ROI 세로
-         */
-
         binding.btnFormingRoiHeightSmaller
             .setOnClickListener {
 
@@ -307,19 +206,11 @@ class FormingActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * ROI 중앙
-         */
-
         binding.btnFormingRoiReset
             .setOnClickListener {
 
                 resetRoiPosition()
             }
-
-        /*
-         * 사진 원래크기
-         */
 
         binding.btnFormingImageReset
             .setOnClickListener {
@@ -327,29 +218,17 @@ class FormingActivity : AppCompatActivity() {
                 resetImageMatrix()
             }
 
-        /*
-         * 카메라로 돌아가기
-         */
-
         binding.btnFormingCameraMode
             .setOnClickListener {
 
                 showCameraMode()
             }
 
-        /*
-         * 뒤로가기
-         */
-
         binding.btnFormingBack
             .setOnClickListener {
 
                 finish()
             }
-
-        /*
-         * 카메라 권한 확인
-         */
 
         if (
             ContextCompat.checkSelfPermission(
@@ -368,12 +247,6 @@ class FormingActivity : AppCompatActivity() {
             )
         }
     }
-
-    /*
-     * =========================================================
-     * CameraX 시작
-     * =========================================================
-     */
 
     private fun startCamera() {
 
@@ -443,12 +316,6 @@ class FormingActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    /*
-     * =========================================================
-     * 사진 촬영
-     * =========================================================
-     */
-
     private fun takePhoto() {
 
         val capture =
@@ -492,13 +359,10 @@ class FormingActivity : AppCompatActivity() {
 
         capture.takePicture(
             outputOptions,
-            ContextCompat.getMainExecutor(
-                this
-            ),
+            ContextCompat.getMainExecutor(this),
 
             object :
-                ImageCapture
-                    .OnImageSavedCallback {
+                ImageCapture.OnImageSavedCallback {
 
                 override fun onImageSaved(
                     outputFileResults:
@@ -546,12 +410,6 @@ class FormingActivity : AppCompatActivity() {
         )
     }
 
-    /*
-     * =========================================================
-     * 촬영 파일 -> Bitmap
-     * =========================================================
-     */
-
     private fun decodeBitmapFromFile(
         file: File
     ): Bitmap? {
@@ -598,12 +456,6 @@ class FormingActivity : AppCompatActivity() {
         )
     }
 
-    /*
-     * =========================================================
-     * 카메라 화면으로 돌아가기
-     * =========================================================
-     */
-
     private fun showCameraMode() {
 
         hasInspectionResult =
@@ -620,17 +472,13 @@ class FormingActivity : AppCompatActivity() {
 
         resetRoiPosition()
 
-        if (imageCapture == null) {
+        if (
+            imageCapture == null
+        ) {
 
             startCamera()
         }
     }
-
-    /*
-     * =========================================================
-     * 갤러리 이미지
-     * =========================================================
-     */
 
     private fun loadGalleryImage(
         uri: Uri
@@ -667,12 +515,6 @@ class FormingActivity : AppCompatActivity() {
                 "사진 불러오기 오류: ${e.message}"
         }
     }
-
-    /*
-     * =========================================================
-     * URI -> Bitmap
-     * =========================================================
-     */
 
     private fun decodeBitmapFromUri(
         uri: Uri
@@ -736,12 +578,6 @@ class FormingActivity : AppCompatActivity() {
             }
     }
 
-    /*
-     * =========================================================
-     * 사진 표시
-     * =========================================================
-     */
-
     private fun showSelectedImage(
         bitmap: Bitmap
     ) {
@@ -758,23 +594,34 @@ class FormingActivity : AppCompatActivity() {
         binding.formingImagePreview.visibility =
             View.VISIBLE
 
-        binding.formingImagePreview
-            .setImageBitmap(
-                bitmap
-            )
+        binding.formingImagePreview.setImageBitmap(
+            bitmap
+        )
 
         resetImageMatrix()
-
         resetRoiPosition()
-
         resetResultDisplay()
     }
 
-    /*
-     * =========================================================
-     * 결과 초기화
-     * =========================================================
-     */
+    private fun restoreOriginalImage() {
+
+        val bitmap =
+            lastBitmap
+                ?: return
+
+        if (
+            binding.formingImagePreview.visibility ==
+            View.VISIBLE
+        ) {
+
+            binding.formingImagePreview.setImageBitmap(
+                bitmap
+            )
+
+            binding.formingImagePreview.imageMatrix =
+                imageMatrixValue
+        }
+    }
 
     private fun resetResultDisplay() {
 
@@ -787,14 +634,10 @@ Shape Error   : -
 Forming Score : -
 
 판정 : -
+
+NG 후보 영역 : -
             """.trimIndent()
     }
-
-    /*
-     * =========================================================
-     * 검사 결과 저장
-     * =========================================================
-     */
 
     private fun saveCurrentInspectionResult() {
 
@@ -813,23 +656,12 @@ Forming Score : -
 
         val success =
             InspectionHistoryStore.save(
-                context =
-                    this,
-
-                inspectionType =
-                    "FORMING",
-
-                score =
-                    lastFormingScore,
-
-                judgment =
-                    lastJudgment,
-
-                sensitivity =
-                    sensitivity,
-
-                details =
-                    lastDetails
+                context = this,
+                inspectionType = "FORMING",
+                score = lastFormingScore,
+                judgment = lastJudgment,
+                sensitivity = sensitivity,
+                details = lastDetails
             )
 
         if (success) {
@@ -854,12 +686,6 @@ Forming Score : -
             ).show()
         }
     }
-
-    /*
-     * =========================================================
-     * 민감도
-     * =========================================================
-     */
 
     private fun setupSensitivity() {
 
@@ -905,6 +731,8 @@ Forming Score : -
 
                             hasInspectionResult =
                                 false
+
+                            restoreOriginalImage()
 
                             prefs.edit()
                                 .putInt(
@@ -953,6 +781,8 @@ Forming Score : -
                 hasInspectionResult =
                     false
 
+                restoreOriginalImage()
+
                 updateSensitivityText()
 
                 Toast.makeText(
@@ -968,12 +798,6 @@ Forming Score : -
         binding.tvFormingSensitivityValue.text =
             "현재 민감도 : ${sensitivity}%"
     }
-
-    /*
-     * =========================================================
-     * 이미지 확대 / 이동
-     * =========================================================
-     */
 
     private fun setupImageZoom() {
 
@@ -996,8 +820,8 @@ Forming Score : -
                         val newZoom =
                             (
                                 zoomFactor *
-                                    detector.scaleFactor
-                                )
+                                detector.scaleFactor
+                            )
                                 .coerceIn(
                                     1f,
                                     8f
@@ -1005,7 +829,7 @@ Forming Score : -
 
                         val actualScale =
                             newZoom /
-                                oldZoom
+                            oldZoom
 
                         zoomFactor =
                             newZoom
@@ -1023,6 +847,8 @@ Forming Score : -
                         hasInspectionResult =
                             false
 
+                        restoreOriginalImage()
+
                         return true
                     }
                 }
@@ -1038,10 +864,9 @@ Forming Score : -
                         true
                     )
 
-                scaleGestureDetector
-                    .onTouchEvent(
-                        event
-                    )
+                scaleGestureDetector.onTouchEvent(
+                    event
+                )
 
                 when (
                     event.actionMasked
@@ -1068,11 +893,11 @@ Forming Score : -
 
                             val dx =
                                 event.x -
-                                    lastImageTouchX
+                                lastImageTouchX
 
                             val dy =
                                 event.y -
-                                    lastImageTouchY
+                                lastImageTouchY
 
                             imageMatrixValue.postTranslate(
                                 dx,
@@ -1084,6 +909,8 @@ Forming Score : -
 
                             hasInspectionResult =
                                 false
+
+                            restoreOriginalImage()
                         }
 
                         lastImageTouchX =
@@ -1112,12 +939,6 @@ Forming Score : -
             }
     }
 
-    /*
-     * =========================================================
-     * 사진 원래크기
-     * =========================================================
-     */
-
     private fun resetImageMatrix() {
 
         val bitmap =
@@ -1132,6 +953,10 @@ Forming Score : -
             return
         }
 
+        binding.formingImagePreview.setImageBitmap(
+            bitmap
+        )
+
         binding.formingImagePreview.post {
 
             val viewWidth =
@@ -1145,10 +970,8 @@ Forming Score : -
                     .toFloat()
 
             if (
-                viewWidth <=
-                0f ||
-                viewHeight <=
-                0f
+                viewWidth <= 0f ||
+                viewHeight <= 0f
             ) {
 
                 return@post
@@ -1165,33 +988,33 @@ Forming Score : -
             val baseScale =
                 minOf(
                     viewWidth /
-                        bitmapWidth,
+                    bitmapWidth,
 
                     viewHeight /
-                        bitmapHeight
+                    bitmapHeight
                 )
 
             val displayedWidth =
                 bitmapWidth *
-                    baseScale
+                baseScale
 
             val displayedHeight =
                 bitmapHeight *
-                    baseScale
+                baseScale
 
             val dx =
                 (
                     viewWidth -
-                        displayedWidth
-                    ) /
-                    2f
+                    displayedWidth
+                ) /
+                2f
 
             val dy =
                 (
                     viewHeight -
-                        displayedHeight
-                    ) /
-                    2f
+                    displayedHeight
+                ) /
+                2f
 
             imageMatrixValue.reset()
 
@@ -1215,12 +1038,6 @@ Forming Score : -
                 false
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 직접 이동
-     * =========================================================
-     */
 
     private fun setupRoiDrag() {
 
@@ -1253,30 +1070,30 @@ Forming Score : -
 
                         val dx =
                             event.rawX -
-                                roiLastTouchX
+                            roiLastTouchX
 
                         val dy =
                             event.rawY -
-                                roiLastTouchY
+                            roiLastTouchY
 
                         var newX =
                             view.x +
-                                dx
+                            dx
 
                         var newY =
                             view.y +
-                                dy
+                            dy
 
                         val parent =
                             binding.formingImageArea
 
                         val maxX =
                             parent.width -
-                                view.width
+                            view.width
 
                         val maxY =
                             parent.height -
-                                view.height
+                            view.height
 
                         newX =
                             newX.coerceIn(
@@ -1313,6 +1130,8 @@ Forming Score : -
                         hasInspectionResult =
                             false
 
+                        restoreOriginalImage()
+
                         true
                     }
 
@@ -1333,12 +1152,6 @@ Forming Score : -
             }
     }
 
-    /*
-     * =========================================================
-     * ROI 가로
-     * =========================================================
-     */
-
     private fun resizeRoiWidth(
         scale: Float
     ) {
@@ -1350,8 +1163,7 @@ Forming Score : -
             binding.formingImageArea
 
         if (
-            parent.width <=
-            0
+            parent.width <= 0
         ) {
 
             return
@@ -1360,9 +1172,8 @@ Forming Score : -
         var newWidth =
             (
                 roi.width *
-                    scale
-                )
-                .toInt()
+                scale
+            ).toInt()
 
         newWidth =
             newWidth.coerceIn(
@@ -1371,16 +1182,15 @@ Forming Score : -
                     80,
                     (
                         parent.width *
-                            0.95f
-                        )
-                        .toInt()
+                        0.95f
+                    ).toInt()
                 )
             )
 
         val centerX =
             roi.x +
-                roi.width /
-                2f
+            roi.width /
+            2f
 
         val params =
             roi.layoutParams
@@ -1394,20 +1204,22 @@ Forming Score : -
         hasInspectionResult =
             false
 
+        restoreOriginalImage()
+
         roi.post {
 
             var newX =
                 centerX -
-                    roi.width /
-                    2f
+                roi.width /
+                2f
 
             newX =
                 newX.coerceIn(
                     0f,
                     (
                         parent.width -
-                            roi.width
-                        )
+                        roi.width
+                    )
                         .coerceAtLeast(
                             0
                         )
@@ -1418,12 +1230,6 @@ Forming Score : -
                 newX
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 세로
-     * =========================================================
-     */
 
     private fun resizeRoiHeight(
         scale: Float
@@ -1436,8 +1242,7 @@ Forming Score : -
             binding.formingImageArea
 
         if (
-            parent.height <=
-            0
+            parent.height <= 0
         ) {
 
             return
@@ -1446,9 +1251,8 @@ Forming Score : -
         var newHeight =
             (
                 roi.height *
-                    scale
-                )
-                .toInt()
+                scale
+            ).toInt()
 
         newHeight =
             newHeight.coerceIn(
@@ -1457,16 +1261,15 @@ Forming Score : -
                     60,
                     (
                         parent.height *
-                            0.95f
-                        )
-                        .toInt()
+                        0.95f
+                    ).toInt()
                 )
             )
 
         val centerY =
             roi.y +
-                roi.height /
-                2f
+            roi.height /
+            2f
 
         val params =
             roi.layoutParams
@@ -1480,20 +1283,22 @@ Forming Score : -
         hasInspectionResult =
             false
 
+        restoreOriginalImage()
+
         roi.post {
 
             var newY =
                 centerY -
-                    roi.height /
-                    2f
+                roi.height /
+                2f
 
             newY =
                 newY.coerceIn(
                     0f,
                     (
                         parent.height -
-                            roi.height
-                        )
+                        roi.height
+                    )
                         .coerceAtLeast(
                             0
                         )
@@ -1504,12 +1309,6 @@ Forming Score : -
                 newY
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 중앙
-     * =========================================================
-     */
 
     private fun resetRoiPosition() {
 
@@ -1524,27 +1323,23 @@ Forming Score : -
             roi.x =
                 (
                     parent.width -
-                        roi.width
-                    ) /
-                    2f
+                    roi.width
+                ) /
+                2f
 
             roi.y =
                 (
                     parent.height -
-                        roi.height
-                    ) /
-                    2f
+                    roi.height
+                ) /
+                2f
 
             hasInspectionResult =
                 false
+
+            restoreOriginalImage()
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 분석 시작
-     * =========================================================
-     */
 
     private fun analyzeSelectedRoi(
         source: Bitmap
@@ -1556,14 +1351,16 @@ Forming Score : -
         hasInspectionResult =
             false
 
+        restoreOriginalImage()
+
         val screenRect =
             RectF(
                 binding.formingRoiGuide.x,
                 binding.formingRoiGuide.y,
                 binding.formingRoiGuide.x +
-                    binding.formingRoiGuide.width,
+                binding.formingRoiGuide.width,
                 binding.formingRoiGuide.y +
-                    binding.formingRoiGuide.height
+                binding.formingRoiGuide.height
             )
 
         val currentMatrix =
@@ -1617,44 +1414,38 @@ Forming Score : -
                 left =
                     left.coerceIn(
                         0,
-                        source.width -
-                            1
+                        source.width - 1
                     )
 
                 top =
                     top.coerceIn(
                         0,
-                        source.height -
-                            1
+                        source.height - 1
                     )
 
                 right =
                     right.coerceIn(
-                        left +
-                            1,
+                        left + 1,
                         source.width
                     )
 
                 bottom =
                     bottom.coerceIn(
-                        top +
-                            1,
+                        top + 1,
                         source.height
                     )
 
                 val roiWidth =
                     right -
-                        left
+                    left
 
                 val roiHeight =
                     bottom -
-                        top
+                    top
 
                 if (
-                    roiWidth <
-                    10 ||
-                    roiHeight <
-                    10
+                    roiWidth < 10 ||
+                    roiHeight < 10
                 ) {
 
                     throw Exception(
@@ -1672,10 +1463,10 @@ Forming Score : -
                     )
 
                 analyzeFormingRoi(
-                    source,
-                    roiBitmap,
-                    left,
-                    top
+                    source = source,
+                    roi = roiBitmap,
+                    roiStartX = left,
+                    roiStartY = top
                 )
 
             } catch (e: Exception) {
@@ -1689,13 +1480,6 @@ Forming Score : -
 
         }.start()
     }
-
-    /*
-     * =========================================================
-     * FORMING 분석
-     * 기존 공식 유지
-     * =========================================================
-     */
 
     private fun analyzeFormingRoi(
         source: Bitmap,
@@ -1721,9 +1505,9 @@ Forming Score : -
         val edgeThreshold =
             (
                 70 -
-                    sensitivity *
-                    0.50
-                )
+                sensitivity *
+                0.50
+            )
                 .toInt()
                 .coerceIn(
                     18,
@@ -1733,9 +1517,9 @@ Forming Score : -
         val strongThreshold =
             (
                 115 -
-                    sensitivity *
-                    0.67
-                )
+                sensitivity *
+                0.67
+            )
                 .toInt()
                 .coerceIn(
                     35,
@@ -1766,62 +1550,14 @@ Forming Score : -
         var rightCount =
             0L
 
-        val markedBitmap =
-            source.copy(
-                Bitmap.Config.ARGB_8888,
-                true
-            )
-
-        val canvas =
-            Canvas(
-                markedBitmap
-            )
-
-        val redPaint =
-            Paint(
-                Paint.ANTI_ALIAS_FLAG
-            ).apply {
-
-                color =
-                    Color.RED
-
-                style =
-                    Paint.Style.FILL
-
-                alpha =
-                    220
-            }
-
-        val xScale =
-            roi.width
-                .toFloat() /
-                analysisWidth
-                    .toFloat()
-
-        val yScale =
-            roi.height
-                .toFloat() /
-                analysisHeight
-                    .toFloat()
-
-        val markRadius =
-            max(
-                2f,
-                roi.width
-                    .toFloat() /
-                    200f
-            )
-
         for (
             y in 1 until
-            small.height -
-                1
+            small.height - 1
         ) {
 
             for (
                 x in 1 until
-                small.width -
-                    1
+                small.width - 1
             ) {
 
                 val center =
@@ -1835,8 +1571,7 @@ Forming Score : -
                 val rightPixel =
                     gray(
                         small.getPixel(
-                            x +
-                                1,
+                            x + 1,
                             y
                         )
                     )
@@ -1845,20 +1580,19 @@ Forming Score : -
                     gray(
                         small.getPixel(
                             x,
-                            y +
-                                1
+                            y + 1
                         )
                     )
 
                 val gradient =
                     abs(
                         center -
-                            rightPixel
+                        rightPixel
                     ) +
-                        abs(
-                            center -
-                                bottomPixel
-                        )
+                    abs(
+                        center -
+                        bottomPixel
+                    )
 
                 totalStrength +=
                     gradient
@@ -1879,47 +1613,12 @@ Forming Score : -
                 ) {
 
                     strongEdgeCount++
-
-                    if (
-                        x %
-                        4 ==
-                        0 &&
-                        y %
-                        4 ==
-                        0
-                    ) {
-
-                        val originalX =
-                            roiStartX +
-                                (
-                                    x *
-                                        xScale
-                                    )
-                                    .toInt()
-
-                        val originalY =
-                            roiStartY +
-                                (
-                                    y *
-                                        yScale
-                                    )
-                                    .toInt()
-
-                        canvas.drawCircle(
-                            originalX
-                                .toFloat(),
-                            originalY
-                                .toFloat(),
-                            markRadius,
-                            redPaint
-                        )
-                    }
                 }
 
                 if (
                     x <
                     small.width /
-                        2
+                    2
                 ) {
 
                     leftGraySum +=
@@ -1939,15 +1638,14 @@ Forming Score : -
 
         val edgeDensity =
             if (
-                pixelCount >
-                0
+                pixelCount > 0
             ) {
 
                 edgeCount
                     .toDouble() /
-                    pixelCount
-                        .toDouble() *
-                    100.0
+                pixelCount
+                    .toDouble() *
+                100.0
 
             } else {
 
@@ -1956,15 +1654,14 @@ Forming Score : -
 
         val strongEdgeDensity =
             if (
-                pixelCount >
-                0
+                pixelCount > 0
             ) {
 
                 strongEdgeCount
                     .toDouble() /
-                    pixelCount
-                        .toDouble() *
-                    100.0
+                pixelCount
+                    .toDouble() *
+                100.0
 
             } else {
 
@@ -1973,14 +1670,13 @@ Forming Score : -
 
         val averageStrength =
             if (
-                pixelCount >
-                0
+                pixelCount > 0
             ) {
 
                 totalStrength
                     .toDouble() /
-                    pixelCount
-                        .toDouble()
+                pixelCount
+                    .toDouble()
 
             } else {
 
@@ -1989,14 +1685,13 @@ Forming Score : -
 
         val leftAverage =
             if (
-                leftCount >
-                0
+                leftCount > 0
             ) {
 
                 leftGraySum
                     .toDouble() /
-                    leftCount
-                        .toDouble()
+                leftCount
+                    .toDouble()
 
             } else {
 
@@ -2005,14 +1700,13 @@ Forming Score : -
 
         val rightAverage =
             if (
-                rightCount >
-                0
+                rightCount > 0
             ) {
 
                 rightGraySum
                     .toDouble() /
-                    rightCount
-                        .toDouble()
+                rightCount
+                    .toDouble()
 
             } else {
 
@@ -2022,67 +1716,63 @@ Forming Score : -
         val symmetryError =
             abs(
                 leftAverage -
-                    rightAverage
+                rightAverage
             )
 
         val sensitivityFactor =
             0.55 +
-                sensitivity /
-                133.3
-
-        /*
-         * 기존 FORMING 계산식 유지
-         */
+            sensitivity /
+            133.3
 
         val shapeError =
             (
                 edgeDensity *
-                    1.1 +
-                    averageStrength *
-                    0.45
-                ) *
-                sensitivityFactor
+                1.1 +
+                averageStrength *
+                0.45
+            ) *
+            sensitivityFactor
 
         val wrinkle =
             (
                 strongEdgeDensity *
-                    4.0 +
-                    edgeDensity *
-                    0.7
-                ) *
-                sensitivityFactor
+                4.0 +
+                edgeDensity *
+                0.7
+            ) *
+            sensitivityFactor
 
         val deformation =
             (
                 averageStrength *
-                    0.9 +
-                    strongEdgeDensity *
-                    2.5
-                ) *
-                sensitivityFactor
+                0.9 +
+                strongEdgeDensity *
+                2.5
+            ) *
+            sensitivityFactor
 
         val symmetry =
             symmetryError *
-                1.8 *
-                sensitivityFactor
+            1.8 *
+            sensitivityFactor
 
         val defectLevel =
             (
                 shapeError *
-                    0.30 +
-                    wrinkle *
-                    0.25 +
-                    deformation *
-                    0.25 +
-                    symmetry *
-                    0.20
-                )
+                0.30 +
+                wrinkle *
+                0.25 +
+                deformation *
+                0.25 +
+                symmetry *
+                0.20
+            )
 
         val formingScore =
             (
                 100.0 -
-                    defectLevel
-                )
+                defectLevel
+            )
                 .coerceIn(
                     0.0,
                     100.0
@@ -2091,21 +1781,40 @@ Forming Score : -
         val judgment =
             when {
 
-                formingScore >=
-                    85 ->
+                formingScore >= 85 ->
                     "정상 후보"
 
-                formingScore >=
-                    70 ->
+                formingScore >= 70 ->
                     "주의 후보"
 
-                formingScore >=
-                    50 ->
+                formingScore >= 50 ->
                     "한계정상 후보"
 
                 else ->
                     "불량 후보"
             }
+
+        /*
+         * NG 후보 영역 그룹화
+         */
+        val markerResult =
+            DefectMarker.markDefectRegions(
+                sourceBitmap = source,
+                roiLeft = roiStartX,
+                roiTop = roiStartY,
+                roiWidth = roi.width,
+                roiHeight = roi.height,
+                sensitivity = sensitivity,
+                maxRegions = 5
+            )
+
+        val regionCount =
+            markerResult.regions.size
+
+        val regionSummary =
+            DefectMarker.buildRegionSummary(
+                markerResult.regions
+            )
 
         lastFormingScore =
             formingScore
@@ -2136,6 +1845,9 @@ Symmetry : %.1f
 Shape Error : %.1f
 Forming Score : %.1f / 100
 Sensitivity : %d%%
+NG 후보 영역 : %d개
+
+%s
                 """.trimIndent(),
 
                 wrinkle,
@@ -2143,7 +1855,9 @@ Sensitivity : %d%%
                 symmetry,
                 shapeError,
                 formingScore,
-                sensitivity
+                sensitivity,
+                regionCount,
+                regionSummary
             )
 
         hasInspectionResult =
@@ -2152,16 +1866,12 @@ Sensitivity : %d%%
         runOnUiThread {
 
             /*
-             * 분석 결과 표시용 이미지는 빨간 후보점 포함
+             * 중요:
+             * lastBitmap은 원본 그대로 유지합니다.
              */
-
-            lastBitmap =
-                markedBitmap
-
-            binding.formingImagePreview
-                .setImageBitmap(
-                    markedBitmap
-                )
+            binding.formingImagePreview.setImageBitmap(
+                markerResult.bitmap
+            )
 
             binding.formingImagePreview.imageMatrix =
                 imageMatrixValue
@@ -2183,12 +1893,15 @@ Forming Score: %.1f / 100
 
 판정 : %s
 
-빨간 표시 : 국부 변화가 큰 위치 후보
+NG 후보 영역 : %d개
+%s
 
+빨간 원/박스 = Forming 영역에서 국부 변화가 큰 검사 후보
+
+※ 빨간 표시는 확정 NG가 아닙니다.
+※ 문자·Barcode·반사광도 후보로 검출될 수 있습니다.
 ※ 현재 수치는 영상 변화 기반 보조 지표입니다.
-※ 빨간 점 자체가 실제 불량 확정을 의미하지 않습니다.
-※ 문자·Barcode·반사광도 Edge로 검출될 수 있습니다.
-※ 실제 형상 치수 판정에는 Calibration 및 Master Sample이 필요합니다.
+※ 실제 형상 치수 및 깊이 판정에는 Calibration과 Master Sample이 필요합니다.
                     """.trimIndent(),
 
                     sensitivity,
@@ -2197,16 +1910,12 @@ Forming Score: %.1f / 100
                     symmetry,
                     shapeError,
                     formingScore,
-                    judgment
+                    judgment,
+                    regionCount,
+                    regionSummary
                 )
         }
     }
-
-    /*
-     * =========================================================
-     * Gray
-     * =========================================================
-     */
 
     private fun gray(
         color: Int
@@ -2229,12 +1938,12 @@ Forming Score: %.1f / 100
 
         return (
             0.299 *
-                r +
-                0.587 *
-                g +
-                0.114 *
-                b
-            )
+            r +
+            0.587 *
+            g +
+            0.114 *
+            b
+        )
             .toInt()
     }
 }

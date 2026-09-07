@@ -2,7 +2,6 @@ package com.pouchvision.inspector
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.pouchvision.inspector.databinding.ActivityMenuBinding
 
@@ -11,6 +10,7 @@ class MenuActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMenuBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
 
         binding =
@@ -18,24 +18,39 @@ class MenuActivity : AppCompatActivity() {
 
         setContentView(binding.root)
 
+        setupButtons()
+    }
+
+    private fun setupButtons() {
+
+        /*
+         * =====================================================
+         * 종합검사
+         * =====================================================
+         */
         binding.btnTotalInspection.setOnClickListener {
 
-            Toast.makeText(
-                this,
-                "종합검사는 개별 검사 기능 완성 후 연결합니다.",
-                Toast.LENGTH_LONG
-            ).show()
+            startActivity(
+                Intent(
+                    this,
+                    TotalInspectionActivity::class.java
+                )
+            )
         }
 
+        /*
+         * =====================================================
+         * Bottom Corner 검사
+         * =====================================================
+         */
         binding.btnBottomCorner.setOnClickListener {
 
-            val intent =
+            startActivity(
                 Intent(
                     this,
                     MainActivity::class.java
                 )
-
-            startActivity(intent)
+            )
         }
 
         binding.btnBottomCornerGuide.setOnClickListener {
@@ -45,15 +60,19 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
+        /*
+         * =====================================================
+         * Seal 검사
+         * =====================================================
+         */
         binding.btnSealInspection.setOnClickListener {
 
-            val intent =
+            startActivity(
                 Intent(
                     this,
                     SealActivity::class.java
                 )
-
-            startActivity(intent)
+            )
         }
 
         binding.btnSealGuide.setOnClickListener {
@@ -63,15 +82,19 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
+        /*
+         * =====================================================
+         * Forming 검사
+         * =====================================================
+         */
         binding.btnFormingInspection.setOnClickListener {
 
-            val intent =
+            startActivity(
                 Intent(
                     this,
                     FormingActivity::class.java
                 )
-
-            startActivity(intent)
+            )
         }
 
         binding.btnFormingGuide.setOnClickListener {
@@ -81,15 +104,19 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
+        /*
+         * =====================================================
+         * Tab 검사
+         * =====================================================
+         */
         binding.btnTabInspection.setOnClickListener {
 
-            val intent =
+            startActivity(
                 Intent(
                     this,
                     TabActivity::class.java
                 )
-
-            startActivity(intent)
+            )
         }
 
         binding.btnTabGuide.setOnClickListener {
@@ -99,26 +126,34 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
+        /*
+         * =====================================================
+         * 분해검사
+         * =====================================================
+         */
         binding.btnDisassemblyInspection.setOnClickListener {
 
-            val intent =
+            startActivity(
                 Intent(
                     this,
                     DisassemblyActivity::class.java
                 )
-
-            startActivity(intent)
+            )
         }
 
+        /*
+         * =====================================================
+         * 검사 이력
+         * =====================================================
+         */
         binding.btnHistory.setOnClickListener {
 
-            val intent =
+            startActivity(
                 Intent(
                     this,
                     HistoryActivity::class.java
                 )
-
-            startActivity(intent)
+            )
         }
     }
 

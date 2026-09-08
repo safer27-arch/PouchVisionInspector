@@ -1366,8 +1366,25 @@ Concentration : ${"%.1f".format(result.concentration)}
          * 빨간 주름 후보가 표시된 결과 Bitmap을 저장해 둡니다.
          * lastBitmap 원본은 그대로 유지합니다.
          */
+        /*
+         * 표시 방식만 공통 Renderer로 변경합니다.
+         *
+         * - 판정 / 점수 / 후보 검출 알고리즘은 그대로 유지
+         * - "주름 후보 N" 라벨은 ROI 바깥으로 이동
+         * - 빨간 원 선 굵기는 기존의 약 50%
+         */
+        val displayBitmap =
+            MarkerDisplayRenderer.renderBottomCorner(
+                sourceBitmap = source,
+                roiLeft = roiLeft,
+                roiTop = roiTop,
+                roiWidth = roiWidth,
+                roiHeight = roiHeight,
+                regions = result.regions
+            )
+
         lastResultBitmap =
-            result.bitmap
+            displayBitmap
 
         hasInspectionResult =
             true
@@ -1375,7 +1392,7 @@ Concentration : ${"%.1f".format(result.concentration)}
         runOnUiThread {
 
             binding.imagePreview.setImageBitmap(
-                result.bitmap
+                displayBitmap
             )
 
             binding.imagePreview.imageMatrix =

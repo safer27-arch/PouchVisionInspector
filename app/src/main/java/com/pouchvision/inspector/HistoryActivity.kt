@@ -1,9 +1,13 @@
 package com.pouchvision.inspector
 
+import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
@@ -19,6 +23,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.pouchvision.inspector.databinding.ActivityHistoryBinding
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 class HistoryActivity : AppCompatActivity() {
@@ -633,6 +639,10 @@ Session 평균 Quality Score : %.1f / 100
 
             return
         }
+
+        addTrendButton(
+            allRecords
+        )
 
         for (
             record in records
@@ -1612,6 +1622,911 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
         ) {
 
             null
+        }
+    }
+
+    /*
+     * =========================================================
+     * 기간별 Trend / 통계 버튼
+     *
+     * XML을 추가로 수정하지 않고 History 화면 안에
+     * 동적으로 버튼을 생성합니다.
+     * =========================================================
+     */
+
+    private fun addTrendButton(
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        val button =
+            Button(
+                this
+            )
+
+        button.text =
+            "기간별 Trend / 통계 보기"
+
+        button.textSize =
+            15f
+
+        button.isAllCaps =
+            false
+
+        button.setTextColor(
+            Color.WHITE
+        )
+
+        button.backgroundTintList =
+            ColorStateList.valueOf(
+                Color.parseColor(
+                    "#102A43"
+                )
+            )
+
+        val params =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52)
+            )
+
+        params.bottomMargin =
+            dp(12)
+
+        button.layoutParams =
+            params
+
+        button.setOnClickListener {
+
+            showTrendDialog(
+                allRecords
+            )
+        }
+
+        binding.historyContainer
+            .addView(
+                button
+            )
+    }
+
+    /*
+     * =========================================================
+     * Trend Dialog
+     *
+     * 7일 / 30일 / 90일 기준으로
+     * 선택한 검사 필터의 Quality Score 변화를 표시합니다.
+     * =========================================================
+     */
+
+    private fun showTrendDialog(
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        val selectedType =
+            binding.spinnerInspectionType
+                .selectedItem
+                ?.toString()
+                ?: FILTER_ALL
+
+        val sourceRecords =
+            trendSourceRecords(
+                allRecords = allRecords,
+                selectedType = selectedType
+            )
+
+        if (
+            sourceRecords.isEmpty()
+        ) {
+
+            Toast.makeText(
+                this,
+                "Trend를 표시할 검사 결과가 없습니다.",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        val root =
+            LinearLayout(
+                this
+            )
+
+        root.orientation =
+            LinearLayout.VERTICAL
+
+        root.setPadding(
+            dp(16),
+            dp(8),
+            dp(16),
+            dp(8)
+        )
+
+        val periodRow =
+            LinearLayout(
+                this
+            )
+
+        periodRow.orientation =
+            LinearLayout.HORIZONTAL
+
+        periodRow.gravity =
+            Gravity.CENTER
+
+        val summaryText =
+            TextView(
+                this
+            )
+
+        summaryText.textSize =
+            14f
+
+        summaryText.setTextColor(
+            Color.parseColor(
+                "#334E68"
+            )
+        )
+
+        summaryText.setPadding(
+            0,
+            dp(12),
+            0,
+            dp(10)
+        )
+
+        val chart =
+            ScoreTrendView(
+                this
+            )
+
+        chart.layoutParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(270)
+            )
+
+        val btn7 =
+            createPeriodButton(
+                "최근 7일"
+            )
+
+        val btn30 =
+            createPeriodButton(
+                "최근 30일"
+            )
+
+        val btn90 =
+            createPeriodButton(
+                "최근 90일"
+            )
+
+        periodRow.addView(
+            btn7
+        )
+
+        periodRow.addView(
+            btn30
+        )
+
+        periodRow.addView(
+            btn90
+        )
+
+        root.addView(
+            periodRow
+        )
+
+        root.addView(
+            summaryText
+        )
+
+        root.addView(
+            chart
+        )
+
+        fun renderPeriod(
+            days: Int
+        ) {
+
+            val records =
+                filterTrendPeriod(
+                    records = sourceRecords,
+                    days = days
+                )
+
+            chart.setRecords(
+                records
+            )
+
+            summaryText.text =
+                buildTrendSummary(
+                    records = records,
+                    selectedType = selectedType,
+                    days = days
+                )
+        }
+
+        btn7.setOnClickListener {
+            renderPeriod(7)
+        }
+
+        btn30.setOnClickListener {
+            renderPeriod(30)
+        }
+
+        btn90.setOnClickListener {
+            renderPeriod(90)
+        }
+
+        /*
+         * 기본 화면은 최근 30일
+         */
+        renderPeriod(
+            30
+        )
+
+        AlertDialog.Builder(
+            this
+        )
+            .setTitle(
+                "Quality Score Trend · ${trendDisplayName(selectedType)}"
+            )
+            .setView(
+                root
+            )
+            .setPositiveButton(
+                "닫기",
+                null
+            )
+            .show()
+    }
+
+    /*
+     * =========================================================
+     * Trend용 기간 버튼
+     * =========================================================
+     */
+
+    private fun createPeriodButton(
+        title: String
+    ): Button {
+
+        val button =
+            Button(
+                this
+            )
+
+        button.text =
+            title
+
+        button.textSize =
+            12f
+
+        button.isAllCaps =
+            false
+
+        button.setTextColor(
+            Color.WHITE
+        )
+
+        button.backgroundTintList =
+            ColorStateList.valueOf(
+                Color.parseColor(
+                    "#486581"
+                )
+            )
+
+        val params =
+            LinearLayout.LayoutParams(
+                0,
+                dp(46),
+                1f
+            )
+
+        params.marginStart =
+            dp(3)
+
+        params.marginEnd =
+            dp(3)
+
+        button.layoutParams =
+            params
+
+        return button
+    }
+
+    /*
+     * =========================================================
+     * 선택한 History 필터에 맞는 Trend 원본 데이터
+     * =========================================================
+     */
+
+    private fun trendSourceRecords(
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        selectedType: String
+    ):
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            > {
+
+        val filtered =
+            when (
+                selectedType
+            ) {
+
+                FILTER_TOTAL_SESSION -> {
+
+                    allRecords.filter {
+
+                        it.inspectionType.equals(
+                            TYPE_TOTAL_SESSION,
+                            ignoreCase = true
+                        )
+                    }
+                }
+
+                FILTER_ALL -> {
+
+                    /*
+                     * 전체 검사는 개별 검사 Quality Score를 모두 표시합니다.
+                     * TOTAL SESSION 요약값은 중복 계산을 피하기 위해 제외합니다.
+                     */
+                    allRecords.filter {
+
+                        !it.inspectionType.equals(
+                            TYPE_TOTAL_SESSION,
+                            ignoreCase = true
+                        )
+                    }
+                }
+
+                else -> {
+
+                    allRecords.filter {
+
+                        it.inspectionType.equals(
+                            selectedType,
+                            ignoreCase = true
+                        )
+                    }
+                }
+            }
+
+        return filtered
+            .sortedBy {
+
+                it.id
+            }
+    }
+
+    /*
+     * =========================================================
+     * 기간 필터
+     * =========================================================
+     */
+
+    private fun filterTrendPeriod(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        days: Int
+    ):
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            > {
+
+        val millisPerDay =
+            24L *
+                60L *
+                60L *
+                1000L
+
+        val startTime =
+            System.currentTimeMillis() -
+                days.toLong() *
+                millisPerDay
+
+        return records.filter {
+
+            it.id >=
+                startTime
+        }
+    }
+
+    /*
+     * =========================================================
+     * Trend 통계 Summary
+     * =========================================================
+     */
+
+    private fun buildTrendSummary(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        selectedType: String,
+        days: Int
+    ): String {
+
+        if (
+            records.isEmpty()
+        ) {
+
+            return """
+기간 : 최근 ${days}일
+검사 항목 : ${trendDisplayName(selectedType)}
+
+해당 기간에 저장된 검사 결과가 없습니다.
+            """.trimIndent()
+        }
+
+        val average =
+            records
+                .map {
+
+                    it.score
+                }
+                .average()
+
+        val minRecord =
+            records.minByOrNull {
+
+                it.score
+            }
+
+        val maxRecord =
+            records.maxByOrNull {
+
+                it.score
+            }
+
+        var normalCount =
+            0
+
+        var warningCount =
+            0
+
+        var limitCount =
+            0
+
+        var ngCount =
+            0
+
+        for (
+            record in records
+        ) {
+
+            when {
+
+                record.judgment.contains(
+                    "불량"
+                ) ->
+                    ngCount++
+
+                record.judgment.contains(
+                    "한계"
+                ) ->
+                    limitCount++
+
+                record.judgment.contains(
+                    "주의"
+                ) ->
+                    warningCount++
+
+                record.judgment.contains(
+                    "정상"
+                ) ->
+                    normalCount++
+            }
+        }
+
+        return String.format(
+            Locale.getDefault(),
+
+            """
+기간 : 최근 %d일
+검사 항목 : %s
+데이터 : %d건
+
+평균 Score : %.1f / 100
+최고 Score : %.1f / 100
+최저 Score : %.1f / 100
+
+정상 %d  ·  주의 %d  ·  한계정상 %d  ·  불량 %d
+
+※ 그래프는 저장된 Quality Score의 시간 순 변화를 보여줍니다.
+            """.trimIndent(),
+
+            days,
+            trendDisplayName(
+                selectedType
+            ),
+            records.size,
+            average,
+            maxRecord?.score ?: 0.0,
+            minRecord?.score ?: 0.0,
+            normalCount,
+            warningCount,
+            limitCount,
+            ngCount
+        )
+    }
+
+    private fun trendDisplayName(
+        selectedType: String
+    ): String {
+
+        return when (
+            selectedType
+        ) {
+
+            FILTER_ALL ->
+                "전체 개별검사"
+
+            FILTER_TOTAL_SESSION ->
+                "종합검사 평균"
+
+            else ->
+                selectedType
+        }
+    }
+
+    /*
+     * =========================================================
+     * 간단한 Quality Score Line Chart
+     *
+     * 외부 Chart Library를 추가하지 않고 Android Canvas만 사용합니다.
+     * =========================================================
+     */
+
+    private class ScoreTrendView(
+        context: Context
+    ) : View(
+        context
+    ) {
+
+        private var records:
+            List<
+                InspectionHistoryStore
+                    .InspectionRecord
+                > =
+            emptyList()
+
+        private val gridPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#D9E2EC"
+                    )
+
+                strokeWidth =
+                    resources.displayMetrics.density
+            }
+
+        private val linePaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#1565C0"
+                    )
+
+                style =
+                    Paint.Style.STROKE
+
+                strokeWidth =
+                    2.5f *
+                        resources.displayMetrics.density
+            }
+
+        private val pointPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#102A43"
+                    )
+
+                style =
+                    Paint.Style.FILL
+            }
+
+        private val textPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#627D98"
+                    )
+
+                textSize =
+                    11f *
+                        resources.displayMetrics.scaledDensity
+            }
+
+        private val dateFormat =
+            SimpleDateFormat(
+                "MM/dd",
+                Locale.getDefault()
+            )
+
+        fun setRecords(
+            newRecords:
+            List<
+                InspectionHistoryStore
+                    .InspectionRecord
+                >
+        ) {
+
+            records =
+                newRecords
+                    .sortedBy {
+
+                        it.id
+                    }
+
+            invalidate()
+        }
+
+        override fun onDraw(
+            canvas: Canvas
+        ) {
+
+            super.onDraw(
+                canvas
+            )
+
+            canvas.drawColor(
+                Color.WHITE
+            )
+
+            val density =
+                resources.displayMetrics.density
+
+            val left =
+                42f *
+                    density
+
+            val right =
+                width.toFloat() -
+                    14f *
+                    density
+
+            val top =
+                18f *
+                    density
+
+            val bottom =
+                height.toFloat() -
+                    34f *
+                    density
+
+            if (
+                right <=
+                left ||
+                bottom <=
+                top
+            ) {
+
+                return
+            }
+
+            /*
+             * 0 / 25 / 50 / 75 / 100 Grid
+             */
+            for (
+                score in listOf(
+                    0,
+                    25,
+                    50,
+                    75,
+                    100
+                )
+            ) {
+
+                val y =
+                    bottom -
+                        score / 100f *
+                        (
+                            bottom -
+                                top
+                            )
+
+                canvas.drawLine(
+                    left,
+                    y,
+                    right,
+                    y,
+                    gridPaint
+                )
+
+                canvas.drawText(
+                    score.toString(),
+                    4f *
+                        density,
+                    y +
+                        4f *
+                        density,
+                    textPaint
+                )
+            }
+
+            if (
+                records.isEmpty()
+            ) {
+
+                canvas.drawText(
+                    "해당 기간의 데이터가 없습니다.",
+                    left,
+                    (
+                        top +
+                            bottom
+                        ) /
+                        2f,
+                    textPaint
+                )
+
+                return
+            }
+
+            val path =
+                Path()
+
+            val count =
+                records.size
+
+            for (
+                index in records.indices
+            ) {
+
+                val record =
+                    records[index]
+
+                val x =
+                    if (
+                        count <=
+                        1
+                    ) {
+
+                        (
+                            left +
+                                right
+                            ) /
+                            2f
+
+                    } else {
+
+                        left +
+                            index.toFloat() /
+                            (
+                                count -
+                                    1
+                                ).toFloat() *
+                            (
+                                right -
+                                    left
+                                )
+                    }
+
+                val score =
+                    record.score
+                        .coerceIn(
+                            0.0,
+                            100.0
+                        )
+
+                val y =
+                    bottom -
+                        score.toFloat() /
+                        100f *
+                        (
+                            bottom -
+                                top
+                            )
+
+                if (
+                    index ==
+                    0
+                ) {
+
+                    path.moveTo(
+                        x,
+                        y
+                    )
+
+                } else {
+
+                    path.lineTo(
+                        x,
+                        y
+                    )
+                }
+
+                canvas.drawCircle(
+                    x,
+                    y,
+                    3.5f *
+                        density,
+                    pointPaint
+                )
+            }
+
+            if (
+                records.size >
+                1
+            ) {
+
+                canvas.drawPath(
+                    path,
+                    linePaint
+                )
+            }
+
+            /*
+             * 시작 / 마지막 날짜
+             */
+            val firstDate =
+                dateFormat.format(
+                    Date(
+                        records.first().id
+                    )
+                )
+
+            val lastDate =
+                dateFormat.format(
+                    Date(
+                        records.last().id
+                    )
+                )
+
+            canvas.drawText(
+                firstDate,
+                left,
+                height.toFloat() -
+                    9f *
+                    density,
+                textPaint
+            )
+
+            val lastWidth =
+                textPaint.measureText(
+                    lastDate
+                )
+
+            canvas.drawText(
+                lastDate,
+                right -
+                    lastWidth,
+                height.toFloat() -
+                    9f *
+                    density,
+                textPaint
+            )
         }
     }
 

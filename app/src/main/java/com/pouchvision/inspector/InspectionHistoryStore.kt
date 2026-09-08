@@ -30,10 +30,6 @@ object InspectionHistoryStore {
 
     /*
      * 저장 사진 최대 크기
-     *
-     * 너무 큰 원본 사진을 그대로 300장 저장하면
-     * 휴대폰 저장공간을 많이 사용할 수 있으므로
-     * 긴 변 기준 최대 1280 pixel로 저장합니다.
      */
     private const val MAX_IMAGE_SIDE =
         1280
@@ -67,12 +63,26 @@ object InspectionHistoryStore {
         val details: String,
 
         /*
-         * 새로 추가
+         * 검사 결과 사진 경로
          *
          * 과거 이력에는 값이 없을 수 있으므로
-         * 기본값은 빈 문자열
+         * 기본값은 빈 문자열입니다.
          */
         val imagePath: String =
+            "",
+
+        /*
+         * 종합검사 Session ID
+         *
+         * 단독 검사:
+         *   ""
+         *
+         * 종합검사:
+         *   같은 5개 검사 결과가 동일한 sessionId를 가집니다.
+         *
+         * 과거 이력과 기존 단독 검사는 빈 문자열로 유지됩니다.
+         */
+        val sessionId: String =
             ""
     )
 
@@ -80,19 +90,9 @@ object InspectionHistoryStore {
      * =========================================================
      * 검사 결과 저장
      *
-     * imageBitmap은 선택 사항입니다.
+     * imageBitmap / sessionId는 선택사항입니다.
      *
-     * 따라서 기존 코드:
-     *
-     * InspectionHistoryStore.save(...)
-     *
-     * 는 그대로 사용할 수 있습니다.
-     *
-     * 결과 사진을 저장하고 싶은 검사만:
-     *
-     * imageBitmap = 결과Bitmap
-     *
-     * 을 추가하면 됩니다.
+     * 따라서 기존 저장 코드도 그대로 동작합니다.
      * =========================================================
      */
 
@@ -103,7 +103,8 @@ object InspectionHistoryStore {
         judgment: String,
         sensitivity: Int,
         details: String,
-        imageBitmap: Bitmap? = null
+        imageBitmap: Bitmap? = null,
+        sessionId: String = ""
     ): Boolean {
 
         var newlySavedImagePath =
@@ -137,9 +138,6 @@ object InspectionHistoryStore {
             /*
              * =================================================
              * 결과 사진 저장
-             *
-             * imageBitmap이 없으면
-             * 기존 방식처럼 문자 이력만 저장됩니다.
              * =================================================
              */
 
@@ -202,12 +200,18 @@ object InspectionHistoryStore {
                 details
             )
 
-            /*
-             * 새로 추가
-             */
             record.put(
                 "imagePath",
                 newlySavedImagePath
+            )
+
+            /*
+             * 새로 추가:
+             * 종합검사에서만 값이 들어갑니다.
+             */
+            record.put(
+                "sessionId",
+                sessionId
             )
 
             /*
@@ -251,8 +255,8 @@ object InspectionHistoryStore {
 
             /*
              * =================================================
-             * 300건을 초과해 삭제되는 오래된 이력의
-             * 사진 경로를 미리 수집
+             * 300건을 초과해 제거되는 오래된 이력의
+             * 결과 사진 경로 수집
              * =================================================
              */
 
@@ -296,9 +300,6 @@ object InspectionHistoryStore {
             /*
              * =================================================
              * SharedPreferences 저장
-             *
-             * commit()을 사용해서 실제 저장 성공 여부를
-             * 확인합니다.
              * =================================================
              */
 
@@ -314,13 +315,8 @@ object InspectionHistoryStore {
                 !saved
             ) {
 
-                /*
-                 * 문자 이력이 저장되지 않았다면
-                 * 이번에 만든 사진도 삭제
-                 */
                 if (
-                    newlySavedImagePath
-                        .isNotBlank()
+                    newlySavedImagePath.isNotBlank()
                 ) {
 
                     deleteImagePath(
@@ -333,12 +329,8 @@ object InspectionHistoryStore {
             }
 
             /*
-             * =================================================
-             * 이력이 300건을 넘어가면서 제거된
-             * 오래된 사진 삭제
-             * =================================================
+             * 오래된 이력과 함께 제거된 사진 삭제
              */
-
             oldImagePathsToDelete
                 .forEach {
 
@@ -355,13 +347,11 @@ object InspectionHistoryStore {
         ) {
 
             /*
-             * 저장 중 오류가 발생했는데
-             * 사진 파일만 만들어진 경우
-             * 남지 않도록 삭제
+             * 문자 이력 저장 실패 시
+             * 이번에 새로 생성된 사진만 남지 않도록 삭제
              */
             if (
-                newlySavedImagePath
-                    .isNotBlank()
+                newlySavedImagePath.isNotBlank()
             ) {
 
                 deleteImagePath(
@@ -461,13 +451,19 @@ object InspectionHistoryStore {
                                 ""
                             ),
 
-                        /*
-                         * 기존에 저장된 과거 이력에는
-                         * imagePath가 없으므로 빈 문자열 처리
-                         */
                         imagePath =
                             item.optString(
                                 "imagePath",
+                                ""
+                            ),
+
+                        /*
+                         * 기존 이력에는 sessionId가 없으므로
+                         * 자동으로 빈 문자열 처리됩니다.
+                         */
+                        sessionId =
+                            item.optString(
+                                "sessionId",
                                 ""
                             )
                     )
@@ -482,6 +478,38 @@ object InspectionHistoryStore {
         }
 
         return result
+    }
+
+    /*
+     * =========================================================
+     * 특정 종합검사 Session의 기록 읽기
+     * =========================================================
+     */
+
+    fun loadSession(
+        context: Context,
+        sessionId: String
+    ): List<InspectionRecord> {
+
+        if (
+            sessionId.isBlank()
+        ) {
+
+            return emptyList()
+        }
+
+        return load(
+            context
+        )
+            .filter {
+
+                it.sessionId ==
+                    sessionId
+            }
+            .sortedBy {
+
+                it.id
+            }
     }
 
     /*
@@ -520,20 +548,12 @@ object InspectionHistoryStore {
                 }
             }
 
-            /*
-             * 검사 종류와 관계없이
-             * recordId가 고유 파일명이 됩니다.
-             */
             val imageFile =
                 File(
                     imageDirectory,
                     "inspection_$recordId.jpg"
                 )
 
-            /*
-             * 저장공간 절약을 위해
-             * 필요하면 크기를 줄입니다.
-             */
             val storageBitmap =
                 resizeBitmapForStorage(
                     bitmap
@@ -602,10 +622,6 @@ object InspectionHistoryStore {
                 height
             )
 
-        /*
-         * 이미 1280 이하라면
-         * 원본 Bitmap 그대로 사용
-         */
         if (
             longestSide <=
             MAX_IMAGE_SIDE
@@ -650,9 +666,7 @@ object InspectionHistoryStore {
 
     /*
      * =========================================================
-     * 저장된 사진 파일 가져오기
-     *
-     * 나중에 HistoryActivity에서 사용합니다.
+     * 저장된 결과 사진 File 가져오기
      * =========================================================
      */
 
@@ -661,8 +675,7 @@ object InspectionHistoryStore {
     ): File? {
 
         if (
-            record.imagePath
-                .isBlank()
+            record.imagePath.isBlank()
         ) {
 
             return null
@@ -719,19 +732,14 @@ object InspectionHistoryStore {
                 )
                     .canonicalFile
 
-            /*
-             * 앱의 inspection_images 폴더 안에 있는
-             * 파일만 삭제합니다.
-             */
             val allowedPrefix =
                 imageDirectory.path +
                     File.separator
 
             if (
-                imageFile.path
-                    .startsWith(
-                        allowedPrefix
-                    )
+                imageFile.path.startsWith(
+                    allowedPrefix
+                )
             ) {
 
                 if (
@@ -747,8 +755,7 @@ object InspectionHistoryStore {
         ) {
 
             /*
-             * 사진 삭제 실패가
-             * 앱 종료로 이어지지 않도록 합니다.
+             * 사진 삭제 실패가 앱 종료로 이어지지 않도록 합니다.
              */
         }
     }
@@ -757,7 +764,7 @@ object InspectionHistoryStore {
      * =========================================================
      * 모든 이력 삭제
      *
-     * 문자 이력 + 검사 사진 모두 삭제
+     * 문자 이력 + 결과 사진 모두 삭제
      * =========================================================
      */
 
@@ -777,9 +784,6 @@ object InspectionHistoryStore {
             )
             .apply()
 
-        /*
-         * 앱 내부 검사 사진 폴더 삭제
-         */
         try {
 
             val imageDirectory =
@@ -801,8 +805,7 @@ object InspectionHistoryStore {
         ) {
 
             /*
-             * 이미지 삭제 오류가 있어도
-             * 앱은 계속 동작
+             * 이미지 삭제 오류가 있어도 앱은 계속 동작합니다.
              */
         }
     }

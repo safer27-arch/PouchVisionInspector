@@ -28,6 +28,12 @@
 
         </activity>
 
+        <!-- 품질 Dashboard -->
+        <activity
+            android:name=".DashboardActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <!-- 종합검사 -->
         <activity
             android:name=".TotalInspectionActivity"

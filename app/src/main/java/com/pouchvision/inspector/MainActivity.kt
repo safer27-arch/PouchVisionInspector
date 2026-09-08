@@ -182,6 +182,21 @@ class MainActivity : AppCompatActivity() {
             showCameraMode()
         }
 
+        /*
+         * 촬영 표준화 가이드
+         *
+         * 검사 알고리즘이나 판정 기준은 변경하지 않고,
+         * 작업자가 촬영 거리 / 각도 / 조명 / ROI 위치를
+         * 일정하게 맞출 수 있도록 안내합니다.
+         */
+        binding.btnCaptureGuide.setOnClickListener {
+
+            CaptureGuideHelper.showGuideDialog(
+                context = this,
+                inspectionType = CaptureGuideHelper.TYPE_BOTTOM_CORNER
+            )
+        }
+
         if (
             ContextCompat.checkSelfPermission(
                 this,

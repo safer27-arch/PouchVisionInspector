@@ -1320,6 +1320,32 @@ class MainActivity : AppCompatActivity() {
             )
 
         /*
+         * 촬영 이미지 품질 점검
+         *
+         * 검사 Score / 판정에는 영향을 주지 않습니다.
+         * 사진 상태가 좋지 않으면 재촬영만 권고합니다.
+         */
+        val photoQuality =
+            ImageQualityChecker.analyzeRoi(
+                sourceBitmap = source,
+                roiLeft = roiLeft,
+                roiTop = roiTop,
+                roiWidth = roiWidth,
+                roiHeight = roiHeight
+            )
+
+        val photoQualityText =
+            String.format(
+                Locale.getDefault(),
+                "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+                photoQuality.status,
+                photoQuality.qualityScore,
+                photoQuality.averageBrightness,
+                photoQuality.contrast,
+                photoQuality.sharpness
+            )
+
+        /*
          * Wrinkle Score가 높을수록 좋지 않으므로
          * Quality Score는 반대로 계산합니다.
          */
@@ -1360,6 +1386,16 @@ Concentration : ${"%.1f".format(result.concentration)}
 ※ 불량 후보 기준은 실제 불량 샘플이 아직 없어
    현재 한계정상 수준을 초과하는 경우를 임시 기준으로 사용합니다.
             """.trimIndent()
+
+        lastResultDetails +=
+            "\n\n" +
+                photoQualityText
+
+        if (!photoQuality.isUsable) {
+            lastResultDetails +=
+                "\n" +
+                    photoQuality.message
+        }
 
         /*
          * 핵심 추가:
@@ -1424,7 +1460,19 @@ Concentration : ${"%.1f".format(result.concentration)}
 ※ 넓고 완만한 음영은 가급적 감점하도록 설계했습니다.
 ※ 빨간 표시 = 주름 의심 후보이며 확정 불량은 아닙니다.
 ※ 실제 불량 Sample 확보 후 불량 기준은 다시 보정할 수 있습니다.
+
+${photoQualityText}
+
+※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다.
                 """.trimIndent()
+
+            if (!photoQuality.isUsable) {
+                Toast.makeText(
+                    this,
+                    "촬영 상태 재확인 권고\n${photoQuality.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 

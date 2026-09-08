@@ -19,6 +19,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.pouchvision.inspector.databinding.ActivityHistoryBinding
@@ -30,6 +31,63 @@ import java.util.Locale
 class HistoryActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityHistoryBinding
+
+    /* CSV 저장 화면을 열기 전에 생성해 둔 내용 */
+    private var pendingCsvContent: String? = null
+
+    /*
+     * Android 저장 위치 선택 화면.
+     * 별도 저장소 권한 없이 사용자가 선택한 위치에 CSV를 저장합니다.
+     */
+    private val csvCreateLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.CreateDocument(
+                "text/csv"
+            )
+        ) { uri ->
+
+            if (uri == null) {
+                pendingCsvContent = null
+                return@registerForActivityResult
+            }
+
+            val csvText = pendingCsvContent
+
+            if (csvText == null) {
+                Toast.makeText(
+                    this,
+                    "내보낼 CSV 데이터가 없습니다.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@registerForActivityResult
+            }
+
+            try {
+                val outputStream =
+                    contentResolver.openOutputStream(uri)
+                        ?: throw Exception("파일을 열 수 없습니다.")
+
+                outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    writer.write("\uFEFF")
+                    writer.write(csvText)
+                }
+
+                Toast.makeText(
+                    this,
+                    "CSV 파일 저장 완료",
+                    Toast.LENGTH_LONG
+                ).show()
+
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this,
+                    "CSV 저장 실패: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                pendingCsvContent = null
+            }
+        }
 
     companion object {
 
@@ -641,6 +699,10 @@ Session 평균 Quality Score : %.1f / 100
         }
 
         addTrendButton(
+            allRecords
+        )
+
+        addCsvExportButton(
             allRecords
         )
 
@@ -1623,6 +1685,249 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
 
             null
         }
+    }
+
+    /*
+     * =========================================================
+     * CSV 내보내기 버튼
+     * =========================================================
+     */
+
+    private fun addCsvExportButton(
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        val button = Button(this)
+
+        button.text =
+            "CSV 내보내기 (현재 필터)"
+
+        button.textSize = 15f
+        button.isAllCaps = false
+        button.setTextColor(Color.WHITE)
+        button.backgroundTintList =
+            ColorStateList.valueOf(
+                Color.parseColor("#102A43")
+            )
+
+        val params =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52)
+            )
+
+        params.topMargin = dp(8)
+        params.bottomMargin = dp(14)
+        button.layoutParams = params
+
+        button.setOnClickListener {
+            prepareCsvExport(allRecords)
+        }
+
+        binding.historyContainer.addView(button)
+    }
+
+    /*
+     * =========================================================
+     * 현재 History 필터 기준 CSV 생성
+     * =========================================================
+     */
+
+    private fun prepareCsvExport(
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        val selectedType =
+            binding.spinnerInspectionType
+                .selectedItem
+                ?.toString()
+                ?: FILTER_ALL
+
+        val exportRecords =
+            when (selectedType) {
+
+                FILTER_ALL -> {
+                    /* PC 분석용 원본 데이터이므로 전체 행을 내보냅니다. */
+                    allRecords
+                }
+
+                FILTER_TOTAL_SESSION -> {
+                    allRecords.filter {
+                        it.inspectionType.equals(
+                            TYPE_TOTAL_SESSION,
+                            ignoreCase = true
+                        )
+                    }
+                }
+
+                else -> {
+                    allRecords.filter {
+                        it.inspectionType.equals(
+                            selectedType,
+                            ignoreCase = true
+                        )
+                    }
+                }
+            }
+
+        if (exportRecords.isEmpty()) {
+            Toast.makeText(
+                this,
+                "현재 필터에 내보낼 검사 이력이 없습니다.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        pendingCsvContent =
+            buildCsvText(
+                records = exportRecords,
+                allRecords = allRecords
+            )
+
+        val timestamp =
+            SimpleDateFormat(
+                "yyyyMMdd_HHmmss",
+                Locale.getDefault()
+            ).format(Date())
+
+        val filterName =
+            sanitizeFileName(selectedType)
+
+        csvCreateLauncher.launch(
+            "PouchVision_${filterName}_$timestamp.csv"
+        )
+    }
+
+    /*
+     * =========================================================
+     * CSV 본문 생성
+     * =========================================================
+     */
+
+    private fun buildCsvText(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ): String {
+
+        val childSessionLabel =
+            mutableMapOf<Long, String>()
+
+        allRecords
+            .filter {
+                it.inspectionType.equals(
+                    TYPE_TOTAL_SESSION,
+                    ignoreCase = true
+                )
+            }
+            .forEach { session ->
+                parseSessionChildIds(session.details)
+                    .forEach { childId ->
+                        childSessionLabel[childId] = session.dateTime
+                    }
+            }
+
+        return buildString {
+
+            val header =
+                listOf(
+                    "Record ID",
+                    "검사일시",
+                    "구분",
+                    "검사항목",
+                    "Quality Score",
+                    "판정",
+                    "민감도(%)",
+                    "결과사진",
+                    "사진파일명",
+                    "종합검사 Session",
+                    "상세결과"
+                )
+
+            append(
+                header.joinToString(",") {
+                    csvEscape(it)
+                }
+            )
+            append("\r\n")
+
+            records.sortedBy { it.id }.forEach { record ->
+
+                val isTotalSession =
+                    record.inspectionType.equals(
+                        TYPE_TOTAL_SESSION,
+                        ignoreCase = true
+                    )
+
+                val imageFile =
+                    InspectionHistoryStore.getImageFile(record)
+
+                val sessionLabel =
+                    if (isTotalSession) {
+                        record.dateTime
+                    } else {
+                        childSessionLabel[record.id] ?: ""
+                    }
+
+                val row =
+                    listOf(
+                        record.id.toString(),
+                        record.dateTime,
+                        if (isTotalSession) "종합검사 요약" else "개별검사",
+                        if (isTotalSession) "종합검사" else record.inspectionType,
+                        String.format(Locale.US, "%.1f", record.score),
+                        record.judgment,
+                        if (isTotalSession) "" else record.sensitivity.toString(),
+                        if (imageFile != null) "Y" else "N",
+                        imageFile?.name ?: "",
+                        sessionLabel,
+                        record.details
+                    )
+
+                append(
+                    row.joinToString(",") {
+                        csvEscape(it)
+                    }
+                )
+                append("\r\n")
+            }
+        }
+    }
+
+    private fun csvEscape(
+        value: String
+    ): String {
+        return "\"" +
+            value.replace("\"", "\"\"") +
+            "\""
+    }
+
+    private fun sanitizeFileName(
+        value: String
+    ): String {
+        return value
+            .replace(
+                Regex("[^0-9A-Za-z가-힣_-]"),
+                "_"
+            )
+            .take(40)
+            .ifBlank { "History" }
     }
 
     /*

@@ -1702,6 +1702,26 @@ Seal Score      : -
                         roiHeight
                     )
 
+                /*
+                 * 촬영 이미지 품질 점검
+                 * 검사 Score / 판정에는 영향을 주지 않습니다.
+                 */
+                val photoQuality =
+                    ImageQualityChecker.analyzeBitmap(
+                        roiBitmap
+                    )
+
+                val photoQualityText =
+                    String.format(
+                        Locale.getDefault(),
+                        "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+                        photoQuality.status,
+                        photoQuality.qualityScore,
+                        photoQuality.averageBrightness,
+                        photoQuality.contrast,
+                        photoQuality.sharpness
+                    )
+
                 val analysisWidth =
                     minOf(
                         320,
@@ -2090,6 +2110,16 @@ NG 후보 영역 : %d개
                         regionSummary
                     )
 
+                lastDetails +=
+                    "\n\n" +
+                        photoQualityText
+
+                if (!photoQuality.isUsable) {
+                    lastDetails +=
+                        "\n" +
+                            photoQuality.message
+                }
+
                 /*
                  * =================================================
                  * 핵심 추가:
@@ -2170,8 +2200,22 @@ NG 후보 영역 : %d개
                             regionSummary
                         )
 
+                    binding.tvSealMetrics.append(
+                        "\n\n" +
+                            photoQualityText +
+                            "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
+                    )
+
                     binding.tvSealStatus.text =
                         "SEAL 검사 완료 - $judgment"
+
+                    if (!photoQuality.isUsable) {
+                        Toast.makeText(
+                            this,
+                            "촬영 상태 재확인 권고\n${photoQuality.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
 
             } catch (e: Exception) {

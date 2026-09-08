@@ -25,9 +25,22 @@ class HistoryActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityHistoryBinding
 
+    companion object {
+
+        private const val TYPE_TOTAL_SESSION =
+            "TOTAL SESSION"
+
+        private const val FILTER_ALL =
+            "전체 검사"
+
+        private const val FILTER_TOTAL_SESSION =
+            "종합검사 묶음"
+    }
+
     private val inspectionTypes =
         listOf(
-            "전체 검사",
+            FILTER_ALL,
+            FILTER_TOTAL_SESSION,
             "BOTTOM CORNER",
             "SEAL",
             "FORMING",
@@ -85,6 +98,12 @@ class HistoryActivity : AppCompatActivity() {
         }
     }
 
+    /*
+     * =========================================================
+     * 검사 항목 필터
+     * =========================================================
+     */
+
     private fun setupSpinner() {
 
         val adapter =
@@ -129,6 +148,12 @@ class HistoryActivity : AppCompatActivity() {
             }
     }
 
+    /*
+     * =========================================================
+     * 검사 이력 불러오기
+     * =========================================================
+     */
+
     private fun loadHistory() {
 
         val allRecords =
@@ -140,43 +165,146 @@ class HistoryActivity : AppCompatActivity() {
             binding.spinnerInspectionType
                 .selectedItem
                 ?.toString()
-                ?: "전체 검사"
+                ?: FILTER_ALL
+
+        /*
+         * TOTAL SESSION 안에 들어간 5개 검사 record ID
+         *
+         * "전체 검사" 화면에서는 이 5개를 다시 개별 카드로
+         * 중복 표시하지 않고 종합검사 카드 안에서만 보여줍니다.
+         *
+         * 특정 검사 필터(BOTTOM CORNER 등)를 선택하면
+         * 종합검사에 포함된 결과도 포함해서 모두 볼 수 있습니다.
+         */
+        val groupedChildIds =
+            allRecords
+                .filter {
+
+                    it.inspectionType.equals(
+                        TYPE_TOTAL_SESSION,
+                        ignoreCase = true
+                    )
+                }
+                .flatMap {
+
+                    parseSessionChildIds(
+                        it.details
+                    )
+                }
+                .toSet()
 
         val filteredRecords =
-            if (
-                selectedType ==
-                "전체 검사"
+            when (
+                selectedType
             ) {
 
-                allRecords
+                FILTER_ALL -> {
 
-            } else {
+                    allRecords.filter {
 
-                allRecords.filter {
+                        it.inspectionType.equals(
+                            TYPE_TOTAL_SESSION,
+                            ignoreCase = true
+                        ) ||
+                            it.id !in
+                            groupedChildIds
+                    }
+                }
 
-                    it.inspectionType ==
-                        selectedType
+                FILTER_TOTAL_SESSION -> {
+
+                    allRecords.filter {
+
+                        it.inspectionType.equals(
+                            TYPE_TOTAL_SESSION,
+                            ignoreCase = true
+                        )
+                    }
+                }
+
+                else -> {
+
+                    allRecords.filter {
+
+                        it.inspectionType.equals(
+                            selectedType,
+                            ignoreCase = true
+                        )
+                    }
                 }
             }
 
         updateSummary(
-            selectedType,
-            filteredRecords
+            selectedType = selectedType,
+            visibleRecords = filteredRecords,
+            allRecords = allRecords
         )
 
         showHistoryItems(
-            filteredRecords
+            records = filteredRecords,
+            allRecords = allRecords
         )
     }
 
+    /*
+     * =========================================================
+     * 검사 요약
+     * =========================================================
+     */
+
     private fun updateSummary(
         selectedType: String,
-        records:
+        visibleRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        allRecords:
         List<
             InspectionHistoryStore
                 .InspectionRecord
             >
     ) {
+
+        if (
+            selectedType ==
+            FILTER_TOTAL_SESSION
+        ) {
+
+            updateTotalSessionSummary(
+                visibleRecords
+            )
+
+            return
+        }
+
+        val ordinaryRecords =
+            visibleRecords.filter {
+
+                !it.inspectionType.equals(
+                    TYPE_TOTAL_SESSION,
+                    ignoreCase = true
+                )
+            }
+
+        val totalSessionCount =
+            if (
+                selectedType ==
+                FILTER_ALL
+            ) {
+
+                allRecords.count {
+
+                    it.inspectionType.equals(
+                        TYPE_TOTAL_SESSION,
+                        ignoreCase = true
+                    )
+                }
+
+            } else {
+
+                0
+            }
 
         var normalCount =
             0
@@ -194,7 +322,7 @@ class HistoryActivity : AppCompatActivity() {
             0
 
         for (
-            record in records
+            record in ordinaryRecords
         ) {
 
             when {
@@ -245,11 +373,163 @@ class HistoryActivity : AppCompatActivity() {
 
         val averageScore =
             if (
-                records.isNotEmpty()
+                ordinaryRecords.isNotEmpty()
             ) {
 
-                records
+                ordinaryRecords
                     .map {
+
+                        it.score
+                    }
+                    .average()
+
+            } else {
+
+                0.0
+            }
+
+        if (
+            selectedType ==
+            FILTER_ALL
+        ) {
+
+            binding.tvHistorySummary.text =
+                String.format(
+                    Locale.getDefault(),
+
+                    """
+현재 필터 : 전체 검사
+
+종합검사 Session : %d회
+단독 검사 결과 : %d건
+단독 결과 사진 있음 : %d건
+
+정상 : %d건
+주의 : %d건
+한계정상 : %d건
+불량 : %d건
+
+단독검사 평균 Quality Score : %.1f / 100
+
+※ 종합검사에 포함된 5개 결과는
+   중복을 피하기 위해 종합검사 카드 안에서 묶어 표시합니다.
+                    """.trimIndent(),
+
+                    totalSessionCount,
+                    ordinaryRecords.size,
+                    imageCount,
+                    normalCount,
+                    warningCount,
+                    limitCount,
+                    ngCount,
+                    averageScore
+                )
+
+        } else {
+
+            binding.tvHistorySummary.text =
+                String.format(
+                    Locale.getDefault(),
+
+                    """
+현재 필터 : %s
+저장된 검사 결과 : %d건
+결과 사진 있음 : %d건
+
+정상 : %d건
+주의 : %d건
+한계정상 : %d건
+불량 : %d건
+
+평균 Quality Score : %.1f / 100
+                    """.trimIndent(),
+
+                    selectedType,
+                    ordinaryRecords.size,
+                    imageCount,
+                    normalCount,
+                    warningCount,
+                    limitCount,
+                    ngCount,
+                    averageScore
+                )
+        }
+    }
+
+    /*
+     * =========================================================
+     * 종합검사 묶음 요약
+     * =========================================================
+     */
+
+    private fun updateTotalSessionSummary(
+        sessions:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        var normalCount =
+            0
+
+        var warningCount =
+            0
+
+        var limitCount =
+            0
+
+        var ngCount =
+            0
+
+        for (
+            record in sessions
+        ) {
+
+            when {
+
+                record.judgment
+                    .contains(
+                        "불량"
+                    ) -> {
+
+                    ngCount++
+                }
+
+                record.judgment
+                    .contains(
+                        "한계"
+                    ) -> {
+
+                    limitCount++
+                }
+
+                record.judgment
+                    .contains(
+                        "주의"
+                    ) -> {
+
+                    warningCount++
+                }
+
+                record.judgment
+                    .contains(
+                        "정상"
+                    ) -> {
+
+                    normalCount++
+                }
+            }
+        }
+
+        val averageScore =
+            if (
+                sessions.isNotEmpty()
+            ) {
+
+                sessions
+                    .map {
+
                         it.score
                     }
                     .average()
@@ -264,21 +544,22 @@ class HistoryActivity : AppCompatActivity() {
                 Locale.getDefault(),
 
                 """
-현재 필터 : %s
-저장된 검사 결과 : %d건
-결과 사진 있음 : %d건
+현재 필터 : 종합검사 묶음
 
-정상 : %d건
-주의 : %d건
-한계정상 : %d건
-불량 : %d건
+종합검사 Session : %d회
 
-평균 Quality Score : %.1f / 100
+종합 정상 : %d회
+종합 주의 : %d회
+종합 한계정상 : %d회
+종합 불량 : %d회
+
+Session 평균 Quality Score : %.1f / 100
+
+각 Session 카드에서
+5개 검사 결과와 저장 사진을 함께 확인할 수 있습니다.
                 """.trimIndent(),
 
-                selectedType,
-                records.size,
-                imageCount,
+                sessions.size,
                 normalCount,
                 warningCount,
                 limitCount,
@@ -287,8 +568,19 @@ class HistoryActivity : AppCompatActivity() {
             )
     }
 
+    /*
+     * =========================================================
+     * 이력 카드 출력
+     * =========================================================
+     */
+
     private fun showHistoryItems(
         records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        allRecords:
         List<
             InspectionHistoryStore
                 .InspectionRecord
@@ -311,7 +603,7 @@ class HistoryActivity : AppCompatActivity() {
                 """
 아직 저장된 검사 결과가 없습니다.
 
-검사 화면에서 ROI 검사를 실행한 뒤
+검사 화면에서 분석 후
 '검사 결과 저장' 버튼을 눌러주세요.
                 """.trimIndent()
 
@@ -346,11 +638,510 @@ class HistoryActivity : AppCompatActivity() {
             record in records
         ) {
 
-            addHistoryCard(
-                record
-            )
+            if (
+                record.inspectionType.equals(
+                    TYPE_TOTAL_SESSION,
+                    ignoreCase = true
+                )
+            ) {
+
+                addTotalSessionCard(
+                    sessionRecord = record,
+                    allRecords = allRecords
+                )
+
+            } else {
+
+                addHistoryCard(
+                    record
+                )
+            }
         }
     }
+
+    /*
+     * =========================================================
+     * 종합검사 1회 카드
+     * =========================================================
+     */
+
+    private fun addTotalSessionCard(
+        sessionRecord:
+        InspectionHistoryStore
+            .InspectionRecord,
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        val card =
+            LinearLayout(
+                this
+            )
+
+        card.orientation =
+            LinearLayout.VERTICAL
+
+        card.setPadding(
+            dp(16),
+            dp(16),
+            dp(16),
+            dp(16)
+        )
+
+        val cardParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+        cardParams.bottomMargin =
+            dp(14)
+
+        card.layoutParams =
+            cardParams
+
+        card.setBackgroundColor(
+            Color.parseColor(
+                "#EEF5FA"
+            )
+        )
+
+        /*
+         * 제목
+         */
+        val title =
+            TextView(
+                this
+            )
+
+        title.text =
+            "종합검사 1회"
+
+        title.textSize =
+            20f
+
+        title.setTypeface(
+            null,
+            Typeface.BOLD
+        )
+
+        title.setTextColor(
+            Color.parseColor(
+                "#102A43"
+            )
+        )
+
+        /*
+         * 종합 판정
+         */
+        val judgment =
+            TextView(
+                this
+            )
+
+        judgment.text =
+            "종합 판정 : ${sessionRecord.judgment}"
+
+        judgment.textSize =
+            18f
+
+        judgment.setTypeface(
+            null,
+            Typeface.BOLD
+        )
+
+        judgment.setTextColor(
+            judgmentColor(
+                sessionRecord.judgment
+            )
+        )
+
+        judgment.setPadding(
+            0,
+            dp(6),
+            0,
+            0
+        )
+
+        /*
+         * 날짜 / 평균
+         */
+        val info =
+            TextView(
+                this
+            )
+
+        info.text =
+            String.format(
+                Locale.getDefault(),
+
+                """
+검사 일시 : %s
+평균 Quality Score : %.1f / 100
+                """.trimIndent(),
+
+                sessionRecord.dateTime,
+                sessionRecord.score
+            )
+
+        info.textSize =
+            14f
+
+        info.setTextColor(
+            Color.parseColor(
+                "#486581"
+            )
+        )
+
+        info.setPadding(
+            0,
+            dp(8),
+            0,
+            dp(12)
+        )
+
+        card.addView(
+            title
+        )
+
+        card.addView(
+            judgment
+        )
+
+        card.addView(
+            info
+        )
+
+        /*
+         * TotalInspectionActivity가 저장해 둔
+         * 각 검사 record ID를 읽습니다.
+         */
+        val childSpecs =
+            listOf(
+                Triple(
+                    "1. BOTTOM CORNER",
+                    "BOTTOM_ID",
+                    "BOTTOM CORNER"
+                ),
+                Triple(
+                    "2. SEAL",
+                    "SEAL_ID",
+                    "SEAL"
+                ),
+                Triple(
+                    "3. FORMING",
+                    "FORMING_ID",
+                    "FORMING"
+                ),
+                Triple(
+                    "4. TAB",
+                    "TAB_ID",
+                    "TAB"
+                ),
+                Triple(
+                    "5. 분해검사",
+                    "DISASSEMBLY_ID",
+                    "DISASSEMBLY"
+                )
+            )
+
+        for (
+            spec in childSpecs
+        ) {
+
+            val recordId =
+                parseRecordId(
+                    sessionRecord.details,
+                    spec.second
+                )
+
+            val childRecord =
+                if (
+                    recordId != null
+                ) {
+
+                    allRecords.firstOrNull {
+
+                        it.id ==
+                            recordId
+                    }
+
+                } else {
+
+                    null
+                }
+
+            addSessionInspectionRow(
+                parent = card,
+                displayName = spec.first,
+                expectedType = spec.third,
+                record = childRecord
+            )
+        }
+
+        /*
+         * 안내
+         */
+        val note =
+            TextView(
+                this
+            )
+
+        note.text =
+            """
+※ 종합 판정은 5개 검사 중 가장 주의가 필요한 판정을 기준으로 합니다.
+※ 각 '사진 보기' 버튼을 누르면 해당 검사 당시의 후보 표시 사진을 확인할 수 있습니다.
+            """.trimIndent()
+
+        note.textSize =
+            12f
+
+        note.setTextColor(
+            Color.parseColor(
+                "#627D98"
+            )
+        )
+
+        note.setPadding(
+            0,
+            dp(12),
+            0,
+            0
+        )
+
+        card.addView(
+            note
+        )
+
+        binding.historyContainer
+            .addView(
+                card
+            )
+    }
+
+    /*
+     * =========================================================
+     * 종합검사 카드 내부 1개 항목
+     * =========================================================
+     */
+
+    private fun addSessionInspectionRow(
+        parent: LinearLayout,
+        displayName: String,
+        expectedType: String,
+        record:
+        InspectionHistoryStore
+            .InspectionRecord?
+    ) {
+
+        val container =
+            LinearLayout(
+                this
+            )
+
+        container.orientation =
+            LinearLayout.VERTICAL
+
+        container.setPadding(
+            dp(12),
+            dp(10),
+            dp(12),
+            dp(10)
+        )
+
+        val containerParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+        containerParams.bottomMargin =
+            dp(7)
+
+        container.layoutParams =
+            containerParams
+
+        container.setBackgroundColor(
+            Color.WHITE
+        )
+
+        val headerRow =
+            LinearLayout(
+                this
+            )
+
+        headerRow.orientation =
+            LinearLayout.HORIZONTAL
+
+        headerRow.gravity =
+            Gravity.CENTER_VERTICAL
+
+        val resultText =
+            TextView(
+                this
+            )
+
+        val resultTextParams =
+            LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+
+        resultText.layoutParams =
+            resultTextParams
+
+        if (
+            record != null &&
+            record.inspectionType.equals(
+                expectedType,
+                ignoreCase = true
+            )
+        ) {
+
+            resultText.text =
+                String.format(
+                    Locale.getDefault(),
+                    "%s\n%.1f / 100  ·  %s",
+                    displayName,
+                    record.score,
+                    record.judgment
+                )
+
+            resultText.setTextColor(
+                judgmentColor(
+                    record.judgment
+                )
+            )
+
+        } else {
+
+            resultText.text =
+                "$displayName\n연결된 검사 결과를 찾을 수 없습니다."
+
+            resultText.setTextColor(
+                Color.parseColor(
+                    "#829AB1"
+                )
+            )
+        }
+
+        resultText.textSize =
+            14f
+
+        resultText.setTypeface(
+            null,
+            Typeface.BOLD
+        )
+
+        headerRow.addView(
+            resultText
+        )
+
+        if (
+            record != null &&
+            InspectionHistoryStore
+                .getImageFile(
+                    record
+                ) != null
+        ) {
+
+            val imageButton =
+                Button(
+                    this
+                )
+
+            imageButton.text =
+                "사진 보기"
+
+            imageButton.textSize =
+                12f
+
+            imageButton.isAllCaps =
+                false
+
+            imageButton.setTextColor(
+                Color.WHITE
+            )
+
+            imageButton.backgroundTintList =
+                ColorStateList.valueOf(
+                    Color.parseColor(
+                        "#102A43"
+                    )
+                )
+
+            val buttonParams =
+                LinearLayout.LayoutParams(
+                    dp(96),
+                    dp(46)
+                )
+
+            buttonParams.marginStart =
+                dp(8)
+
+            imageButton.layoutParams =
+                buttonParams
+
+            imageButton.setOnClickListener {
+
+                showResultImage(
+                    record
+                )
+            }
+
+            headerRow.addView(
+                imageButton
+            )
+
+        } else {
+
+            val noImage =
+                TextView(
+                    this
+                )
+
+            noImage.text =
+                "사진 없음"
+
+            noImage.textSize =
+                12f
+
+            noImage.setTextColor(
+                Color.parseColor(
+                    "#829AB1"
+                )
+            )
+
+            noImage.setPadding(
+                dp(8),
+                0,
+                0,
+                0
+            )
+
+            headerRow.addView(
+                noImage
+            )
+        }
+
+        container.addView(
+            headerRow
+        )
+
+        parent.addView(
+            container
+        )
+    }
+
+    /*
+     * =========================================================
+     * 일반 개별 검사 카드
+     * =========================================================
+     */
 
     private fun addHistoryCard(
         record:
@@ -540,6 +1331,12 @@ Quality Score : %.1f / 100
             )
     }
 
+    /*
+     * =========================================================
+     * 일반 결과 사진 보기 버튼
+     * =========================================================
+     */
+
     private fun createImageButton(
         record:
         InspectionHistoryStore
@@ -593,6 +1390,12 @@ Quality Score : %.1f / 100
         return button
     }
 
+    /*
+     * =========================================================
+     * 사진이 없는 이력
+     * =========================================================
+     */
+
     private fun createNoImageText():
         TextView {
 
@@ -622,6 +1425,12 @@ Quality Score : %.1f / 100
 
         return textView
     }
+
+    /*
+     * =========================================================
+     * 결과 사진 크게 보기
+     * =========================================================
+     */
 
     private fun showResultImage(
         record:
@@ -733,6 +1542,12 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
         dialog.show()
     }
 
+    /*
+     * =========================================================
+     * 사진 Decode
+     * =========================================================
+     */
+
     private fun decodeBitmapForDisplay(
         file: File
     ): Bitmap? {
@@ -752,8 +1567,10 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
             )
 
             if (
-                bounds.outWidth <= 0 ||
-                bounds.outHeight <= 0
+                bounds.outWidth <=
+                0 ||
+                bounds.outHeight <=
+                0
             ) {
 
                 return null
@@ -798,6 +1615,67 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
         }
     }
 
+    /*
+     * =========================================================
+     * TOTAL SESSION 내부 record ID 파싱
+     * =========================================================
+     */
+
+    private fun parseSessionChildIds(
+        details: String
+    ): List<Long> {
+
+        return listOf(
+            "BOTTOM_ID",
+            "SEAL_ID",
+            "FORMING_ID",
+            "TAB_ID",
+            "DISASSEMBLY_ID"
+        )
+            .mapNotNull {
+
+                parseRecordId(
+                    details,
+                    it
+                )
+            }
+    }
+
+    private fun parseRecordId(
+        details: String,
+        key: String
+    ): Long? {
+
+        val prefix =
+            "$key="
+
+        val line =
+            details
+                .lineSequence()
+                .firstOrNull {
+
+                    it.trim()
+                        .startsWith(
+                            prefix
+                        )
+                }
+                ?: return null
+
+        return line
+            .trim()
+            .removePrefix(
+                prefix
+            )
+            .trim()
+            .toLongOrNull()
+    }
+
+    /*
+     * =========================================================
+     * 판정 색상
+     * =========================================================
+     */
+
     private fun judgmentColor(
         judgment: String
     ): Int {
@@ -839,6 +1717,12 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
             }
         }
     }
+
+    /*
+     * =========================================================
+     * dp 변환
+     * =========================================================
+     */
 
     private fun dp(
         value: Int

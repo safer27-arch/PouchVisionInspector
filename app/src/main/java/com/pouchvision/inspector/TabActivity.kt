@@ -36,9 +36,14 @@ class TabActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
 
     /*
-     * 항상 원본 사진 유지
+     * lastBitmap:
+     *   빨간 표시가 없는 깨끗한 원본 사진
+     *
+     * lastResultBitmap:
+     *   TAB 검사 후 빨간 NG 후보가 표시된 결과 사진
      */
     private var lastBitmap: Bitmap? = null
+    private var lastResultBitmap: Bitmap? = null
 
     private var hasInspectionResult = false
 
@@ -47,7 +52,6 @@ class TabActivity : AppCompatActivity() {
     private var lastTiltError = 0.0
     private var lastSpacingError = 0.0
     private var lastLocalDeformation = 0.0
-
     private var lastJudgment = ""
     private var lastDetails = ""
 
@@ -67,7 +71,7 @@ class TabActivity : AppCompatActivity() {
         defaultSensitivity
 
     /*
-     * 이미지 확대/이동
+     * 이미지 확대 / 이동
      */
     private val imageMatrixValue =
         Matrix()
@@ -136,7 +140,9 @@ class TabActivity : AppCompatActivity() {
                 layoutInflater
             )
 
-        setContentView(binding.root)
+        setContentView(
+            binding.root
+        )
 
         setupSensitivity()
         setupImageZoom()
@@ -144,6 +150,7 @@ class TabActivity : AppCompatActivity() {
 
         binding.btnTabCapture
             .setOnClickListener {
+
                 takePhoto()
             }
 
@@ -169,7 +176,7 @@ class TabActivity : AppCompatActivity() {
 
                     Toast.makeText(
                         this,
-                        "먼저 TAB 사진을 촬영하거나 선택해주세요.",
+                        "먼저 사진을 촬영하거나 선택해주세요.",
                         Toast.LENGTH_LONG
                     ).show()
 
@@ -262,6 +269,19 @@ class TabActivity : AppCompatActivity() {
     }
 
     /*
+     * 사진 / ROI / 민감도 / 확대 위치가 바뀌면
+     * 이전 검사 결과를 다시 저장하지 못하게 합니다.
+     */
+    private fun invalidateInspectionResult() {
+
+        hasInspectionResult =
+            false
+
+        lastResultBitmap =
+            null
+    }
+
+    /*
      * =========================================================
      * CameraX
      * =========================================================
@@ -310,21 +330,17 @@ class TabActivity : AppCompatActivity() {
                         )
                         .build()
 
-                val cameraSelector =
-                    CameraSelector
-                        .DEFAULT_BACK_CAMERA
-
                 cameraProvider.unbindAll()
 
                 cameraProvider.bindToLifecycle(
                     this,
-                    cameraSelector,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     imageCapture
                 )
 
                 binding.tvTabStatus.text =
-                    "카메라 준비 완료 - TAB 영역을 촬영해주세요."
+                    "카메라 준비 완료 - Tab 영역을 촬영해주세요."
 
             } catch (e: Exception) {
 
@@ -384,7 +400,9 @@ class TabActivity : AppCompatActivity() {
 
         capture.takePicture(
             outputOptions,
-            ContextCompat.getMainExecutor(this),
+            ContextCompat.getMainExecutor(
+                this
+            ),
 
             object :
                 ImageCapture.OnImageSavedCallback {
@@ -435,12 +453,6 @@ class TabActivity : AppCompatActivity() {
         )
     }
 
-    /*
-     * =========================================================
-     * 사진 불러오기
-     * =========================================================
-     */
-
     private fun decodeBitmapFromFile(
         file: File
     ): Bitmap? {
@@ -467,7 +479,7 @@ class TabActivity : AppCompatActivity() {
 
         while (
             maxSize /
-            sampleSize >
+                sampleSize >
             1600
         ) {
 
@@ -487,67 +499,41 @@ class TabActivity : AppCompatActivity() {
         )
     }
 
-    private fun decodeBitmapFromUri(
-        uri: Uri
-    ): Bitmap? {
+    /*
+     * =========================================================
+     * 카메라 화면 복귀
+     * =========================================================
+     */
 
-        val options =
-            BitmapFactory.Options()
+    private fun showCameraMode() {
 
-        options.inJustDecodeBounds =
-            true
+        invalidateInspectionResult()
 
-        contentResolver
-            .openInputStream(
-                uri
-            )
-            ?.use {
+        binding.tabImagePreview.visibility =
+            View.GONE
 
-                BitmapFactory.decodeStream(
-                    it,
-                    null,
-                    options
-                )
-            }
+        binding.tabPreviewView.visibility =
+            View.VISIBLE
 
-        val maxSize =
-            max(
-                options.outWidth,
-                options.outHeight
-            )
+        binding.tvTabStatus.text =
+            "카메라 화면 - Tab 영역을 맞춘 뒤 사진을 촬영해주세요."
 
-        var sampleSize =
-            1
+        resetRoiPosition()
 
-        while (
-            maxSize /
-            sampleSize >
-            1600
+        if (
+            imageCapture ==
+            null
         ) {
 
-            sampleSize *=
-                2
+            startCamera()
         }
-
-        val decodeOptions =
-            BitmapFactory.Options()
-
-        decodeOptions.inSampleSize =
-            sampleSize
-
-        return contentResolver
-            .openInputStream(
-                uri
-            )
-            ?.use {
-
-                BitmapFactory.decodeStream(
-                    it,
-                    null,
-                    decodeOptions
-                )
-            }
     }
+
+    /*
+     * =========================================================
+     * 갤러리 사진
+     * =========================================================
+     */
 
     private fun loadGalleryImage(
         uri: Uri
@@ -585,6 +571,74 @@ class TabActivity : AppCompatActivity() {
         }
     }
 
+    private fun decodeBitmapFromUri(
+        uri: Uri
+    ): Bitmap? {
+
+        val options =
+            BitmapFactory.Options()
+
+        options.inJustDecodeBounds =
+            true
+
+        contentResolver
+            .openInputStream(
+                uri
+            )
+            ?.use {
+
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    options
+                )
+            }
+
+        val maxSize =
+            max(
+                options.outWidth,
+                options.outHeight
+            )
+
+        var sampleSize =
+            1
+
+        while (
+            maxSize /
+                sampleSize >
+            1600
+        ) {
+
+            sampleSize *=
+                2
+        }
+
+        val decodeOptions =
+            BitmapFactory.Options()
+
+        decodeOptions.inSampleSize =
+            sampleSize
+
+        return contentResolver
+            .openInputStream(
+                uri
+            )
+            ?.use {
+
+                BitmapFactory.decodeStream(
+                    it,
+                    null,
+                    decodeOptions
+                )
+            }
+    }
+
+    /*
+     * =========================================================
+     * 이미지 표시
+     * =========================================================
+     */
+
     private fun showSelectedImage(
         bitmap: Bitmap
     ) {
@@ -592,8 +646,7 @@ class TabActivity : AppCompatActivity() {
         lastBitmap =
             bitmap
 
-        hasInspectionResult =
-            false
+        invalidateInspectionResult()
 
         binding.tabPreviewView.visibility =
             View.GONE
@@ -601,57 +654,14 @@ class TabActivity : AppCompatActivity() {
         binding.tabImagePreview.visibility =
             View.VISIBLE
 
-        binding.tabImagePreview.setImageBitmap(
-            bitmap
-        )
+        binding.tabImagePreview
+            .setImageBitmap(
+                bitmap
+            )
 
         resetImageMatrix()
         resetRoiPosition()
         resetResultDisplay()
-    }
-
-    private fun showCameraMode() {
-
-        hasInspectionResult =
-            false
-
-        binding.tabImagePreview.visibility =
-            View.GONE
-
-        binding.tabPreviewView.visibility =
-            View.VISIBLE
-
-        binding.tvTabStatus.text =
-            "카메라 화면 - TAB 영역을 맞춘 뒤 사진을 촬영해주세요."
-
-        resetRoiPosition()
-
-        if (
-            imageCapture == null
-        ) {
-
-            startCamera()
-        }
-    }
-
-    private fun restoreOriginalImage() {
-
-        val bitmap =
-            lastBitmap
-                ?: return
-
-        if (
-            binding.tabImagePreview.visibility ==
-            View.VISIBLE
-        ) {
-
-            binding.tabImagePreview.setImageBitmap(
-                bitmap
-            )
-
-            binding.tabImagePreview.imageMatrix =
-                imageMatrixValue
-        }
     }
 
     private fun resetResultDisplay() {
@@ -665,8 +675,6 @@ Local Deformation : -
 Tab Score         : -
 
 판정 : -
-
-NG 후보 영역 : -
             """.trimIndent()
     }
 
@@ -718,9 +726,7 @@ NG 후보 영역 : -
 
                         if (fromUser) {
 
-                            hasInspectionResult =
-                                false
-
+                            invalidateInspectionResult()
                             restoreOriginalImage()
 
                             prefs.edit()
@@ -767,11 +773,8 @@ NG 후보 영역 : -
                     )
                     .apply()
 
-                hasInspectionResult =
-                    false
-
+                invalidateInspectionResult()
                 restoreOriginalImage()
-
                 updateSensitivityText()
 
                 Toast.makeText(
@@ -815,8 +818,8 @@ NG 후보 영역 : -
                         val newZoom =
                             (
                                 zoomFactor *
-                                detector.scaleFactor
-                            )
+                                    detector.scaleFactor
+                                )
                                 .coerceIn(
                                     1f,
                                     8f
@@ -824,7 +827,7 @@ NG 후보 영역 : -
 
                         val actualScale =
                             newZoom /
-                            oldZoom
+                                oldZoom
 
                         zoomFactor =
                             newZoom
@@ -839,9 +842,7 @@ NG 후보 영역 : -
                         binding.tabImagePreview.imageMatrix =
                             imageMatrixValue
 
-                        hasInspectionResult =
-                            false
-
+                        invalidateInspectionResult()
                         restoreOriginalImage()
 
                         return true
@@ -859,9 +860,10 @@ NG 후보 영역 : -
                         true
                     )
 
-                scaleGestureDetector.onTouchEvent(
-                    event
-                )
+                scaleGestureDetector
+                    .onTouchEvent(
+                        event
+                    )
 
                 when (
                     event.actionMasked
@@ -882,17 +884,19 @@ NG 후보 영역 : -
 
                         if (
                             !scaleGestureDetector.isInProgress &&
-                            event.pointerCount == 1 &&
-                            zoomFactor > 1f
+                            event.pointerCount ==
+                            1 &&
+                            zoomFactor >
+                            1f
                         ) {
 
                             val dx =
                                 event.x -
-                                lastImageTouchX
+                                    lastImageTouchX
 
                             val dy =
                                 event.y -
-                                lastImageTouchY
+                                    lastImageTouchY
 
                             imageMatrixValue.postTranslate(
                                 dx,
@@ -902,9 +906,7 @@ NG 후보 영역 : -
                             binding.tabImagePreview.imageMatrix =
                                 imageMatrixValue
 
-                            hasInspectionResult =
-                                false
-
+                            invalidateInspectionResult()
                             restoreOriginalImage()
                         }
 
@@ -948,9 +950,10 @@ NG 후보 영역 : -
             return
         }
 
-        binding.tabImagePreview.setImageBitmap(
-            bitmap
-        )
+        binding.tabImagePreview
+            .setImageBitmap(
+                bitmap
+            )
 
         binding.tabImagePreview.post {
 
@@ -965,8 +968,10 @@ NG 후보 영역 : -
                     .toFloat()
 
             if (
-                viewWidth <= 0f ||
-                viewHeight <= 0f
+                viewWidth <=
+                0f ||
+                viewHeight <=
+                0f
             ) {
 
                 return@post
@@ -983,33 +988,33 @@ NG 후보 영역 : -
             val baseScale =
                 minOf(
                     viewWidth /
-                    bitmapWidth,
+                        bitmapWidth,
 
                     viewHeight /
-                    bitmapHeight
+                        bitmapHeight
                 )
 
             val displayedWidth =
                 bitmapWidth *
-                baseScale
+                    baseScale
 
             val displayedHeight =
                 bitmapHeight *
-                baseScale
+                    baseScale
 
             val dx =
                 (
                     viewWidth -
-                    displayedWidth
-                ) /
-                2f
+                        displayedWidth
+                    ) /
+                    2f
 
             val dy =
                 (
                     viewHeight -
-                    displayedHeight
-                ) /
-                2f
+                        displayedHeight
+                    ) /
+                    2f
 
             imageMatrixValue.reset()
 
@@ -1029,14 +1034,34 @@ NG 후보 영역 : -
             binding.tabImagePreview.imageMatrix =
                 imageMatrixValue
 
-            hasInspectionResult =
-                false
+            invalidateInspectionResult()
+        }
+    }
+
+    private fun restoreOriginalImage() {
+
+        val bitmap =
+            lastBitmap
+                ?: return
+
+        if (
+            binding.tabImagePreview.visibility ==
+            View.VISIBLE
+        ) {
+
+            binding.tabImagePreview
+                .setImageBitmap(
+                    bitmap
+                )
+
+            binding.tabImagePreview.imageMatrix =
+                imageMatrixValue
         }
     }
 
     /*
      * =========================================================
-     * ROI 이동
+     * ROI 이동 / 크기
      * =========================================================
      */
 
@@ -1071,30 +1096,30 @@ NG 후보 영역 : -
 
                         val dx =
                             event.rawX -
-                            roiLastTouchX
+                                roiLastTouchX
 
                         val dy =
                             event.rawY -
-                            roiLastTouchY
+                                roiLastTouchY
 
                         var newX =
                             view.x +
-                            dx
+                                dx
 
                         var newY =
                             view.y +
-                            dy
+                                dy
 
                         val parent =
                             binding.tabImageArea
 
                         val maxX =
                             parent.width -
-                            view.width
+                                view.width
 
                         val maxY =
                             parent.height -
-                            view.height
+                                view.height
 
                         newX =
                             newX.coerceIn(
@@ -1128,9 +1153,7 @@ NG 후보 영역 : -
                         roiLastTouchY =
                             event.rawY
 
-                        hasInspectionResult =
-                            false
-
+                        invalidateInspectionResult()
                         restoreOriginalImage()
 
                         true
@@ -1163,15 +1186,20 @@ NG 후보 영역 : -
         val parent =
             binding.tabImageArea
 
-        if (parent.width <= 0) {
+        if (
+            parent.width <=
+            0
+        ) {
+
             return
         }
 
         var newWidth =
             (
                 roi.width *
-                scale
-            ).toInt()
+                    scale
+                )
+                .toInt()
 
         newWidth =
             newWidth.coerceIn(
@@ -1180,15 +1208,16 @@ NG 후보 영역 : -
                     80,
                     (
                         parent.width *
-                        0.95f
-                    ).toInt()
+                            0.95f
+                        )
+                        .toInt()
                 )
             )
 
         val centerX =
             roi.x +
-            roi.width /
-            2f
+                roi.width /
+                    2f
 
         val params =
             roi.layoutParams
@@ -1199,25 +1228,23 @@ NG 후보 영역 : -
         roi.layoutParams =
             params
 
-        hasInspectionResult =
-            false
-
+        invalidateInspectionResult()
         restoreOriginalImage()
 
         roi.post {
 
             var newX =
                 centerX -
-                roi.width /
-                2f
+                    roi.width /
+                        2f
 
             newX =
                 newX.coerceIn(
                     0f,
                     (
                         parent.width -
-                        roi.width
-                    )
+                            roi.width
+                        )
                         .coerceAtLeast(
                             0
                         )
@@ -1239,15 +1266,20 @@ NG 후보 영역 : -
         val parent =
             binding.tabImageArea
 
-        if (parent.height <= 0) {
+        if (
+            parent.height <=
+            0
+        ) {
+
             return
         }
 
         var newHeight =
             (
                 roi.height *
-                scale
-            ).toInt()
+                    scale
+                )
+                .toInt()
 
         newHeight =
             newHeight.coerceIn(
@@ -1256,15 +1288,16 @@ NG 후보 영역 : -
                     60,
                     (
                         parent.height *
-                        0.95f
-                    ).toInt()
+                            0.95f
+                        )
+                        .toInt()
                 )
             )
 
         val centerY =
             roi.y +
-            roi.height /
-            2f
+                roi.height /
+                    2f
 
         val params =
             roi.layoutParams
@@ -1275,25 +1308,23 @@ NG 후보 영역 : -
         roi.layoutParams =
             params
 
-        hasInspectionResult =
-            false
-
+        invalidateInspectionResult()
         restoreOriginalImage()
 
         roi.post {
 
             var newY =
                 centerY -
-                roi.height /
-                2f
+                    roi.height /
+                        2f
 
             newY =
                 newY.coerceIn(
                     0f,
                     (
                         parent.height -
-                        roi.height
-                    )
+                            roi.height
+                        )
                         .coerceAtLeast(
                             0
                         )
@@ -1318,20 +1349,18 @@ NG 후보 영역 : -
             roi.x =
                 (
                     parent.width -
-                    roi.width
-                ) /
-                2f
+                        roi.width
+                    ) /
+                    2f
 
             roi.y =
                 (
                     parent.height -
-                    roi.height
-                ) /
-                2f
+                        roi.height
+                    ) /
+                    2f
 
-            hasInspectionResult =
-                false
-
+            invalidateInspectionResult()
             restoreOriginalImage()
         }
     }
@@ -1349,9 +1378,7 @@ NG 후보 영역 : -
         binding.tvTabStatus.text =
             "TAB ROI 분석 중..."
 
-        hasInspectionResult =
-            false
-
+        invalidateInspectionResult()
         restoreOriginalImage()
 
         val screenRect =
@@ -1359,9 +1386,9 @@ NG 후보 영역 : -
                 binding.tabRoiGuide.x,
                 binding.tabRoiGuide.y,
                 binding.tabRoiGuide.x +
-                binding.tabRoiGuide.width,
+                    binding.tabRoiGuide.width,
                 binding.tabRoiGuide.y +
-                binding.tabRoiGuide.height
+                    binding.tabRoiGuide.height
             )
 
         val currentMatrix =
@@ -1411,38 +1438,44 @@ NG 후보 영역 : -
                 left =
                     left.coerceIn(
                         0,
-                        source.width - 1
+                        source.width -
+                            1
                     )
 
                 top =
                     top.coerceIn(
                         0,
-                        source.height - 1
+                        source.height -
+                            1
                     )
 
                 right =
                     right.coerceIn(
-                        left + 1,
+                        left +
+                            1,
                         source.width
                     )
 
                 bottom =
                     bottom.coerceIn(
-                        top + 1,
+                        top +
+                            1,
                         source.height
                     )
 
                 val roiWidth =
                     right -
-                    left
+                        left
 
                 val roiHeight =
                     bottom -
-                    top
+                        top
 
                 if (
-                    roiWidth < 10 ||
-                    roiHeight < 10
+                    roiWidth <
+                    10 ||
+                    roiHeight <
+                    10
                 ) {
 
                     throw Exception(
@@ -1481,6 +1514,8 @@ NG 후보 영역 : -
     /*
      * =========================================================
      * TAB 알고리즘
+     *
+     * 기존 TAB 점수 계산식과 판정 기준은 유지합니다.
      * =========================================================
      */
 
@@ -1508,9 +1543,9 @@ NG 후보 영역 : -
         val strongThreshold =
             (
                 115 -
-                sensitivity *
-                0.67
-            )
+                    sensitivity *
+                    0.67
+                )
                 .toInt()
                 .coerceIn(
                     35,
@@ -1540,12 +1575,14 @@ NG 후보 영역 : -
 
         for (
             y in 1 until
-            small.height - 1
+                small.height -
+                    1
         ) {
 
             for (
                 x in 1 until
-                small.width - 1
+                    small.width -
+                        1
             ) {
 
                 val center =
@@ -1559,7 +1596,8 @@ NG 후보 영역 : -
                 val right =
                     gray(
                         small.getPixel(
-                            x + 1,
+                            x +
+                                1,
                             y
                         )
                     )
@@ -1568,19 +1606,20 @@ NG 후보 영역 : -
                     gray(
                         small.getPixel(
                             x,
-                            y + 1
+                            y +
+                                1
                         )
                     )
 
                 val gradient =
                     abs(
                         center -
-                        right
+                            right
                     ) +
-                    abs(
-                        center -
-                        bottom
-                    )
+                        abs(
+                            center -
+                                bottom
+                        )
 
                 totalGradient +=
                     gradient
@@ -1598,7 +1637,7 @@ NG 후보 영역 : -
                 if (
                     x <
                     small.width /
-                    2
+                        2
                 ) {
 
                     leftGradient +=
@@ -1613,7 +1652,7 @@ NG 후보 영역 : -
                 if (
                     y <
                     small.height /
-                    2
+                        2
                 ) {
 
                     topGradient +=
@@ -1629,13 +1668,14 @@ NG 후보 영역 : -
 
         val averageGradient =
             if (
-                pixelCount > 0
+                pixelCount >
+                0
             ) {
 
                 totalGradient
                     .toDouble() /
-                pixelCount
-                    .toDouble()
+                    pixelCount
+                        .toDouble()
 
             } else {
 
@@ -1644,14 +1684,15 @@ NG 후보 영역 : -
 
         val strongEdgeDensity =
             if (
-                pixelCount > 0
+                pixelCount >
+                0
             ) {
 
                 strongEdgeCount
                     .toDouble() /
-                pixelCount
-                    .toDouble() *
-                100.0
+                    pixelCount
+                        .toDouble() *
+                    100.0
 
             } else {
 
@@ -1663,8 +1704,9 @@ NG 후보 영역 : -
                 1.0,
                 (
                     leftGradient +
-                    rightGradient
-                ).toDouble()
+                        rightGradient
+                    )
+                    .toDouble()
             )
 
         val verticalTotal =
@@ -1672,78 +1714,81 @@ NG 후보 영역 : -
                 1.0,
                 (
                     topGradient +
-                    bottomGradient
-                ).toDouble()
+                        bottomGradient
+                    )
+                    .toDouble()
             )
 
         val horizontalBalance =
             abs(
                 leftGradient -
-                rightGradient
-            ).toDouble() /
-            horizontalTotal *
-            100.0
+                    rightGradient
+            )
+                .toDouble() /
+                horizontalTotal *
+                100.0
 
         val verticalBalance =
             abs(
                 topGradient -
-                bottomGradient
-            ).toDouble() /
-            verticalTotal *
-            100.0
+                    bottomGradient
+            )
+                .toDouble() /
+                verticalTotal *
+                100.0
 
         val sensitivityFactor =
             0.55 +
-            sensitivity /
-            133.3
+                sensitivity /
+                    133.3
 
         val positionError =
             (
                 horizontalBalance *
-                0.75 +
-                verticalBalance *
-                0.25
-            ) *
-            sensitivityFactor
+                    0.75 +
+                    verticalBalance *
+                    0.25
+                ) *
+                sensitivityFactor
 
         val tiltError =
             (
                 verticalBalance *
-                0.70 +
-                strongEdgeDensity *
-                1.2
-            ) *
-            sensitivityFactor
+                    0.70 +
+                    strongEdgeDensity *
+                    1.2
+                ) *
+                sensitivityFactor
 
         val spacingError =
             (
                 horizontalBalance *
-                0.85 +
-                strongEdgeDensity *
-                0.5
-            ) *
-            sensitivityFactor
+                    0.85 +
+                    strongEdgeDensity *
+                    0.5
+                ) *
+                sensitivityFactor
 
         val localDeformation =
             (
                 averageGradient *
-                0.8 +
-                strongEdgeDensity *
-                2.0
-            ) *
-            sensitivityFactor
+                    0.8 +
+                    strongEdgeDensity *
+                    2.0
+                ) *
+                sensitivityFactor
 
         val defectLevel =
             (
                 positionError *
-                0.30 +
-                tiltError *
-                0.25 +
-                spacingError *
-                0.25 +
-                localDeformation *
-                0.20
-            )
+                    0.30 +
+                    tiltError *
+                    0.25 +
+                    spacingError *
+                    0.25 +
+                    localDeformation *
+                    0.20
+                )
                 .coerceIn(
                     0.0,
                     100.0
@@ -1752,8 +1797,8 @@ NG 후보 영역 : -
         val tabScore =
             (
                 100.0 -
-                defectLevel
-            )
+                    defectLevel
+                )
                 .coerceIn(
                     0.0,
                     100.0
@@ -1762,13 +1807,16 @@ NG 후보 영역 : -
         val judgment =
             when {
 
-                tabScore >= 85.0 ->
+                tabScore >=
+                    85.0 ->
                     "정상 후보"
 
-                tabScore >= 70.0 ->
+                tabScore >=
+                    70.0 ->
                     "주의 후보"
 
-                tabScore >= 50.0 ->
+                tabScore >=
+                    50.0 ->
                     "한계정상 후보"
 
                 else ->
@@ -1776,11 +1824,8 @@ NG 후보 영역 : -
             }
 
         /*
-         * =====================================================
-         * NG 후보 큰 원 / 박스
-         * =====================================================
+         * 현재 공용 DefectMarker는 그대로 유지합니다.
          */
-
         val markerResult =
             DefectMarker.markDefectRegions(
                 sourceBitmap = source,
@@ -1799,10 +1844,6 @@ NG 후보 영역 : -
             DefectMarker.buildRegionSummary(
                 markerResult.regions
             )
-
-        /*
-         * 결과 저장
-         */
 
         lastTabScore =
             tabScore
@@ -1848,14 +1889,21 @@ NG 후보 영역 : %d개
                 regionSummary
             )
 
+        /*
+         * 핵심 추가:
+         * 빨간 NG 후보가 표시된 결과 사진을
+         * 이력 저장용으로 보관합니다.
+         *
+         * lastBitmap 원본은 변경하지 않습니다.
+         */
+        lastResultBitmap =
+            markerResult.bitmap
+
         hasInspectionResult =
             true
 
         runOnUiThread {
 
-            /*
-             * 원본 lastBitmap은 변경하지 않음
-             */
             binding.tabImagePreview.setImageBitmap(
                 markerResult.bitmap
             )
@@ -1906,17 +1954,36 @@ NG 후보 영역 : %d개
 
     /*
      * =========================================================
-     * 결과 저장
+     * TAB 검사 결과 + 결과 사진 저장
      * =========================================================
      */
 
     private fun saveCurrentInspectionResult() {
 
-        if (!hasInspectionResult) {
+        if (
+            !hasInspectionResult
+        ) {
 
             Toast.makeText(
                 this,
                 "먼저 TAB ROI 검사를 실행해주세요.",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        val resultBitmap =
+            lastResultBitmap
+
+        if (
+            resultBitmap ==
+            null
+        ) {
+
+            Toast.makeText(
+                this,
+                "TAB 결과 사진이 없습니다. TAB 검사를 다시 실행해주세요.",
                 Toast.LENGTH_LONG
             ).show()
 
@@ -1930,16 +1997,24 @@ NG 후보 영역 : %d개
                 score = lastTabScore,
                 judgment = lastJudgment,
                 sensitivity = sensitivity,
-                details = lastDetails
+                details = lastDetails,
+
+                /*
+                 * 새 기능:
+                 * 빨간 NG 후보가 표시된 TAB 결과 사진도 함께 저장
+                 */
+                imageBitmap = resultBitmap
             )
 
-        if (success) {
+        if (
+            success
+        ) {
 
             Toast.makeText(
                 this,
                 String.format(
                     Locale.getDefault(),
-                    "TAB 검사 결과 저장 완료\nScore %.1f / 100\n%s",
+                    "TAB 검사 결과 + 사진 저장 완료\nScore %.1f / 100\n%s",
                     lastTabScore,
                     lastJudgment
                 ),
@@ -1955,6 +2030,12 @@ NG 후보 영역 : %d개
             ).show()
         }
     }
+
+    /*
+     * =========================================================
+     * RGB → Gray
+     * =========================================================
+     */
 
     private fun gray(
         color: Int
@@ -1976,9 +2057,13 @@ NG 후보 영역 : %d개
             )
 
         return (
-            0.299 * r +
-            0.587 * g +
-            0.114 * b
-        ).toInt()
+            0.299 *
+                r +
+                0.587 *
+                g +
+                0.114 *
+                b
+            )
+            .toInt()
     }
 }

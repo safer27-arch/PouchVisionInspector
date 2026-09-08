@@ -1693,8 +1693,25 @@ NG 후보 영역 : %d개
          * 핵심 추가:
          * 빨간 후보 표시가 포함된 결과 Bitmap을 보관
          */
+        /*
+         * 표시 방식만 공통 Renderer로 변경합니다.
+         *
+         * - FORMING 판정 / 후보 검출 알고리즘은 그대로 유지
+         * - "NG 후보 N" 라벨은 ROI 바깥으로 이동
+         * - 빨간 원 선 굵기는 기존의 약 50%
+         */
+        val displayBitmap =
+            MarkerDisplayRenderer.renderGeneric(
+                sourceBitmap = source,
+                roiLeft = roiStartX,
+                roiTop = roiStartY,
+                roiWidth = roi.width,
+                roiHeight = roi.height,
+                regions = markerResult.regions
+            )
+
         lastResultBitmap =
-            markerResult.bitmap
+            displayBitmap
 
         hasInspectionResult =
             true
@@ -1705,7 +1722,7 @@ NG 후보 영역 : %d개
              * lastBitmap은 깨끗한 원본 그대로 유지
              */
             binding.formingImagePreview.setImageBitmap(
-                markerResult.bitmap
+                displayBitmap
             )
 
             binding.formingImagePreview.imageMatrix =

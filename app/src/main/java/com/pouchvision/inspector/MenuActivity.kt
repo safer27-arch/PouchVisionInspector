@@ -9,14 +9,22 @@ class MenuActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMenuBinding
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
 
-        super.onCreate(savedInstanceState)
+        super.onCreate(
+            savedInstanceState
+        )
 
         binding =
-            ActivityMenuBinding.inflate(layoutInflater)
+            ActivityMenuBinding.inflate(
+                layoutInflater
+            )
 
-        setContentView(binding.root)
+        setContentView(
+            binding.root
+        )
 
         setupButtons()
     }
@@ -28,133 +36,160 @@ class MenuActivity : AppCompatActivity() {
          * 종합검사
          * =====================================================
          */
-        binding.btnTotalInspection.setOnClickListener {
+        binding.btnTotalInspection
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    TotalInspectionActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        TotalInspectionActivity::class.java
+                    )
                 )
-            )
-        }
+            }
+
+        /*
+         * =====================================================
+         * 품질 Dashboard
+         * =====================================================
+         */
+        binding.btnDashboard
+            .setOnClickListener {
+
+                startActivity(
+                    Intent(
+                        this,
+                        DashboardActivity::class.java
+                    )
+                )
+            }
 
         /*
          * =====================================================
          * Bottom Corner 검사
          * =====================================================
          */
-        binding.btnBottomCorner.setOnClickListener {
+        binding.btnBottomCorner
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    MainActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        MainActivity::class.java
+                    )
                 )
-            )
-        }
+            }
 
-        binding.btnBottomCornerGuide.setOnClickListener {
+        binding.btnBottomCornerGuide
+            .setOnClickListener {
 
-            openGuide(
-                GuideActivity.TYPE_BOTTOM_CORNER
-            )
-        }
+                openGuide(
+                    GuideActivity.TYPE_BOTTOM_CORNER
+                )
+            }
 
         /*
          * =====================================================
          * Seal 검사
          * =====================================================
          */
-        binding.btnSealInspection.setOnClickListener {
+        binding.btnSealInspection
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    SealActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        SealActivity::class.java
+                    )
                 )
-            )
-        }
+            }
 
-        binding.btnSealGuide.setOnClickListener {
+        binding.btnSealGuide
+            .setOnClickListener {
 
-            openGuide(
-                GuideActivity.TYPE_SEAL
-            )
-        }
+                openGuide(
+                    GuideActivity.TYPE_SEAL
+                )
+            }
 
         /*
          * =====================================================
          * Forming 검사
          * =====================================================
          */
-        binding.btnFormingInspection.setOnClickListener {
+        binding.btnFormingInspection
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    FormingActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        FormingActivity::class.java
+                    )
                 )
-            )
-        }
+            }
 
-        binding.btnFormingGuide.setOnClickListener {
+        binding.btnFormingGuide
+            .setOnClickListener {
 
-            openGuide(
-                GuideActivity.TYPE_FORMING
-            )
-        }
+                openGuide(
+                    GuideActivity.TYPE_FORMING
+                )
+            }
 
         /*
          * =====================================================
          * Tab 검사
          * =====================================================
          */
-        binding.btnTabInspection.setOnClickListener {
+        binding.btnTabInspection
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    TabActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        TabActivity::class.java
+                    )
                 )
-            )
-        }
+            }
 
-        binding.btnTabGuide.setOnClickListener {
+        binding.btnTabGuide
+            .setOnClickListener {
 
-            openGuide(
-                GuideActivity.TYPE_TAB
-            )
-        }
+                openGuide(
+                    GuideActivity.TYPE_TAB
+                )
+            }
 
         /*
          * =====================================================
          * 분해검사
          * =====================================================
          */
-        binding.btnDisassemblyInspection.setOnClickListener {
+        binding.btnDisassemblyInspection
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    DisassemblyActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        DisassemblyActivity::class.java
+                    )
                 )
-            )
-        }
+            }
 
         /*
          * =====================================================
          * 검사 이력
          * =====================================================
          */
-        binding.btnHistory.setOnClickListener {
+        binding.btnHistory
+            .setOnClickListener {
 
-            startActivity(
-                Intent(
-                    this,
-                    HistoryActivity::class.java
+                startActivity(
+                    Intent(
+                        this,
+                        HistoryActivity::class.java
+                    )
                 )
-            )
-        }
+            }
     }
 
     private fun openGuide(
@@ -172,6 +207,8 @@ class MenuActivity : AppCompatActivity() {
             guideType
         )
 
-        startActivity(intent)
+        startActivity(
+            intent
+        )
     }
 }

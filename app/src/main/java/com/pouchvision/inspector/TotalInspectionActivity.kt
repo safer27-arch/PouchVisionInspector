@@ -15,7 +15,13 @@ class TotalInspectionActivity : AppCompatActivity() {
     private lateinit var binding: ActivityTotalInspectionBinding
 
     /*
-     * 현재 종합검사 세션 시작 시각
+     * 현재 종합검사 1회의 시작 시각
+     *
+     * 기존 개별 검사 이력의 id가 저장 시각(System.currentTimeMillis)이므로
+     * 이 시각 이후 저장된 5개 결과를 현재 종합검사 Session으로 봅니다.
+     *
+     * 이번 버전은 InspectionHistoryStore 구조를 다시 변경하지 않고
+     * 현재 안정적으로 동작하는 저장 구조를 그대로 사용합니다.
      */
     private var sessionStartTime: Long = 0L
 
@@ -25,22 +31,27 @@ class TotalInspectionActivity : AppCompatActivity() {
     private var autoSequenceActive = false
 
     /*
-     * 직전에 실행한 검사
+     * 직전에 실행한 검사 종류
      */
     private var launchedInspectionType: String? = null
 
     /*
-     * 해당 검사를 실행한 시각
+     * 검사 화면을 연 시각
      *
-     * 이 시각 이후에 저장된 결과가 있어야
-     * "검사를 완료했다"고 판단합니다.
+     * 이 시각 이후에 같은 검사 결과가 새로 저장되어야
+     * 해당 검사를 완료했다고 판단합니다.
      */
     private var launchedInspectionTime: Long = 0L
 
     /*
-     * 검사 화면으로 실제 이동했는지 확인
+     * 검사 화면에서 결과 저장 후 복귀를 기다리는 상태
      */
     private var waitingForInspectionResult = false
+
+    /*
+     * 현재 종합검사 Session Summary가 이미 저장되었는지
+     */
+    private var totalSummarySaved = false
 
     companion object {
 
@@ -59,6 +70,9 @@ class TotalInspectionActivity : AppCompatActivity() {
         private const val STATE_WAITING_RESULT =
             "total_inspection_waiting_result"
 
+        private const val STATE_TOTAL_SUMMARY_SAVED =
+            "total_inspection_summary_saved"
+
         private const val TYPE_BOTTOM =
             "BOTTOM CORNER"
 
@@ -73,7 +87,25 @@ class TotalInspectionActivity : AppCompatActivity() {
 
         private const val TYPE_DISASSEMBLY =
             "DISASSEMBLY"
+
+        /*
+         * 종합검사 한 회를 대표하는 이력 타입
+         *
+         * 다음 단계에서 HistoryActivity가 이 기록을 읽어
+         * 5개 검사 결과와 사진을 하나의 묶음으로 보여주게 됩니다.
+         */
+        private const val TYPE_TOTAL_SESSION =
+            "TOTAL SESSION"
     }
+
+    private val inspectionOrder =
+        listOf(
+            TYPE_BOTTOM,
+            TYPE_SEAL,
+            TYPE_FORMING,
+            TYPE_TAB,
+            TYPE_DISASSEMBLY
+        )
 
     override fun onCreate(
         savedInstanceState: Bundle?
@@ -86,12 +118,13 @@ class TotalInspectionActivity : AppCompatActivity() {
                 layoutInflater
             )
 
-        setContentView(binding.root)
+        setContentView(
+            binding.root
+        )
 
-        /*
-         * 기존 세션 복원
-         */
-        if (savedInstanceState != null) {
+        if (
+            savedInstanceState != null
+        ) {
 
             sessionStartTime =
                 savedInstanceState.getLong(
@@ -122,16 +155,33 @@ class TotalInspectionActivity : AppCompatActivity() {
                     false
                 )
 
+            totalSummarySaved =
+                savedInstanceState.getBoolean(
+                    STATE_TOTAL_SUMMARY_SAVED,
+                    false
+                )
+
         } else {
 
             /*
-             * 새로운 종합검사 세션
+             * 새로운 종합검사 Session
              */
             sessionStartTime =
                 System.currentTimeMillis()
+
+            totalSummarySaved =
+                false
         }
 
         setupButtons()
+
+        /*
+         * 앱 재생성 등으로 Summary 저장 여부를 잃어도
+         * 기존 이력에 같은 Session Summary가 있는지 다시 확인합니다.
+         */
+        totalSummarySaved =
+            totalSummarySaved ||
+                hasSavedTotalSessionSummary()
 
         refreshInspectionResults()
     }
@@ -142,9 +192,6 @@ class TotalInspectionActivity : AppCompatActivity() {
 
         refreshInspectionResults()
 
-        /*
-         * 검사 화면에서 돌아왔을 때만 확인
-         */
         if (
             waitingForInspectionResult &&
             launchedInspectionType != null
@@ -183,6 +230,11 @@ class TotalInspectionActivity : AppCompatActivity() {
             waitingForInspectionResult
         )
 
+        outState.putBoolean(
+            STATE_TOTAL_SUMMARY_SAVED,
+            totalSummarySaved
+        )
+
         super.onSaveInstanceState(
             outState
         )
@@ -196,12 +248,6 @@ class TotalInspectionActivity : AppCompatActivity() {
 
     private fun setupButtons() {
 
-        /*
-         * Bottom Corner
-         *
-         * 첫 번째 검사를 누르면
-         * 자동 순차검사 모드를 시작합니다.
-         */
         binding.btnTotalBottom
             .setOnClickListener {
 
@@ -210,9 +256,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * Seal
-         */
         binding.btnTotalSeal
             .setOnClickListener {
 
@@ -221,9 +264,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * Forming
-         */
         binding.btnTotalForming
             .setOnClickListener {
 
@@ -232,9 +272,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * Tab
-         */
         binding.btnTotalTab
             .setOnClickListener {
 
@@ -243,9 +280,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * 분해검사
-         */
         binding.btnTotalDisassembly
             .setOnClickListener {
 
@@ -254,9 +288,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * 새로고침
-         */
         binding.btnTotalRefresh
             .setOnClickListener {
 
@@ -269,9 +300,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 ).show()
             }
 
-        /*
-         * 검사 이력
-         */
         binding.btnTotalHistory
             .setOnClickListener {
 
@@ -283,9 +311,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 )
             }
 
-        /*
-         * 메뉴로
-         */
         binding.btnTotalBack
             .setOnClickListener {
 
@@ -303,12 +328,52 @@ class TotalInspectionActivity : AppCompatActivity() {
         inspectionType: String
     ) {
 
+        /*
+         * 5개 완료 후 같은 화면에서 다시 검사 버튼을 누르면
+         * 새로운 Session으로 시작합니다.
+         */
+        if (
+            isSessionComplete()
+        ) {
+
+            startNewSession()
+        }
+
         autoSequenceActive =
             true
 
         launchInspection(
             inspectionType
         )
+    }
+
+    /*
+     * =========================================================
+     * 새 종합검사 Session
+     * =========================================================
+     */
+
+    private fun startNewSession() {
+
+        sessionStartTime =
+            System.currentTimeMillis()
+
+        autoSequenceActive =
+            false
+
+        launchedInspectionType =
+            null
+
+        launchedInspectionTime =
+            0L
+
+        waitingForInspectionResult =
+            false
+
+        totalSummarySaved =
+            false
+
+        refreshInspectionResults()
     }
 
     /*
@@ -322,7 +387,9 @@ class TotalInspectionActivity : AppCompatActivity() {
     ) {
 
         val intent =
-            when (inspectionType) {
+            when (
+                inspectionType
+            ) {
 
                 TYPE_BOTTOM ->
                     Intent(
@@ -374,7 +441,7 @@ class TotalInspectionActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 검사 화면에서 돌아온 후 확인
+     * 검사 화면에서 돌아온 후 결과 저장 확인
      * =========================================================
      */
 
@@ -384,19 +451,17 @@ class TotalInspectionActivity : AppCompatActivity() {
             launchedInspectionType
                 ?: return
 
-        /*
-         * 동일 검사의 가장 최근 저장 결과 확인
-         */
         val latestRecord =
             InspectionHistoryStore
-                .load(this)
+                .load(
+                    this
+                )
                 .filter {
 
                     it.inspectionType.equals(
                         type,
                         ignoreCase = true
                     )
-
                 }
                 .maxByOrNull {
 
@@ -414,11 +479,10 @@ class TotalInspectionActivity : AppCompatActivity() {
         waitingForInspectionResult =
             false
 
-        if (!successfullySaved) {
+        if (
+            !successfullySaved
+        ) {
 
-            /*
-             * 저장하지 않고 뒤로 나온 경우
-             */
             autoSequenceActive =
                 false
 
@@ -440,7 +504,7 @@ class TotalInspectionActivity : AppCompatActivity() {
         }
 
         /*
-         * 정상 저장 완료
+         * 검사 저장 성공
          */
         launchedInspectionType =
             null
@@ -450,39 +514,42 @@ class TotalInspectionActivity : AppCompatActivity() {
 
         refreshInspectionResults()
 
-        if (!autoSequenceActive) {
+        if (
+            !autoSequenceActive
+        ) {
 
             return
         }
 
-        /*
-         * 다음 미검사 항목 확인
-         */
         val nextType =
             findNextIncompleteInspection()
 
-        if (nextType == null) {
+        if (
+            nextType == null
+        ) {
 
             /*
-             * 5개 검사 모두 완료
+             * 5개 모두 완료
              */
             autoSequenceActive =
                 false
 
-            Toast.makeText(
-                this,
-                "5개 종합검사가 모두 완료되었습니다.",
-                Toast.LENGTH_LONG
-            ).show()
+            saveTotalSessionSummaryIfNeeded()
 
             refreshInspectionResults()
+
+            Toast.makeText(
+                this,
+                "5개 종합검사가 모두 완료되었습니다.\n종합검사 1회 이력이 저장되었습니다.",
+                Toast.LENGTH_LONG
+            ).show()
 
             return
         }
 
         /*
-         * 결과 화면을 잠시 보여준 뒤
-         * 다음 검사로 자동 이동
+         * 현재 결과를 잠시 보여준 뒤
+         * 다음 검사 화면으로 자동 이동
          */
         Handler(
             Looper.getMainLooper()
@@ -509,7 +576,22 @@ class TotalInspectionActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 다음 미완료 검사 찾기
+     * 현재 Session 완료 여부
+     * =========================================================
+     */
+
+    private fun isSessionComplete():
+        Boolean {
+
+        return findNextIncompleteInspection() ==
+            null &&
+            getCompletedInspectionRecords().size ==
+            inspectionOrder.size
+    }
+
+    /*
+     * =========================================================
+     * 다음 미완료 검사
      * =========================================================
      */
 
@@ -519,17 +601,8 @@ class TotalInspectionActivity : AppCompatActivity() {
         val records =
             getCurrentSessionHistory()
 
-        val order =
-            listOf(
-                TYPE_BOTTOM,
-                TYPE_SEAL,
-                TYPE_FORMING,
-                TYPE_TAB,
-                TYPE_DISASSEMBLY
-            )
-
         for (
-            type in order
+            type in inspectionOrder
         ) {
 
             val completed =
@@ -541,7 +614,9 @@ class TotalInspectionActivity : AppCompatActivity() {
                     )
                 }
 
-            if (!completed) {
+            if (
+                !completed
+            ) {
 
                 return type
             }
@@ -552,7 +627,7 @@ class TotalInspectionActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 현재 세션 기록
+     * 현재 종합검사 Session의 개별 검사 이력
      * =========================================================
      */
 
@@ -560,12 +635,215 @@ class TotalInspectionActivity : AppCompatActivity() {
         List<InspectionHistoryStore.InspectionRecord> {
 
         return InspectionHistoryStore
-            .load(this)
+            .load(
+                this
+            )
             .filter {
 
                 it.id >=
-                    sessionStartTime
+                    sessionStartTime &&
+                    inspectionOrder.any { type ->
+
+                        it.inspectionType.equals(
+                            type,
+                            ignoreCase = true
+                        )
+                    }
             }
+    }
+
+    /*
+     * =========================================================
+     * 현재 Session에서 검사별 최신 결과 5개
+     * =========================================================
+     */
+
+    private fun getCompletedInspectionRecords():
+        List<InspectionHistoryStore.InspectionRecord> {
+
+        val records =
+            getCurrentSessionHistory()
+
+        return inspectionOrder
+            .mapNotNull { type ->
+
+                findLatestRecord(
+                    records,
+                    type
+                )
+            }
+    }
+
+    /*
+     * =========================================================
+     * 종합검사 Summary가 이미 저장됐는지 확인
+     * =========================================================
+     */
+
+    private fun hasSavedTotalSessionSummary():
+        Boolean {
+
+        val token =
+            "SESSION_START=$sessionStartTime"
+
+        return InspectionHistoryStore
+            .load(
+                this
+            )
+            .any {
+
+                it.inspectionType.equals(
+                    TYPE_TOTAL_SESSION,
+                    ignoreCase = true
+                ) &&
+                    it.details.contains(
+                        token
+                    )
+            }
+    }
+
+    /*
+     * =========================================================
+     * 종합검사 1회 Summary 저장
+     *
+     * InspectionHistoryStore 파일을 다시 수정하지 않고도
+     * 현재 5개 결과를 하나의 Session으로 묶을 수 있도록,
+     * 별도의 TOTAL SESSION 기록 1건을 저장합니다.
+     *
+     * 각 검사 record id를 Details에 함께 넣습니다.
+     * 다음 단계에서 HistoryActivity가 이 id들을 이용해
+     * 5개 결과와 사진을 한 화면에 묶어 보여줄 수 있습니다.
+     * =========================================================
+     */
+
+    private fun saveTotalSessionSummaryIfNeeded() {
+
+        if (
+            totalSummarySaved ||
+            hasSavedTotalSessionSummary()
+        ) {
+
+            totalSummarySaved =
+                true
+
+            return
+        }
+
+        val completedRecords =
+            getCompletedInspectionRecords()
+
+        if (
+            completedRecords.size !=
+            inspectionOrder.size
+        ) {
+
+            return
+        }
+
+        val averageScore =
+            completedRecords
+                .map {
+
+                    it.score
+                }
+                .average()
+
+        val worstRecord =
+            completedRecords
+                .maxByOrNull {
+
+                    judgmentSeverity(
+                        it.judgment
+                    )
+                }
+
+        val finalJudgment =
+            worstRecord
+                ?.judgment
+                ?: "-"
+
+        val bottom =
+            findLatestRecord(
+                completedRecords,
+                TYPE_BOTTOM
+            )
+
+        val seal =
+            findLatestRecord(
+                completedRecords,
+                TYPE_SEAL
+            )
+
+        val forming =
+            findLatestRecord(
+                completedRecords,
+                TYPE_FORMING
+            )
+
+        val tab =
+            findLatestRecord(
+                completedRecords,
+                TYPE_TAB
+            )
+
+        val disassembly =
+            findLatestRecord(
+                completedRecords,
+                TYPE_DISASSEMBLY
+            )
+
+        if (
+            bottom == null ||
+            seal == null ||
+            forming == null ||
+            tab == null ||
+            disassembly == null
+        ) {
+
+            return
+        }
+
+        /*
+         * 이 줄들은 다음 History 묶음 기능에서
+         * 각 사진 기록을 정확하게 찾기 위한 내부 정보입니다.
+         */
+        val details =
+            """
+SESSION_START=$sessionStartTime
+BOTTOM_ID=${bottom.id}
+SEAL_ID=${seal.id}
+FORMING_ID=${forming.id}
+TAB_ID=${tab.id}
+DISASSEMBLY_ID=${disassembly.id}
+
+종합검사 완료
+
+Bottom Corner : ${formatRecord(bottom)}
+Seal : ${formatRecord(seal)}
+Forming : ${formatRecord(forming)}
+Tab : ${formatRecord(tab)}
+분해검사 : ${formatRecord(disassembly)}
+
+평균 Quality Score : ${String.format(Locale.getDefault(), "%.1f", averageScore)} / 100
+종합 판정 : $finalJudgment
+
+※ 종합 판정은 5개 항목 중 가장 주의가 필요한 판정을 기준으로 합니다.
+※ 현재 결과는 영상 기반 검사 보조 결과입니다.
+※ 실제 양산 OK/NG 판정에는 Spec, Master Sample 및 불량품 검증이 필요합니다.
+            """.trimIndent()
+
+        val success =
+            InspectionHistoryStore.save(
+                context = this,
+                inspectionType = TYPE_TOTAL_SESSION,
+                score = averageScore,
+                judgment = finalJudgment,
+                sensitivity = 0,
+                details = details
+            )
+
+        totalSummarySaved =
+            success
     }
 
     /*
@@ -609,9 +887,6 @@ class TotalInspectionActivity : AppCompatActivity() {
                 TYPE_DISASSEMBLY
             )
 
-        /*
-         * 검사별 상태
-         */
         updateStatusView(
             TYPE_BOTTOM,
             bottomRecord
@@ -637,9 +912,6 @@ class TotalInspectionActivity : AppCompatActivity() {
             disassemblyRecord
         )
 
-        /*
-         * 완료 검사
-         */
         val completedRecords =
             listOfNotNull(
                 bottomRecord,
@@ -693,7 +965,9 @@ class TotalInspectionActivity : AppCompatActivity() {
     ) {
 
         val target =
-            when (type) {
+            when (
+                type
+            ) {
 
                 TYPE_BOTTOM ->
                     binding.tvTotalBottomStatus
@@ -714,7 +988,9 @@ class TotalInspectionActivity : AppCompatActivity() {
                     return
             }
 
-        if (record == null) {
+        if (
+            record == null
+        ) {
 
             target.text =
                 "미검사"
@@ -757,10 +1033,10 @@ class TotalInspectionActivity : AppCompatActivity() {
         val completedCount =
             completedRecords.size
 
-        /*
-         * 아직 시작 전
-         */
-        if (completedCount == 0) {
+        if (
+            completedCount ==
+            0
+        ) {
 
             binding.tvTotalSummary.text =
                 """
@@ -774,11 +1050,11 @@ class TotalInspectionActivity : AppCompatActivity() {
 4. Tab
 5. 분해검사
 
-1번 Bottom Corner의
-'검사' 버튼을 누르면 종합검사를 시작할 수 있습니다.
+Bottom Corner의 '검사' 버튼을 누르면
+종합검사를 시작할 수 있습니다.
 
 각 검사 화면에서 분석 후
-반드시 '결과 저장'을 눌러주세요.
+반드시 '검사 결과 저장'을 눌러주세요.
 
 저장 후 뒤로 돌아오면
 다음 검사가 자동으로 시작됩니다.
@@ -818,7 +1094,8 @@ class TotalInspectionActivity : AppCompatActivity() {
                 }
 
         val finalJudgment =
-            worstRecord?.judgment
+            worstRecord
+                ?.judgment
                 ?: "-"
 
         val bottomText =
@@ -851,10 +1128,10 @@ class TotalInspectionActivity : AppCompatActivity() {
                 completedRecords
             )
 
-        /*
-         * 5개 모두 완료
-         */
-        if (completedCount == 5) {
+        if (
+            completedCount ==
+            5
+        ) {
 
             binding.tvTotalSummary.text =
                 String.format(
@@ -864,7 +1141,6 @@ class TotalInspectionActivity : AppCompatActivity() {
 종합검사 완료
 
 진행 상태 : 5 / 5
-
 평균 Score : %.1f / 100
 종합 판정 : %s
 
@@ -881,8 +1157,11 @@ class TotalInspectionActivity : AppCompatActivity() {
 최저 Score
 %s
 
-종합 판정은 5개 항목 중
-가장 주의가 필요한 판정을 기준으로 합니다.
+종합검사 1회 Summary가
+검사 이력에 함께 저장됩니다.
+
+다음 단계에서 History 화면에서
+이 5개 검사와 결과 사진을 하나의 묶음으로 볼 수 있게 연결합니다.
 
 ※ 현재 판정은 영상 기반 검사 보조 결과입니다.
 ※ 실제 양산 OK/NG 판정에는
@@ -891,7 +1170,6 @@ class TotalInspectionActivity : AppCompatActivity() {
 
                     averageScore,
                     finalJudgment,
-
                     bottomText,
                     sealText,
                     formingText,
@@ -904,15 +1182,11 @@ class TotalInspectionActivity : AppCompatActivity() {
 
                         String.format(
                             Locale.getDefault(),
-
                             "%s : %.1f점 / %s",
-
                             displayTypeName(
                                 lowestRecord.inspectionType
                             ),
-
                             lowestRecord.score,
-
                             lowestRecord.judgment
                         )
 
@@ -930,9 +1204,6 @@ class TotalInspectionActivity : AppCompatActivity() {
 
         } else {
 
-            /*
-             * 일부 완료
-             */
             val nextType =
                 findNextIncompleteInspection()
 
@@ -960,7 +1231,7 @@ class TotalInspectionActivity : AppCompatActivity() {
 ────────────────
 
 각 검사 후 반드시
-'결과 저장'을 눌러주세요.
+'검사 결과 저장'을 눌러주세요.
 
 정상 저장 후 뒤로 돌아오면
 다음 검사가 자동으로 시작됩니다.
@@ -1011,21 +1282,14 @@ class TotalInspectionActivity : AppCompatActivity() {
     ): String {
 
         val record =
-            records
-                .filter {
-
-                    it.inspectionType.equals(
-                        type,
-                        ignoreCase = true
-                    )
-                }
-                .maxByOrNull {
-
-                    it.id
-                }
+            findLatestRecord(
+                records,
+                type
+            )
 
         return if (
-            record == null
+            record ==
+            null
         ) {
 
             "${displayTypeName(type)} : 미검사"
@@ -1034,18 +1298,27 @@ class TotalInspectionActivity : AppCompatActivity() {
 
             String.format(
                 Locale.getDefault(),
-
                 "%s : %.1f점 / %s",
-
                 displayTypeName(
                     type
                 ),
-
                 record.score,
-
                 record.judgment
             )
         }
+    }
+
+    private fun formatRecord(
+        record:
+        InspectionHistoryStore.InspectionRecord
+    ): String {
+
+        return String.format(
+            Locale.getDefault(),
+            "%.1f점 / %s",
+            record.score,
+            record.judgment
+        )
     }
 
     /*

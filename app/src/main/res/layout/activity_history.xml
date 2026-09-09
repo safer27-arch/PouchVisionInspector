@@ -189,6 +189,56 @@
 
         </LinearLayout>
 
+        <!-- Telegram 전송 이력 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="14dp"
+            android:padding="14dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Telegram 전송 이력"
+                android:textColor="#102A43"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tvTelegramDeliverySummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="전송 이력을 확인하는 중입니다."
+                android:textColor="#486581"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"/>
+
+            <LinearLayout
+                android:id="@+id/telegramDeliveryContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvEmptyTelegramDelivery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="20dp"
+                    android:gravity="center"
+                    android:text="아직 Telegram 전송 이력이 없습니다."
+                    android:textColor="#829AB1"
+                    android:textSize="14sp"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
         <!-- 향후 확장 -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -212,7 +262,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="• Model / Line별 검사 이력 조회&#10;• 기간별 Trend / 통계&#10;• 검사 항목별 Score 관리&#10;• CSV 내보내기&#10;• 검사 이미지 이력 관리"
+                android:text="• Model / Line별 검사 이력 조회&#10;• 기간별 Trend / 통계&#10;• 검사 항목별 Score 관리&#10;• CSV 내보내기&#10;• 검사 이미지 이력 관리&#10;• Telegram 전송 성공/실패 및 재전송 관리"
                 android:textColor="#486581"
                 android:textSize="14sp"
                 android:lineSpacingExtra="3dp"/>

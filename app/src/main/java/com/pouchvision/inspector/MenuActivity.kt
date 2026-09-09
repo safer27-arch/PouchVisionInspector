@@ -63,11 +63,6 @@ class MenuActivity : AppCompatActivity() {
                 this
             )
 
-        val lines =
-            ProductionContextStore.getLines(
-                this
-            )
-
         val modelAdapter =
             ArrayAdapter(
                 this,
@@ -82,23 +77,8 @@ class MenuActivity : AppCompatActivity() {
         binding.spinnerModel.adapter =
             modelAdapter
 
-        val lineAdapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
-                lines
-            )
-
-        lineAdapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
-
-        binding.spinnerLine.adapter =
-            lineAdapter
-
         /*
-         * 앱에 저장되어 있는 마지막 선택값을 불러와
-         * Spinner의 현재 위치에 맞춥니다.
+         * 저장되어 있는 현재 Model / Line
          */
         val current =
             ProductionContextStore.getCurrent(
@@ -119,19 +99,72 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-        val linePosition =
-            lines.indexOf(
-                current.line
-            )
+        /*
+         * 현재 Model에 맞는 Line 목록을 먼저 표시합니다.
+         */
+        updateLineSpinnerForModel(
+            model = current.model,
+            preferredLine = current.line
+        )
 
-        if (
-            linePosition >= 0
-        ) {
+        /*
+         * Model을 바꾸는 즉시
+         * 해당 Model에 등록된 Line만 다시 표시합니다.
+         */
+        binding.spinnerModel.onItemSelectedListener =
+            object :
+                android.widget.AdapterView.OnItemSelectedListener {
 
-            binding.spinnerLine.setSelection(
-                linePosition
-            )
-        }
+                override fun onItemSelected(
+                    parent: android.widget.AdapterView<*>?,
+                    view: android.view.View?,
+                    position: Int,
+                    id: Long
+                ) {
+
+                    val selectedModel =
+                        binding.spinnerModel.selectedItem
+                            ?.toString()
+                            ?.trim()
+                            .orEmpty()
+
+                    if (
+                        selectedModel.isBlank()
+                    ) {
+
+                        return
+                    }
+
+                    val saved =
+                        ProductionContextStore.getCurrent(
+                            this@MenuActivity
+                        )
+
+                    val preferredLine =
+                        if (
+                            saved.model ==
+                            selectedModel
+                        ) {
+
+                            saved.line
+
+                        } else {
+
+                            ""
+                        }
+
+                    updateLineSpinnerForModel(
+                        model = selectedModel,
+                        preferredLine = preferredLine
+                    )
+                }
+
+                override fun onNothingSelected(
+                    parent: android.widget.AdapterView<*>?
+                ) {
+                    // 아무 작업도 하지 않습니다.
+                }
+            }
 
         refreshCurrentProductionText()
 
@@ -182,6 +215,59 @@ class MenuActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
+    }
+
+    /*
+     * =========================================================
+     * Model별 Line Spinner 갱신
+     * =========================================================
+     */
+
+    private fun updateLineSpinnerForModel(
+        model: String,
+        preferredLine: String = ""
+    ) {
+
+        val lines =
+            ProductionContextStore.getLinesForModel(
+                model
+            )
+
+        val lineAdapter =
+            ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                lines
+            )
+
+        lineAdapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        binding.spinnerLine.adapter =
+            lineAdapter
+
+        val preferredPosition =
+            lines.indexOf(
+                preferredLine
+            )
+
+        if (
+            preferredPosition >= 0
+        ) {
+
+            binding.spinnerLine.setSelection(
+                preferredPosition
+            )
+
+        } else if (
+            lines.isNotEmpty()
+        ) {
+
+            binding.spinnerLine.setSelection(
+                0
+            )
+        }
     }
 
     /*

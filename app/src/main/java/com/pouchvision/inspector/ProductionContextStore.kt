@@ -51,8 +51,7 @@ object ProductionContextStore {
     private val DEFAULT_LINES =
         listOf(
             "Line 1",
-            "Line 2",
-            "Line 3"
+            "Line 2"
         )
 
     data class ProductionContext(

@@ -38,4 +38,8 @@ dependencies {
     implementation 'androidx.camera:camera-camera2:1.4.1'
     implementation 'androidx.camera:camera-lifecycle:1.4.1'
     implementation 'androidx.camera:camera-view:1.4.1'
+
+    // Telegram 네트워크 장애 자동 재전송
+    // 네트워크가 다시 연결될 때 백그라운드 작업을 실행합니다.
+    implementation 'androidx.work:work-runtime:2.11.2'
 }

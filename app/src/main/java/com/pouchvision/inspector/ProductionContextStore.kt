@@ -7,15 +7,20 @@ import android.content.Context
  * 생산 조건(Model / Line) 공용 저장소
  * =============================================================
  *
- * 목적
- * - 메뉴에서 선택한 Model / Line을 앱 전체에서 공통으로 사용합니다.
- * - Bottom Corner / Seal / Forming / Tab / Disassembly / 종합검사에서
- *   같은 생산 조건을 유지할 수 있도록 합니다.
- * - 앱을 종료했다가 다시 실행해도 마지막 선택값을 기억합니다.
+ * 현재 등록 Model : 23종
+ *
+ * Model별 사용 Line을 현장 조건에 맞게 구분합니다.
+ *
+ * 예:
+ * L10D  -> Line 3
+ * H5.5  -> Line 6 / Line 7 / Line 25
+ * E78   -> Line 10 / 13 / 14 / 20 / 21 / 22 / 23 / 24
  *
  * 중요
- * - 이 파일은 검사 알고리즘이나 판정 기준을 변경하지 않습니다.
- * - 현재 단계에서는 Model / Line "선택 상태"를 저장하는 기능입니다.
+ * - 선택한 Model에 등록된 Line만 사용할 수 있습니다.
+ * - 앱을 종료했다 다시 실행해도 마지막 유효 Model / Line을 기억합니다.
+ * - 과거 임시 Model A/B/C 또는 잘못된 Line 값은 자동 정리합니다.
+ * - 검사 알고리즘과 판정 기준은 변경하지 않습니다.
  * =============================================================
  */
 
@@ -30,28 +35,70 @@ object ProductionContextStore {
     private const val KEY_SELECTED_LINE =
         "selected_line"
 
-    private const val KEY_MODEL_LIST =
-        "model_list"
-
-    private const val KEY_LINE_LIST =
-        "line_list"
-
     /*
-     * 초기 기본값
-     *
-     * 현장에서 원하는 이름으로 나중에 변경할 수 있습니다.
+     * =========================================================
+     * 현장 Model Master
+     * =========================================================
      */
-    private val DEFAULT_MODELS =
+
+    private val MASTER_MODELS =
         listOf(
-            "Model A",
-            "Model B",
-            "Model C"
+            "L10D",
+            "H5.5",
+            "E85B",
+            "E81A",
+            "E72B",
+            "E71A",
+            "E73A",
+            "E66A",
+            "E61V",
+            "H5.0",
+            "P37B",
+            "P41A",
+            "N2.2",
+            "P39",
+            "LV20",
+            "LV9.8",
+            "E78",
+            "E79",
+            "E77A",
+            "E90B",
+            "E161A",
+            "E128A",
+            "E129A"
         )
 
-    private val DEFAULT_LINES =
-        listOf(
-            "Line 1",
-            "Line 2"
+    /*
+     * =========================================================
+     * Model별 Line Master
+     * =========================================================
+     */
+
+    private val MODEL_LINE_MAP =
+        linkedMapOf(
+            "L10D" to listOf("Line 3"),
+            "H5.5" to listOf("Line 6", "Line 7", "Line 25"),
+            "E85B" to listOf("Line 8"),
+            "E81A" to listOf("Line 15", "Line 18"),
+            "E72B" to listOf("Line 17"),
+            "E71A" to listOf("Line 11", "Line 12"),
+            "E73A" to listOf("Line 11", "Line 12"),
+            "E66A" to listOf("Line 17"),
+            "E61V" to listOf("Line 17"),
+            "H5.0" to listOf("Line 16"),
+            "P37B" to listOf("Line 9"),
+            "P41A" to listOf("Line 9"),
+            "N2.2" to listOf("Line 9"),
+            "P39" to listOf("Line 9"),
+            "LV20" to listOf("Line 9"),
+            "LV9.8" to listOf("Line 9"),
+            "E78" to listOf("Line 10", "Line 13", "Line 14", "Line 20", "Line 21", "Line 22", "Line 23", "Line 24"),
+            "E79" to listOf("Line 10", "Line 13", "Line 14", "Line 20", "Line 21", "Line 22", "Line 23", "Line 24"),
+            "E77A" to listOf("Line 10", "Line 13", "Line 14", "Line 20", "Line 21", "Line 22", "Line 23", "Line 24"),
+            "E90B" to listOf("Line 23"),
+            "E161A" to listOf("Line 27", "Line 28"),
+            "E128A" to listOf("Line 26"),
+            "E129A" to listOf("Line 26")
         )
 
     data class ProductionContext(
@@ -67,7 +114,60 @@ object ProductionContextStore {
 
     /*
      * =========================================================
-     * 현재 선택값
+     * Model 목록
+     * =========================================================
+     */
+
+    fun getModels(
+        context: Context
+    ): List<String> {
+
+        return MASTER_MODELS
+    }
+
+    /*
+     * =========================================================
+     * 특정 Model의 Line 목록
+     * =========================================================
+     */
+
+    fun getLinesForModel(
+        model: String
+    ): List<String> {
+
+        return MODEL_LINE_MAP[
+            model.trim()
+        ]
+            ?: emptyList()
+    }
+
+    /*
+     * =========================================================
+     * 기존 MenuActivity 호환용
+     *
+     * 현재 저장된 Model에 해당하는 Line만 반환합니다.
+     * 다음 단계에서 MenuActivity가 Model 선택 즉시 이 함수를
+     * 갱신하도록 연결합니다.
+     * =========================================================
+     */
+
+    fun getLines(
+        context: Context
+    ): List<String> {
+
+        val current =
+            getCurrent(
+                context
+            )
+
+        return getLinesForModel(
+            current.model
+        )
+    }
+
+    /*
+     * =========================================================
+     * 현재 선택값 읽기
      * =========================================================
      */
 
@@ -75,49 +175,94 @@ object ProductionContextStore {
         context: Context
     ): ProductionContext {
 
-        val models =
-            getModels(
-                context
-            )
-
-        val lines =
-            getLines(
-                context
-            )
-
         val prefs =
             context.getSharedPreferences(
                 PREF_NAME,
                 Context.MODE_PRIVATE
             )
 
-        val selectedModel =
+        val savedModel =
             prefs.getString(
                 KEY_SELECTED_MODEL,
                 null
             )
-                ?.takeIf {
-                    it.isNotBlank()
-                }
-                ?: models.firstOrNull()
-                ?: "Model A"
+                ?.trim()
+                .orEmpty()
 
-        val selectedLine =
+        val savedLine =
             prefs.getString(
                 KEY_SELECTED_LINE,
                 null
             )
-                ?.takeIf {
-                    it.isNotBlank()
-                }
-                ?: lines.firstOrNull()
-                ?: "Line 1"
+                ?.trim()
+                .orEmpty()
+
+        val selectedModel =
+            if (
+                MASTER_MODELS.contains(
+                    savedModel
+                )
+            ) {
+
+                savedModel
+
+            } else {
+
+                MASTER_MODELS.first()
+            }
+
+        val validLines =
+            getLinesForModel(
+                selectedModel
+            )
+
+        val selectedLine =
+            if (
+                validLines.contains(
+                    savedLine
+                )
+            ) {
+
+                savedLine
+
+            } else {
+
+                validLines.firstOrNull()
+                    ?: ""
+            }
+
+        /*
+         * 과거 값이 현재 Master와 맞지 않으면
+         * 유효한 Model / Line으로 자동 복구합니다.
+         */
+        if (
+            selectedModel != savedModel ||
+            selectedLine != savedLine
+        ) {
+
+            prefs.edit()
+                .putString(
+                    KEY_SELECTED_MODEL,
+                    selectedModel
+                )
+                .putString(
+                    KEY_SELECTED_LINE,
+                    selectedLine
+                )
+                .apply()
+        }
 
         return ProductionContext(
             model = selectedModel,
             line = selectedLine
         )
     }
+
+    /*
+     * =========================================================
+     * 현재 선택값 저장
+     * =========================================================
+     */
 
     fun setCurrent(
         context: Context,
@@ -132,25 +277,27 @@ object ProductionContextStore {
             line.trim()
 
         if (
-            safeModel.isBlank() ||
-            safeLine.isBlank()
+            !MASTER_MODELS.contains(
+                safeModel
+            )
         ) {
 
             return
         }
 
-        /*
-         * 선택된 항목이 목록에 없으면 자동으로 목록에도 추가합니다.
-         */
-        addModel(
-            context,
-            safeModel
-        )
+        val validLines =
+            getLinesForModel(
+                safeModel
+            )
 
-        addLine(
-            context,
-            safeLine
-        )
+        if (
+            !validLines.contains(
+                safeLine
+            )
+        ) {
+
+            return
+        }
 
         context.getSharedPreferences(
             PREF_NAME,
@@ -188,285 +335,44 @@ object ProductionContextStore {
 
     /*
      * =========================================================
-     * Model 목록
+     * 기존 코드 호환용
+     *
+     * Master 목록은 이 파일에서 고정 관리하므로
+     * 실행 중 임의 추가/삭제는 하지 않습니다.
      * =========================================================
      */
-
-    fun getModels(
-        context: Context
-    ): List<String> {
-
-        val prefs =
-            context.getSharedPreferences(
-                PREF_NAME,
-                Context.MODE_PRIVATE
-            )
-
-        val saved =
-            prefs.getStringSet(
-                KEY_MODEL_LIST,
-                null
-            )
-
-        val result =
-            if (
-                saved.isNullOrEmpty()
-            ) {
-
-                DEFAULT_MODELS
-
-            } else {
-
-                saved.toList()
-            }
-
-        return result
-            .map {
-                it.trim()
-            }
-            .filter {
-                it.isNotBlank()
-            }
-            .distinct()
-            .sorted()
-    }
 
     fun addModel(
         context: Context,
         model: String
     ) {
-
-        val safeModel =
-            model.trim()
-
-        if (
-            safeModel.isBlank()
-        ) {
-
-            return
-        }
-
-        val models =
-            getModels(
-                context
-            )
-                .toMutableSet()
-
-        models.add(
-            safeModel
-        )
-
-        context.getSharedPreferences(
-            PREF_NAME,
-            Context.MODE_PRIVATE
-        )
-            .edit()
-            .putStringSet(
-                KEY_MODEL_LIST,
-                models
-            )
-            .apply()
+        // no-op
     }
 
     fun removeModel(
         context: Context,
         model: String
     ) {
-
-        val safeModel =
-            model.trim()
-
-        val current =
-            getCurrent(
-                context
-            )
-
-        /*
-         * 현재 선택 중인 Model은 실수로 삭제하지 않도록 보호합니다.
-         */
-        if (
-            safeModel.equals(
-                current.model,
-                ignoreCase = false
-            )
-        ) {
-
-            return
-        }
-
-        val models =
-            getModels(
-                context
-            )
-                .toMutableSet()
-
-        models.remove(
-            safeModel
-        )
-
-        if (
-            models.isEmpty()
-        ) {
-
-            models.addAll(
-                DEFAULT_MODELS
-            )
-        }
-
-        context.getSharedPreferences(
-            PREF_NAME,
-            Context.MODE_PRIVATE
-        )
-            .edit()
-            .putStringSet(
-                KEY_MODEL_LIST,
-                models
-            )
-            .apply()
-    }
-
-    /*
-     * =========================================================
-     * Line 목록
-     * =========================================================
-     */
-
-    fun getLines(
-        context: Context
-    ): List<String> {
-
-        val prefs =
-            context.getSharedPreferences(
-                PREF_NAME,
-                Context.MODE_PRIVATE
-            )
-
-        val saved =
-            prefs.getStringSet(
-                KEY_LINE_LIST,
-                null
-            )
-
-        val result =
-            if (
-                saved.isNullOrEmpty()
-            ) {
-
-                DEFAULT_LINES
-
-            } else {
-
-                saved.toList()
-            }
-
-        return result
-            .map {
-                it.trim()
-            }
-            .filter {
-                it.isNotBlank()
-            }
-            .distinct()
-            .sorted()
+        // no-op
     }
 
     fun addLine(
         context: Context,
         line: String
     ) {
-
-        val safeLine =
-            line.trim()
-
-        if (
-            safeLine.isBlank()
-        ) {
-
-            return
-        }
-
-        val lines =
-            getLines(
-                context
-            )
-                .toMutableSet()
-
-        lines.add(
-            safeLine
-        )
-
-        context.getSharedPreferences(
-            PREF_NAME,
-            Context.MODE_PRIVATE
-        )
-            .edit()
-            .putStringSet(
-                KEY_LINE_LIST,
-                lines
-            )
-            .apply()
+        // no-op
     }
 
     fun removeLine(
         context: Context,
         line: String
     ) {
-
-        val safeLine =
-            line.trim()
-
-        val current =
-            getCurrent(
-                context
-            )
-
-        /*
-         * 현재 선택 중인 Line은 실수로 삭제하지 않도록 보호합니다.
-         */
-        if (
-            safeLine.equals(
-                current.line,
-                ignoreCase = false
-            )
-        ) {
-
-            return
-        }
-
-        val lines =
-            getLines(
-                context
-            )
-                .toMutableSet()
-
-        lines.remove(
-            safeLine
-        )
-
-        if (
-            lines.isEmpty()
-        ) {
-
-            lines.addAll(
-                DEFAULT_LINES
-            )
-        }
-
-        context.getSharedPreferences(
-            PREF_NAME,
-            Context.MODE_PRIVATE
-        )
-            .edit()
-            .putStringSet(
-                KEY_LINE_LIST,
-                lines
-            )
-            .apply()
+        // no-op
     }
 
     /*
      * =========================================================
-     * 초기화
+     * 선택값 초기화
      * =========================================================
      */
 
@@ -479,7 +385,12 @@ object ProductionContextStore {
             Context.MODE_PRIVATE
         )
             .edit()
-            .clear()
+            .remove(
+                KEY_SELECTED_MODEL
+            )
+            .remove(
+                KEY_SELECTED_LINE
+            )
             .apply()
     }
 }

@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 카메라 사용 -->
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Telegram Bot API 전송을 위한 인터넷 사용 -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature
         android:name="android.hardware.camera"

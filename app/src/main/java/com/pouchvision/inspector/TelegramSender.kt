@@ -218,7 +218,36 @@ Telegram 연결 테스트 메시지입니다.
                 File? =
                 null
 
+            var deliveryRecordId =
+                0L
+
             try {
+
+                /*
+                 * =================================================
+                 * Telegram 전송 이력 PENDING 생성
+                 * =================================================
+                 *
+                 * 사용자가 "결과 이미지 전송"을 켠 경우에만
+                 * 실패 재전송용 이미지를 앱 내부에 임시 보관합니다.
+                 */
+                deliveryRecordId =
+                    TelegramDeliveryStore.createPending(
+                        context = context,
+                        model = production.model,
+                        line = production.line,
+                        inspectionType = inspectionType,
+                        score = score,
+                        judgment = judgment,
+                        resultBitmap =
+                            if (
+                                settings.sendImage
+                            ) {
+                                resultBitmap
+                            } else {
+                                null
+                            }
+                    )
 
                 val result =
                     if (
@@ -245,6 +274,10 @@ Telegram 연결 테스트 메시지입니다.
 
                         } else {
 
+                            /*
+                             * 이미지 임시 생성에 실패한 경우
+                             * 알림 자체를 놓치지 않도록 Text로 전송합니다.
+                             */
                             sendTextToAll(
                                 botToken = settings.botToken,
                                 chatIds = settings.chatIds,
@@ -261,6 +294,29 @@ Telegram 연결 테스트 메시지입니다.
                         )
                     }
 
+                /*
+                 * =================================================
+                 * Telegram 성공 / 실패 이력 갱신
+                 * =================================================
+                 *
+                 * 여러 수신처 중 하나라도 실패하면
+                 * STATUS_FAILED로 남겨 재전송 대상으로 관리합니다.
+                 */
+                if (
+                    deliveryRecordId !=
+                    0L
+                ) {
+
+                    TelegramDeliveryStore.updateResult(
+                        context = context,
+                        recordId = deliveryRecordId,
+                        success = result.success,
+                        successCount = result.successCount,
+                        failureCount = result.failureCount,
+                        message = result.message
+                    )
+                }
+
                 callback?.invoke(
                     result
                 )
@@ -269,7 +325,7 @@ Telegram 연결 테스트 메시지입니다.
                 e: Exception
             ) {
 
-                callback?.invoke(
+                val errorResult =
                     SendResult(
                         success = false,
                         successCount = 0,
@@ -281,6 +337,24 @@ Telegram 연결 테스트 메시지입니다.
                                         ?: "알 수 없는 오류"
                                     )
                     )
+
+                if (
+                    deliveryRecordId !=
+                    0L
+                ) {
+
+                    TelegramDeliveryStore.updateResult(
+                        context = context,
+                        recordId = deliveryRecordId,
+                        success = false,
+                        successCount = errorResult.successCount,
+                        failureCount = errorResult.failureCount,
+                        message = errorResult.message
+                    )
+                }
+
+                callback?.invoke(
+                    errorResult
                 )
 
             } finally {

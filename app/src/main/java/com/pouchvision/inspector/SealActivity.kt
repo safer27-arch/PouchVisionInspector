@@ -2167,6 +2167,15 @@ NG 후보 영역 : %d개
                     true
 
                 /*
+                 * Telegram 자동 알림
+                 *
+                 * 설정한 전송 기준에 해당하는 판정이면
+                 * 결과 이미지 + Model / Line / 검사 항목 / Score를
+                 * 자동으로 전송합니다.
+                 */
+                sendTelegramAlertIfNeeded()
+
+                /*
                  * 화면 결과
                  */
                 runOnUiThread {
@@ -2244,6 +2253,66 @@ NG 후보 영역 : %d개
             }
 
         }.start()
+    }
+
+    /*
+     * =========================================================
+     * SEAL Telegram 자동 알림
+     * =========================================================
+     */
+
+    private fun sendTelegramAlertIfNeeded() {
+
+        if (
+            !TelegramSettingsStore.isReady(
+                this
+            )
+        ) {
+            return
+        }
+
+        if (
+            !TelegramSettingsStore.shouldSendForJudgment(
+                context = this,
+                judgment = lastJudgment
+            )
+        ) {
+            return
+        }
+
+        TelegramSender.sendInspectionAlert(
+            context = this,
+            inspectionType = "SEAL",
+            score = lastSealScore,
+            judgment = lastJudgment,
+            details = lastDetails,
+            resultBitmap = lastResultBitmap
+        ) { result ->
+
+            runOnUiThread {
+
+                val message =
+                    if (
+                        result.success
+                    ) {
+
+                        "SEAL Telegram 자동전송 완료\n" +
+                            "성공 ${result.successCount}개 / " +
+                            "실패 ${result.failureCount}개"
+
+                    } else {
+
+                        "SEAL Telegram 자동전송 실패\n" +
+                            result.message
+                    }
+
+                Toast.makeText(
+                    this,
+                    message,
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     /*

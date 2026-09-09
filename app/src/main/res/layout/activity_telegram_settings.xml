@@ -171,6 +171,17 @@
             android:textStyle="bold"/>
 
         <Button
+            android:id="@+id/btnTelegramTest"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="14dp"
+            android:text="테스트 메시지 보내기"
+            android:textSize="15sp"
+            android:textStyle="bold"/>
+
+        <Button
             android:id="@+id/btnTelegramBack"
             android:layout_width="match_parent"
             android:layout_height="54dp"

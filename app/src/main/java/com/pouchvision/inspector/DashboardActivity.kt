@@ -8,42 +8,42 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-class DashboardActivity : AppCompatActivity() {
+/*
+ * =============================================================
+ * 품질 Dashboard
+ * =============================================================
+ *
+ * 기능
+ * - 오늘 / 최근 7일 / 이번 달
+ * - 전체 Model 또는 특정 Model
+ * - 전체 Line 또는 특정 Line
+ * - Model 선택 시 해당 Model의 Line만 표시
+ * - Quality Score 요약
+ * - 정상 / 주의 / 한계정상 / 불량 건수
+ * - 우선 확인 항목
+ * - 검사 항목별 현황
+ *
+ * 중요
+ * - Dashboard는 저장된 검사 이력을 집계해서 보여주는 화면입니다.
+ * - 검사 알고리즘과 판정 기준은 변경하지 않습니다.
+ * =============================================================
+ */
 
-    private lateinit var rootContent: LinearLayout
-    private lateinit var periodStatusText: TextView
-
-    private var selectedPeriod =
-        Period.TODAY
-
-    private enum class Period(
-        val title: String
-    ) {
-
-        TODAY(
-            "오늘"
-        ),
-
-        WEEK(
-            "최근 7일"
-        ),
-
-        MONTH(
-            "이번 달"
-        )
-    }
+class DashboardActivity :
+    AppCompatActivity() {
 
     companion object {
 
@@ -64,7 +64,38 @@ class DashboardActivity : AppCompatActivity() {
 
         private const val TYPE_DISASSEMBLY =
             "DISASSEMBLY"
+
+        private const val FILTER_ALL_MODELS =
+            "전체 Model"
+
+        private const val FILTER_ALL_LINES =
+            "전체 Line"
     }
+
+    private enum class Period(
+        val title: String
+    ) {
+
+        TODAY(
+            "오늘"
+        ),
+
+        WEEK(
+            "최근 7일"
+        ),
+
+        MONTH(
+            "이번 달"
+        )
+    }
+
+    private data class ItemSummary(
+        val type: String,
+        val count: Int,
+        val averageScore: Double,
+        val issueCount: Int,
+        val issueRate: Double
+    )
 
     private val inspectionOrder =
         listOf(
@@ -74,6 +105,28 @@ class DashboardActivity : AppCompatActivity() {
             TYPE_TAB,
             TYPE_DISASSEMBLY
         )
+
+    private lateinit var rootContent:
+        LinearLayout
+
+    private lateinit var spinnerModel:
+        Spinner
+
+    private lateinit var spinnerLine:
+        Spinner
+
+    private lateinit var periodStatusText:
+        TextView
+
+    private var selectedPeriod =
+        Period.TODAY
+
+    /*
+     * Spinner를 최초 구성할 때 발생하는
+     * 불필요한 중복 render를 줄이기 위한 Flag
+     */
+    private var filterUiReady =
+        false
 
     override fun onCreate(
         savedInstanceState: Bundle?
@@ -87,6 +140,11 @@ class DashboardActivity : AppCompatActivity() {
             createScreen()
         )
 
+        setupProductionFilters()
+
+        filterUiReady =
+            true
+
         renderDashboard()
     }
 
@@ -95,7 +153,8 @@ class DashboardActivity : AppCompatActivity() {
         super.onResume()
 
         if (
-            ::rootContent.isInitialized
+            ::rootContent.isInitialized &&
+            filterUiReady
         ) {
 
             renderDashboard()
@@ -104,9 +163,7 @@ class DashboardActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 전체 화면 생성
-     *
-     * XML 파일을 추가하지 않고 Kotlin 코드만으로 구성합니다.
+     * 전체 화면
      * =========================================================
      */
 
@@ -137,7 +194,7 @@ class DashboardActivity : AppCompatActivity() {
             }
 
         /*
-         * 상단 Header
+         * Header
          */
         val header =
             LinearLayout(
@@ -161,7 +218,7 @@ class DashboardActivity : AppCompatActivity() {
                 )
             }
 
-        val title =
+        header.addView(
             TextView(
                 this
             ).apply {
@@ -181,8 +238,9 @@ class DashboardActivity : AppCompatActivity() {
                     Color.WHITE
                 )
             }
+        )
 
-        val subtitle =
+        header.addView(
             TextView(
                 this
             ).apply {
@@ -206,22 +264,12 @@ class DashboardActivity : AppCompatActivity() {
                     0
                 )
             }
-
-        header.addView(
-            title
-        )
-
-        header.addView(
-            subtitle
         )
 
         outer.addView(
             header
         )
 
-        /*
-         * 본문
-         */
         rootContent =
             LinearLayout(
                 this
@@ -239,15 +287,106 @@ class DashboardActivity : AppCompatActivity() {
             }
 
         /*
-         * 기간 버튼
+         * =====================================================
+         * Model / Line 필터
+         * =====================================================
          */
-        val periodTitle =
+
+        rootContent.addView(
+            sectionTitle(
+                "생산 조건"
+            )
+        )
+
+        val filterCard =
+            createCard()
+
+        filterCard.addView(
+            labelText(
+                "Model"
+            )
+        )
+
+        spinnerModel =
+            Spinner(
+                this
+            ).apply {
+
+                minimumHeight =
+                    dp(52)
+
+                setPadding(
+                    dp(8),
+                    0,
+                    dp(8),
+                    0
+                )
+
+                background =
+                    roundedBackground(
+                        "#F4F6F8",
+                        8f
+                    )
+            }
+
+        filterCard.addView(
+            spinnerModel,
+            fullWidthParams(
+                top = 4,
+                bottom = 10
+            )
+        )
+
+        filterCard.addView(
+            labelText(
+                "Line"
+            )
+        )
+
+        spinnerLine =
+            Spinner(
+                this
+            ).apply {
+
+                minimumHeight =
+                    dp(52)
+
+                setPadding(
+                    dp(8),
+                    0,
+                    dp(8),
+                    0
+                )
+
+                background =
+                    roundedBackground(
+                        "#F4F6F8",
+                        8f
+                    )
+            }
+
+        filterCard.addView(
+            spinnerLine,
+            fullWidthParams(
+                top = 4,
+                bottom = 0
+            )
+        )
+
+        rootContent.addView(
+            filterCard
+        )
+
+        /*
+         * =====================================================
+         * 기간
+         * =====================================================
+         */
+
+        rootContent.addView(
             sectionTitle(
                 "조회 기간"
             )
-
-        rootContent.addView(
-            periodTitle
         )
 
         val periodRow =
@@ -262,7 +401,7 @@ class DashboardActivity : AppCompatActivity() {
                     Gravity.CENTER
             }
 
-        val btnToday =
+        periodRow.addView(
             periodButton(
                 "오늘"
             ) {
@@ -272,8 +411,9 @@ class DashboardActivity : AppCompatActivity() {
 
                 renderDashboard()
             }
+        )
 
-        val btnWeek =
+        periodRow.addView(
             periodButton(
                 "최근 7일"
             ) {
@@ -283,8 +423,9 @@ class DashboardActivity : AppCompatActivity() {
 
                 renderDashboard()
             }
+        )
 
-        val btnMonth =
+        periodRow.addView(
             periodButton(
                 "이번 달"
             ) {
@@ -294,17 +435,6 @@ class DashboardActivity : AppCompatActivity() {
 
                 renderDashboard()
             }
-
-        periodRow.addView(
-            btnToday
-        )
-
-        periodRow.addView(
-            btnWeek
-        )
-
-        periodRow.addView(
-            btnMonth
         )
 
         rootContent.addView(
@@ -329,7 +459,7 @@ class DashboardActivity : AppCompatActivity() {
                     dp(2),
                     dp(10),
                     dp(2),
-                    dp(6)
+                    dp(8)
                 )
             }
 
@@ -338,7 +468,14 @@ class DashboardActivity : AppCompatActivity() {
         )
 
         /*
-         * Dashboard 내용은 이 아래부터 renderDashboard()가 재생성합니다.
+         * 이 아래 View들은 renderDashboard()에서 재생성합니다.
+         *
+         * 고정 View 개수:
+         * 0 생산조건 제목
+         * 1 생산조건 Card
+         * 2 조회기간 제목
+         * 3 기간 버튼 Row
+         * 4 기간 상태 Text
          */
         outer.addView(
             rootContent
@@ -353,6 +490,202 @@ class DashboardActivity : AppCompatActivity() {
 
     /*
      * =========================================================
+     * Model / Line 필터
+     * =========================================================
+     */
+
+    private fun setupProductionFilters() {
+
+        val modelItems =
+            mutableListOf<String>()
+
+        modelItems.add(
+            FILTER_ALL_MODELS
+        )
+
+        modelItems.addAll(
+            ProductionContextStore.getModels(
+                this
+            )
+        )
+
+        val modelAdapter =
+            ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                modelItems
+            )
+
+        modelAdapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        spinnerModel.adapter =
+            modelAdapter
+
+        /*
+         * Dashboard 최초 진입 시
+         * 전체 Model을 기본으로 보여줍니다.
+         */
+        spinnerModel.setSelection(
+            0
+        )
+
+        updateLineSpinner(
+            model = FILTER_ALL_MODELS,
+            preferredLine = FILTER_ALL_LINES
+        )
+
+        spinnerModel.onItemSelectedListener =
+            object :
+                AdapterView.OnItemSelectedListener {
+
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+
+                    val selectedModel =
+                        spinnerModel.selectedItem
+                            ?.toString()
+                            ?: FILTER_ALL_MODELS
+
+                    updateLineSpinner(
+                        model = selectedModel,
+                        preferredLine = FILTER_ALL_LINES
+                    )
+
+                    if (
+                        filterUiReady
+                    ) {
+
+                        renderDashboard()
+                    }
+                }
+
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {
+                }
+            }
+
+        spinnerLine.onItemSelectedListener =
+            object :
+                AdapterView.OnItemSelectedListener {
+
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+
+                    if (
+                        filterUiReady
+                    ) {
+
+                        renderDashboard()
+                    }
+                }
+
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {
+                }
+            }
+    }
+
+    private fun updateLineSpinner(
+        model: String,
+        preferredLine: String =
+            FILTER_ALL_LINES
+    ) {
+
+        val lines =
+            if (
+                model ==
+                FILTER_ALL_MODELS
+            ) {
+
+                ProductionContextStore
+                    .getModels(
+                        this
+                    )
+                    .flatMap { modelName ->
+
+                        ProductionContextStore
+                            .getLinesForModel(
+                                modelName
+                            )
+                    }
+                    .distinct()
+                    .sortedWith(
+                        compareBy<String> {
+
+                            it.removePrefix(
+                                "Line "
+                            )
+                                .toIntOrNull()
+                                ?: Int.MAX_VALUE
+                        }
+                            .thenBy {
+                                it
+                            }
+                    )
+
+            } else {
+
+                ProductionContextStore
+                    .getLinesForModel(
+                        model
+                    )
+            }
+
+        val items =
+            mutableListOf<String>()
+
+        items.add(
+            FILTER_ALL_LINES
+        )
+
+        items.addAll(
+            lines
+        )
+
+        val adapter =
+            ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                items
+            )
+
+        adapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        spinnerLine.adapter =
+            adapter
+
+        val preferredPosition =
+            items.indexOf(
+                preferredLine
+            )
+
+        spinnerLine.setSelection(
+            if (
+                preferredPosition >= 0
+            ) {
+                preferredPosition
+            } else {
+                0
+            }
+        )
+    }
+
+    /*
+     * =========================================================
      * Dashboard 갱신
      * =========================================================
      */
@@ -360,16 +693,15 @@ class DashboardActivity : AppCompatActivity() {
     private fun renderDashboard() {
 
         /*
-         * periodStatusText 이전까지는 고정 UI이므로
-         * 그 아래 View만 삭제합니다.
+         * 고정 UI 5개 아래만 삭제합니다.
          */
         while (
             rootContent.childCount >
-            3
+            5
         ) {
 
             rootContent.removeViewAt(
-                3
+                5
             )
         }
 
@@ -383,26 +715,57 @@ class DashboardActivity : AppCompatActivity() {
                 selectedPeriod
             )
 
-        val periodRecords =
-            allRecords.filter {
+        val selectedModel =
+            spinnerModel.selectedItem
+                ?.toString()
+                ?: FILTER_ALL_MODELS
 
-                it.id >=
-                    startTime
+        val selectedLine =
+            spinnerLine.selectedItem
+                ?.toString()
+                ?: FILTER_ALL_LINES
+
+        val periodRecords =
+            allRecords.filter { record ->
+
+                val periodMatches =
+                    record.id >=
+                        startTime
+
+                val modelMatches =
+                    selectedModel ==
+                        FILTER_ALL_MODELS ||
+                        record.model.equals(
+                            selectedModel,
+                            ignoreCase = true
+                        )
+
+                val lineMatches =
+                    selectedLine ==
+                        FILTER_ALL_LINES ||
+                        record.line.equals(
+                            selectedLine,
+                            ignoreCase = true
+                        )
+
+                periodMatches &&
+                    modelMatches &&
+                    lineMatches
             }
 
         /*
-         * TOTAL SESSION은 개별 검사 건수/Score 계산에서 제외합니다.
+         * TOTAL SESSION은 개별 검사 Score / 건수 계산에서 제외합니다.
          */
         val inspectionRecords =
-            periodRecords.filter {
+            periodRecords.filter { record ->
 
-                !it.inspectionType.equals(
+                !record.inspectionType.equals(
                     TYPE_TOTAL_SESSION,
                     ignoreCase = true
                 ) &&
                     inspectionOrder.any { type ->
 
-                        it.inspectionType.equals(
+                        record.inspectionType.equals(
                             type,
                             ignoreCase = true
                         )
@@ -410,22 +773,38 @@ class DashboardActivity : AppCompatActivity() {
             }
 
         val totalSessions =
-            periodRecords.count {
+            periodRecords.count { record ->
 
-                it.inspectionType.equals(
+                record.inspectionType.equals(
                     TYPE_TOTAL_SESSION,
                     ignoreCase = true
                 )
             }
 
         periodStatusText.text =
-            buildPeriodCaption(
-                selectedPeriod
-            )
+            buildString {
 
-        /*
-         * 데이터가 없어도 0건 Dashboard를 보여줍니다.
-         */
+                append(
+                    selectedPeriod.title
+                )
+
+                append(
+                    "  |  "
+                )
+
+                append(
+                    selectedModel
+                )
+
+                append(
+                    "  |  "
+                )
+
+                append(
+                    selectedLine
+                )
+            }
+
         addOverallSummary(
             records = inspectionRecords,
             totalSessions = totalSessions
@@ -448,7 +827,7 @@ class DashboardActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 전체 요약
+     * 전체 품질 요약
      * =========================================================
      */
 
@@ -487,10 +866,9 @@ class DashboardActivity : AppCompatActivity() {
             }
 
         val minimum =
-            records
-                .minByOrNull {
-                    it.score
-                }
+            records.minByOrNull {
+                it.score
+            }
 
         val issueCount =
             records.count {
@@ -507,10 +885,8 @@ class DashboardActivity : AppCompatActivity() {
                 0
             ) {
 
-                issueCount
-                    .toDouble() /
-                    count
-                        .toDouble() *
+                issueCount.toDouble() /
+                    count.toDouble() *
                     100.0
 
             } else {
@@ -521,7 +897,7 @@ class DashboardActivity : AppCompatActivity() {
         val card =
             createCard()
 
-        val headline =
+        card.addView(
             TextView(
                 this
             ).apply {
@@ -547,9 +923,6 @@ class DashboardActivity : AppCompatActivity() {
                     )
                 )
             }
-
-        card.addView(
-            headline
         )
 
         val progress =
@@ -585,7 +958,8 @@ class DashboardActivity : AppCompatActivity() {
                     )
             }
 
-        val progressParams =
+        card.addView(
+            progress,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(12)
@@ -597,15 +971,9 @@ class DashboardActivity : AppCompatActivity() {
                 bottomMargin =
                     dp(12)
             }
-
-        progress.layoutParams =
-            progressParams
-
-        card.addView(
-            progress
         )
 
-        val summary =
+        card.addView(
             TextView(
                 this
             ).apply {
@@ -613,12 +981,10 @@ class DashboardActivity : AppCompatActivity() {
                 text =
                     String.format(
                         Locale.getDefault(),
-
                         """
 검사 건수 : %d건
 종합검사 Session : %d회
 주의 이상 발생 : %d건 (%.1f%%)
-
 최저 Score : %s
                         """.trimIndent(),
 
@@ -662,9 +1028,6 @@ class DashboardActivity : AppCompatActivity() {
                     1.18f
                 )
             }
-
-        card.addView(
-            summary
         )
 
         rootContent.addView(
@@ -674,7 +1037,7 @@ class DashboardActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 정상 / 주의 / 한계 / 불량 건수
+     * 판정 현황
      * =========================================================
      */
 
@@ -704,37 +1067,31 @@ class DashboardActivity : AppCompatActivity() {
         var ng =
             0
 
-        for (
-            record in records
-        ) {
+        records.forEach { record ->
 
             when {
 
                 record.judgment.contains(
                     "불량"
                 ) -> {
-
                     ng++
                 }
 
                 record.judgment.contains(
                     "한계"
                 ) -> {
-
                     limit++
                 }
 
                 record.judgment.contains(
                     "주의"
                 ) -> {
-
                     warning++
                 }
 
                 record.judgment.contains(
                     "정상"
                 ) -> {
-
                     normal++
                 }
             }
@@ -751,21 +1108,17 @@ class DashboardActivity : AppCompatActivity() {
 
         row1.addView(
             countCard(
-                title = "정상",
-                count = normal,
-                textColor = Color.parseColor(
-                    "#2E7D32"
-                )
+                "정상",
+                normal,
+                "#2E7D32"
             )
         )
 
         row1.addView(
             countCard(
-                title = "주의",
-                count = warning,
-                textColor = Color.parseColor(
-                    "#D89000"
-                )
+                "주의",
+                warning,
+                "#D89000"
             )
         )
 
@@ -780,21 +1133,17 @@ class DashboardActivity : AppCompatActivity() {
 
         row2.addView(
             countCard(
-                title = "한계정상",
-                count = limit,
-                textColor = Color.parseColor(
-                    "#EF6C00"
-                )
+                "한계정상",
+                limit,
+                "#EF6C00"
             )
         )
 
         row2.addView(
             countCard(
-                title = "불량",
-                count = ng,
-                textColor = Color.parseColor(
-                    "#C62828"
-                )
+                "불량",
+                ng,
+                "#C62828"
             )
         )
 
@@ -809,7 +1158,7 @@ class DashboardActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 가장 주의가 필요한 항목
+     * 우선 확인 항목
      * =========================================================
      */
 
@@ -857,10 +1206,8 @@ class DashboardActivity : AppCompatActivity() {
                         }
 
                     val issueRate =
-                        issueCount
-                            .toDouble() /
-                            itemRecords.size
-                                .toDouble() *
+                        issueCount.toDouble() /
+                            itemRecords.size.toDouble() *
                             100.0
 
                     ItemSummary(
@@ -895,7 +1242,7 @@ class DashboardActivity : AppCompatActivity() {
         val card =
             createCard()
 
-        val text =
+        card.addView(
             TextView(
                 this
             ).apply {
@@ -905,8 +1252,8 @@ class DashboardActivity : AppCompatActivity() {
                     null
                 ) {
 
-                    this.text =
-                        "현재 기간에 검사 데이터가 없습니다."
+                    text =
+                        "현재 조건에 검사 데이터가 없습니다."
 
                     setTextColor(
                         Color.parseColor(
@@ -916,10 +1263,9 @@ class DashboardActivity : AppCompatActivity() {
 
                 } else {
 
-                    this.text =
+                    text =
                         String.format(
                             Locale.getDefault(),
-
                             """
 %s
 
@@ -971,9 +1317,6 @@ class DashboardActivity : AppCompatActivity() {
                     1.15f
                 )
             }
-
-        card.addView(
-            text
         )
 
         rootContent.addView(
@@ -983,7 +1326,7 @@ class DashboardActivity : AppCompatActivity() {
 
     /*
      * =========================================================
-     * 항목별 현황
+     * 검사 항목별 현황
      * =========================================================
      */
 
@@ -1001,9 +1344,7 @@ class DashboardActivity : AppCompatActivity() {
             )
         )
 
-        for (
-            type in inspectionOrder
-        ) {
+        inspectionOrder.forEach { type ->
 
             val itemRecords =
                 records.filter {
@@ -1017,7 +1358,7 @@ class DashboardActivity : AppCompatActivity() {
             val card =
                 createCard()
 
-            val title =
+            card.addView(
                 TextView(
                     this
                 ).apply {
@@ -1041,16 +1382,13 @@ class DashboardActivity : AppCompatActivity() {
                         )
                     )
                 }
-
-            card.addView(
-                title
             )
 
             if (
                 itemRecords.isEmpty()
             ) {
 
-                val empty =
+                card.addView(
                     TextView(
                         this
                     ).apply {
@@ -1074,16 +1412,13 @@ class DashboardActivity : AppCompatActivity() {
                             0
                         )
                     }
-
-                card.addView(
-                    empty
                 )
 
                 rootContent.addView(
                     card
                 )
 
-                continue
+                return@forEach
             }
 
             val average =
@@ -1103,13 +1438,11 @@ class DashboardActivity : AppCompatActivity() {
                 }
 
             val issueRate =
-                issueCount
-                    .toDouble() /
-                    itemRecords.size
-                        .toDouble() *
+                issueCount.toDouble() /
+                    itemRecords.size.toDouble() *
                     100.0
 
-            val info =
+            card.addView(
                 TextView(
                     this
                 ).apply {
@@ -1140,9 +1473,6 @@ class DashboardActivity : AppCompatActivity() {
                         dp(6)
                     )
                 }
-
-            card.addView(
-                info
             )
 
             val progress =
@@ -1178,14 +1508,12 @@ class DashboardActivity : AppCompatActivity() {
                         )
                 }
 
-            progress.layoutParams =
+            card.addView(
+                progress,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     dp(10)
                 )
-
-            card.addView(
-                progress
             )
 
             rootContent.addView(
@@ -1202,15 +1530,16 @@ class DashboardActivity : AppCompatActivity() {
 
     private fun addActionButtons() {
 
-        val refresh =
+        rootContent.addView(
             actionButton(
                 "Dashboard 새로고침"
             ) {
 
                 renderDashboard()
             }
+        )
 
-        val history =
+        rootContent.addView(
             actionButton(
                 "검사 이력 / Trend / CSV 보기"
             ) {
@@ -1222,57 +1551,15 @@ class DashboardActivity : AppCompatActivity() {
                     )
                 )
             }
+        )
 
-        val back =
+        rootContent.addView(
             actionButton(
                 "메뉴로 돌아가기"
             ) {
 
                 finish()
             }
-
-        rootContent.addView(
-            refresh
-        )
-
-        rootContent.addView(
-            history
-        )
-
-        rootContent.addView(
-            back
-        )
-
-        val note =
-            TextView(
-                this
-            ).apply {
-
-                text =
-                    """
-※ Dashboard는 저장된 영상 검사 결과를 요약한 관리용 화면입니다.
-※ 현재 판정 알고리즘은 검사 보조 단계이며 실제 양산 OK/NG 기준과는 별도로 검증이 필요합니다.
-                    """.trimIndent()
-
-                textSize =
-                    12f
-
-                setTextColor(
-                    Color.parseColor(
-                        "#829AB1"
-                    )
-                )
-
-                setPadding(
-                    dp(2),
-                    dp(12),
-                    dp(2),
-                    dp(4)
-                )
-            }
-
-        rootContent.addView(
-            note
         )
     }
 
@@ -1380,48 +1667,14 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
-    private fun buildPeriodCaption(
-        period: Period
-    ): String {
-
-        val dateFormat =
-            SimpleDateFormat(
-                "yyyy-MM-dd",
-                Locale.getDefault()
-            )
-
-        val start =
-            dateFormat.format(
-                Date(
-                    periodStartTime(
-                        period
-                    )
-                )
-            )
-
-        val today =
-            dateFormat.format(
-                Date()
-            )
-
-        return when (
-            period
-        ) {
-
-            Period.TODAY ->
-                "일간 : $today"
-
-            Period.WEEK ->
-                "주간 : $start ~ $today"
-
-            Period.MONTH ->
-                "월간 : $start ~ $today"
-        }
-    }
-
     /*
      * =========================================================
      * 판정 Severity
+     *
+     * 1 정상
+     * 2 주의
+     * 3 한계정상
+     * 4 불량
      * =========================================================
      */
 
@@ -1433,48 +1686,100 @@ class DashboardActivity : AppCompatActivity() {
 
             judgment.contains(
                 "불량"
-            ) ->
+            ) -> {
                 4
+            }
 
             judgment.contains(
                 "한계"
-            ) ->
+            ) -> {
                 3
+            }
 
             judgment.contains(
                 "주의"
-            ) ->
+            ) -> {
                 2
+            }
 
             judgment.contains(
                 "정상"
-            ) ->
+            ) -> {
                 1
+            }
 
-            else ->
+            else -> {
                 0
+            }
+        }
+    }
+
+    private fun displayTypeName(
+        type: String
+    ): String {
+
+        return when {
+
+            type.equals(
+                TYPE_BOTTOM,
+                ignoreCase = true
+            ) -> {
+                "BOTTOM CORNER"
+            }
+
+            type.equals(
+                TYPE_SEAL,
+                ignoreCase = true
+            ) -> {
+                "SEAL"
+            }
+
+            type.equals(
+                TYPE_FORMING,
+                ignoreCase = true
+            ) -> {
+                "FORMING"
+            }
+
+            type.equals(
+                TYPE_TAB,
+                ignoreCase = true
+            ) -> {
+                "TAB"
+            }
+
+            type.equals(
+                TYPE_DISASSEMBLY,
+                ignoreCase = true
+            ) -> {
+                "분해검사"
+            }
+
+            else -> {
+                type
+            }
         }
     }
 
     /*
      * =========================================================
-     * UI Helper
+     * 공용 UI
      * =========================================================
      */
 
     private fun sectionTitle(
-        text: String
+        title: String
     ): TextView {
 
         return TextView(
             this
         ).apply {
 
-            this.text =
-                text
+            text =
+                title
 
             textSize =
-                20f
+                19f
 
             setTypeface(
                 null,
@@ -1491,7 +1796,34 @@ class DashboardActivity : AppCompatActivity() {
                 dp(2),
                 dp(14),
                 dp(2),
-                dp(10)
+                dp(8)
+            )
+        }
+    }
+
+    private fun labelText(
+        value: String
+    ): TextView {
+
+        return TextView(
+            this
+        ).apply {
+
+            text =
+                value
+
+            textSize =
+                14f
+
+            setTypeface(
+                null,
+                Typeface.BOLD
+            )
+
+            setTextColor(
+                Color.parseColor(
+                    "#334E68"
+                )
             )
         }
     }
@@ -1499,53 +1831,42 @@ class DashboardActivity : AppCompatActivity() {
     private fun createCard():
         LinearLayout {
 
-        val card =
-            LinearLayout(
-                this
-            ).apply {
+        return LinearLayout(
+            this
+        ).apply {
 
-                orientation =
-                    LinearLayout.VERTICAL
+            orientation =
+                LinearLayout.VERTICAL
 
-                setPadding(
-                    dp(16),
-                    dp(15),
-                    dp(16),
-                    dp(15)
-                )
-
-                background =
-                    roundedBackground(
-                        fillColor =
-                            Color.WHITE,
-                        strokeColor =
-                            Color.parseColor(
-                                "#D9E2EC"
-                            ),
-                        radiusDp =
-                            10
-                    )
-            }
-
-        val params =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+            setPadding(
+                dp(16),
+                dp(16),
+                dp(16),
+                dp(16)
             )
 
-        params.bottomMargin =
-            dp(10)
+            background =
+                roundedBackground(
+                    "#FFFFFF",
+                    12f
+                )
 
-        card.layoutParams =
-            params
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
 
-        return card
+                    bottomMargin =
+                        dp(10)
+                }
+        }
     }
 
     private fun countCard(
         title: String,
         count: Int,
-        textColor: Int
+        colorText: String
     ): View {
 
         val card =
@@ -1560,43 +1881,54 @@ class DashboardActivity : AppCompatActivity() {
                     Gravity.CENTER
 
                 setPadding(
-                    dp(8),
+                    dp(10),
                     dp(14),
-                    dp(8),
+                    dp(10),
                     dp(14)
                 )
 
                 background =
                     roundedBackground(
-                        fillColor =
-                            Color.WHITE,
-                        strokeColor =
-                            Color.parseColor(
-                                "#D9E2EC"
-                            ),
-                        radiusDp =
-                            9
+                        "#FFFFFF",
+                        10f
                     )
+
+                layoutParams =
+                    LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f
+                    ).apply {
+
+                        setMargins(
+                            dp(4),
+                            dp(4),
+                            dp(4),
+                            dp(4)
+                        )
+                    }
             }
 
-        val params =
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f
-            )
+        card.addView(
+            TextView(
+                this
+            ).apply {
 
-        params.setMargins(
-            dp(4),
-            dp(4),
-            dp(4),
-            dp(4)
+                text =
+                    title
+
+                textSize =
+                    14f
+
+                setTextColor(
+                    Color.parseColor(
+                        "#486581"
+                    )
+                )
+            }
         )
 
-        card.layoutParams =
-            params
-
-        val countText =
+        card.addView(
             TextView(
                 this
             ).apply {
@@ -1605,7 +1937,7 @@ class DashboardActivity : AppCompatActivity() {
                     count.toString()
 
                 textSize =
-                    28f
+                    24f
 
                 setTypeface(
                     null,
@@ -1613,177 +1945,86 @@ class DashboardActivity : AppCompatActivity() {
                 )
 
                 setTextColor(
-                    textColor
-                )
-
-                gravity =
-                    Gravity.CENTER
-            }
-
-        val titleText =
-            TextView(
-                this
-            ).apply {
-
-                text =
-                    title
-
-                textSize =
-                    13f
-
-                setTextColor(
                     Color.parseColor(
-                        "#486581"
+                        colorText
                     )
                 )
-
-                gravity =
-                    Gravity.CENTER
             }
-
-        card.addView(
-            countText
-        )
-
-        card.addView(
-            titleText
         )
 
         return card
     }
 
     private fun periodButton(
-        title: String,
-        click: () -> Unit
+        textValue: String,
+        onClick: () -> Unit
     ): Button {
 
-        val button =
-            Button(
-                this
-            ).apply {
+        return Button(
+            this
+        ).apply {
 
-                text =
-                    title
+            text =
+                textValue
 
-                textSize =
-                    13f
+            textSize =
+                13f
 
-                isAllCaps =
-                    false
+            isAllCaps =
+                false
 
-                setTextColor(
-                    Color.WHITE
-                )
-
-                backgroundTintList =
-                    ColorStateList.valueOf(
-                        Color.parseColor(
-                            "#4E7697"
-                        )
-                    )
-
-                setOnClickListener {
-
-                    click()
-                }
+            setOnClickListener {
+                onClick()
             }
 
-        val params =
-            LinearLayout.LayoutParams(
-                0,
-                dp(50),
-                1f
-            )
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    0,
+                    dp(48),
+                    1f
+                ).apply {
 
-        params.setMargins(
-            dp(4),
-            0,
-            dp(4),
-            0
-        )
-
-        button.layoutParams =
-            params
-
-        return button
+                    setMargins(
+                        dp(3),
+                        0,
+                        dp(3),
+                        0
+                    )
+                }
+        }
     }
 
     private fun actionButton(
-        title: String,
-        click: () -> Unit
+        textValue: String,
+        onClick: () -> Unit
     ): Button {
 
-        val button =
-            Button(
-                this
-            ).apply {
+        return Button(
+            this
+        ).apply {
 
-                text =
-                    title
+            text =
+                textValue
 
-                textSize =
-                    15f
+            textSize =
+                15f
 
-                isAllCaps =
-                    false
+            isAllCaps =
+                false
 
-                setTextColor(
-                    Color.WHITE
-                )
-
-                backgroundTintList =
-                    ColorStateList.valueOf(
-                        Color.parseColor(
-                            "#102F4A"
-                        )
-                    )
-
-                setOnClickListener {
-
-                    click()
-                }
+            setOnClickListener {
+                onClick()
             }
 
-        val params =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(54)
-            )
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(56)
+                ).apply {
 
-        params.topMargin =
-            dp(8)
-
-        button.layoutParams =
-            params
-
-        return button
-    }
-
-    private fun roundedBackground(
-        fillColor: Int,
-        strokeColor: Int,
-        radiusDp: Int
-    ): GradientDrawable {
-
-        return GradientDrawable().apply {
-
-            shape =
-                GradientDrawable.RECTANGLE
-
-            setColor(
-                fillColor
-            )
-
-            setStroke(
-                dp(1),
-                strokeColor
-            )
-
-            cornerRadius =
-                dp(
-                    radiusDp
-                )
-                    .toFloat()
+                    topMargin =
+                        dp(6)
+                }
         }
     }
 
@@ -1794,72 +2035,78 @@ class DashboardActivity : AppCompatActivity() {
         return when {
 
             score >=
-                85.0 ->
+                80.0 -> {
 
                 Color.parseColor(
                     "#2E7D32"
                 )
+            }
 
             score >=
-                70.0 ->
+                60.0 -> {
 
                 Color.parseColor(
                     "#D89000"
                 )
+            }
 
             score >=
-                50.0 ->
+                40.0 -> {
 
                 Color.parseColor(
                     "#EF6C00"
                 )
+            }
 
-            else ->
+            else -> {
 
                 Color.parseColor(
                     "#C62828"
                 )
+            }
         }
     }
 
-    private fun displayTypeName(
-        type: String
-    ): String {
+    private fun roundedBackground(
+        colorText: String,
+        radiusDp: Float
+    ): GradientDrawable {
 
-        return when {
+        return GradientDrawable().apply {
 
-            type.equals(
-                TYPE_BOTTOM,
-                ignoreCase = true
-            ) ->
-                "Bottom Corner"
+            shape =
+                GradientDrawable.RECTANGLE
 
-            type.equals(
-                TYPE_SEAL,
-                ignoreCase = true
-            ) ->
-                "Seal"
+            setColor(
+                Color.parseColor(
+                    colorText
+                )
+            )
 
-            type.equals(
-                TYPE_FORMING,
-                ignoreCase = true
-            ) ->
-                "Forming"
+            cornerRadius =
+                dp(
+                    radiusDp
+                        .roundToInt()
+                )
+                    .toFloat()
+        }
+    }
 
-            type.equals(
-                TYPE_TAB,
-                ignoreCase = true
-            ) ->
-                "Tab"
+    private fun fullWidthParams(
+        top: Int,
+        bottom: Int
+    ): LinearLayout.LayoutParams {
 
-            type.equals(
-                TYPE_DISASSEMBLY,
-                ignoreCase = true
-            ) ->
-                "분해검사"
+        return LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(52)
+        ).apply {
 
-            else ->
-                type
+            topMargin =
+                dp(top)
+
+            bottomMargin =
+                dp(bottom)
         }
     }
 
@@ -1869,23 +2116,8 @@ class DashboardActivity : AppCompatActivity() {
 
         return (
             value *
-                resources
-                    .displayMetrics
-                    .density
+                resources.displayMetrics.density
             )
             .roundToInt()
     }
-
-    private data class ItemSummary(
-
-        val type: String,
-
-        val count: Int,
-
-        val averageScore: Double,
-
-        val issueCount: Int,
-
-        val issueRate: Double
-    )
 }

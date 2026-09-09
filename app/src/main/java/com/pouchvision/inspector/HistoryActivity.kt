@@ -596,6 +596,11 @@ class HistoryActivity : AppCompatActivity() {
             records = filteredRecords,
             allRecords = allRecords
         )
+
+        /*
+         * 검사 이력과 별도로 Telegram 전송 이력도 갱신합니다.
+         */
+        loadTelegramDeliveryHistory()
     }
 
     /*
@@ -3253,6 +3258,620 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
 
                 Color.parseColor(
                     "#2E7D32"
+                )
+            }
+        }
+    }
+
+    /*
+     * =========================================================
+     * Telegram 전송 이력
+     * =========================================================
+     */
+
+    private fun loadTelegramDeliveryHistory() {
+
+        val records =
+            TelegramDeliveryStore.load(
+                this
+            )
+
+        val successCount =
+            records.count {
+                it.status ==
+                    TelegramDeliveryStore.STATUS_SUCCESS
+            }
+
+        val failedCount =
+            records.count {
+                it.status ==
+                    TelegramDeliveryStore.STATUS_FAILED
+            }
+
+        val pendingCount =
+            records.count {
+                it.status ==
+                    TelegramDeliveryStore.STATUS_PENDING
+            }
+
+        binding.tvTelegramDeliverySummary.text =
+            buildString {
+
+                append(
+                    "전체 "
+                )
+
+                append(
+                    records.size
+                )
+
+                append(
+                    "건"
+                )
+
+                append(
+                    "  |  성공 "
+                )
+
+                append(
+                    successCount
+                )
+
+                append(
+                    "  |  실패 "
+                )
+
+                append(
+                    failedCount
+                )
+
+                if (
+                    pendingCount >
+                    0
+                ) {
+
+                    append(
+                        "  |  전송중 "
+                    )
+
+                    append(
+                        pendingCount
+                    )
+                }
+
+                if (
+                    failedCount >
+                    0
+                ) {
+
+                    append(
+                        "\n⚠ 실패 건은 아래 [재전송] 버튼으로 다시 보낼 수 있습니다."
+                    )
+                } else if (
+                    records.isNotEmpty()
+                ) {
+
+                    append(
+                        "\n현재 확인되지 않은 전송 실패 건이 없습니다."
+                    )
+                }
+            }
+
+        binding.telegramDeliveryContainer
+            .removeAllViews()
+
+        if (
+            records.isEmpty()
+        ) {
+
+            val empty =
+                TextView(
+                    this
+                )
+
+            empty.text =
+                "아직 Telegram 전송 이력이 없습니다."
+
+            empty.textSize =
+                14f
+
+            empty.setTextColor(
+                Color.parseColor(
+                    "#829AB1"
+                )
+            )
+
+            empty.gravity =
+                Gravity.CENTER
+
+            empty.setPadding(
+                dp(12),
+                dp(20),
+                dp(12),
+                dp(20)
+            )
+
+            binding.telegramDeliveryContainer
+                .addView(
+                    empty
+                )
+
+            return
+        }
+
+        /*
+         * 화면이 너무 길어지지 않도록 최근 30건을 표시합니다.
+         * 실제 저장 이력은 TelegramDeliveryStore에 더 많이 유지됩니다.
+         */
+        records
+            .take(
+                30
+            )
+            .forEach { record ->
+
+                addTelegramDeliveryCard(
+                    record
+                )
+            }
+    }
+
+    private fun addTelegramDeliveryCard(
+        record: TelegramDeliveryStore.DeliveryRecord
+    ) {
+
+        val card =
+            LinearLayout(
+                this
+            )
+
+        card.orientation =
+            LinearLayout.VERTICAL
+
+        card.setPadding(
+            dp(12),
+            dp(12),
+            dp(12),
+            dp(12)
+        )
+
+        val cardParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+        cardParams.bottomMargin =
+            dp(10)
+
+        card.layoutParams =
+            cardParams
+
+        card.setBackgroundColor(
+            when (
+                record.status
+            ) {
+
+                TelegramDeliveryStore.STATUS_SUCCESS -> {
+
+                    Color.parseColor(
+                        "#E8F5E9"
+                    )
+                }
+
+                TelegramDeliveryStore.STATUS_PENDING -> {
+
+                    Color.parseColor(
+                        "#FFF8E1"
+                    )
+                }
+
+                else -> {
+
+                    Color.parseColor(
+                        "#FFEBEE"
+                    )
+                }
+            }
+        )
+
+        val title =
+            TextView(
+                this
+            )
+
+        title.text =
+            "${telegramStatusText(record.status)}  ${record.inspectionType}"
+
+        title.textSize =
+            16f
+
+        title.setTypeface(
+            null,
+            Typeface.BOLD
+        )
+
+        title.setTextColor(
+            telegramStatusColor(
+                record.status
+            )
+        )
+
+        val basic =
+            TextView(
+                this
+            )
+
+        basic.text =
+            buildString {
+
+                append(
+                    record.dateTime
+                )
+
+                append(
+                    "\nModel "
+                )
+
+                append(
+                    record.model.ifBlank {
+                        "-"
+                    }
+                )
+
+                append(
+                    "  /  Line "
+                )
+
+                append(
+                    record.line.ifBlank {
+                        "-"
+                    }
+                )
+
+                append(
+                    "\n판정 : "
+                )
+
+                append(
+                    record.judgment
+                )
+
+                append(
+                    "  |  Score "
+                )
+
+                append(
+                    String.format(
+                        Locale.getDefault(),
+                        "%.1f",
+                        record.score
+                    )
+                )
+            }
+
+        basic.textSize =
+            14f
+
+        basic.setTextColor(
+            Color.parseColor(
+                "#334E68"
+            )
+        )
+
+        basic.setPadding(
+            0,
+            dp(6),
+            0,
+            0
+        )
+
+        val result =
+            TextView(
+                this
+            )
+
+        result.text =
+            buildString {
+
+                append(
+                    "수신 성공 "
+                )
+
+                append(
+                    record.successCount
+                )
+
+                append(
+                    " / 실패 "
+                )
+
+                append(
+                    record.failureCount
+                )
+
+                if (
+                    record.retryCount >
+                    0
+                ) {
+
+                    append(
+                        "  |  재전송 "
+                    )
+
+                    append(
+                        record.retryCount
+                    )
+
+                    append(
+                        "회"
+                    )
+                }
+
+                if (
+                    record.message.isNotBlank()
+                ) {
+
+                    append(
+                        "\n"
+                    )
+
+                    append(
+                        record.message.take(
+                            220
+                        )
+                    )
+                }
+            }
+
+        result.textSize =
+            13f
+
+        result.setTextColor(
+            Color.parseColor(
+                "#486581"
+            )
+        )
+
+        result.setPadding(
+            0,
+            dp(5),
+            0,
+            0
+        )
+
+        card.addView(
+            title
+        )
+
+        card.addView(
+            basic
+        )
+
+        card.addView(
+            result
+        )
+
+        if (
+            record.status ==
+            TelegramDeliveryStore.STATUS_FAILED
+        ) {
+
+            val retryButton =
+                Button(
+                    this
+                )
+
+            retryButton.text =
+                "Telegram 재전송"
+
+            retryButton.isAllCaps =
+                false
+
+            retryButton.textSize =
+                14f
+
+            retryButton.setTextColor(
+                Color.WHITE
+            )
+
+            retryButton.backgroundTintList =
+                ColorStateList.valueOf(
+                    Color.parseColor(
+                        "#1565C0"
+                    )
+                )
+
+            val retryParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(48)
+                )
+
+            retryParams.topMargin =
+                dp(10)
+
+            retryButton.layoutParams =
+                retryParams
+
+            retryButton.setOnClickListener {
+
+                confirmTelegramRetry(
+                    record = record,
+                    retryButton = retryButton
+                )
+            }
+
+            card.addView(
+                retryButton
+            )
+        }
+
+        binding.telegramDeliveryContainer
+            .addView(
+                card
+            )
+    }
+
+    private fun confirmTelegramRetry(
+        record: TelegramDeliveryStore.DeliveryRecord,
+        retryButton: Button
+    ) {
+
+        AlertDialog.Builder(
+            this
+        )
+            .setTitle(
+                "Telegram 재전송"
+            )
+            .setMessage(
+                buildString {
+
+                    append(
+                        record.inspectionType
+                    )
+
+                    append(
+                        "\nModel "
+                    )
+
+                    append(
+                        record.model
+                    )
+
+                    append(
+                        " / "
+                    )
+
+                    append(
+                        record.line
+                    )
+
+                    append(
+                        "\n"
+                    )
+
+                    append(
+                        record.judgment
+                    )
+
+                    append(
+                        " / Score "
+                    )
+
+                    append(
+                        String.format(
+                            Locale.getDefault(),
+                            "%.1f",
+                            record.score
+                        )
+                    )
+
+                    append(
+                        "\n\n현재 등록된 Telegram 수신처로 다시 전송하시겠습니까?"
+                    )
+                }
+            )
+            .setNegativeButton(
+                "취소",
+                null
+            )
+            .setPositiveButton(
+                "재전송"
+            ) { _, _ ->
+
+                retryTelegramDelivery(
+                    record = record,
+                    retryButton = retryButton
+                )
+            }
+            .show()
+    }
+
+    private fun retryTelegramDelivery(
+        record: TelegramDeliveryStore.DeliveryRecord,
+        retryButton: Button
+    ) {
+
+        retryButton.isEnabled =
+            false
+
+        retryButton.text =
+            "재전송 중..."
+
+        TelegramSender.retryDelivery(
+            context = this,
+            record = record
+        ) { sendResult ->
+
+            runOnUiThread {
+
+                Toast.makeText(
+                    this,
+                    if (
+                        sendResult.success
+                    ) {
+                        "Telegram 재전송 성공"
+                    } else {
+                        "Telegram 재전송 실패\n${sendResult.message}"
+                    },
+                    Toast.LENGTH_LONG
+                ).show()
+
+                /*
+                 * 결과 저장이 끝난 뒤 화면을 다시 읽습니다.
+                 * 성공하면 버튼이 사라지고 SUCCESS 카드가 됩니다.
+                 * 실패하면 FAILED 카드와 재전송 버튼이 유지됩니다.
+                 */
+                loadTelegramDeliveryHistory()
+            }
+        }
+    }
+
+    private fun telegramStatusText(
+        status: String
+    ): String {
+
+        return when (
+            status
+        ) {
+
+            TelegramDeliveryStore.STATUS_SUCCESS ->
+                "✅ 전송 성공"
+
+            TelegramDeliveryStore.STATUS_PENDING ->
+                "⏳ 전송 중"
+
+            else ->
+                "⚠ 전송 실패"
+        }
+    }
+
+    private fun telegramStatusColor(
+        status: String
+    ): Int {
+
+        return when (
+            status
+        ) {
+
+            TelegramDeliveryStore.STATUS_SUCCESS -> {
+
+                Color.parseColor(
+                    "#2E7D32"
+                )
+            }
+
+            TelegramDeliveryStore.STATUS_PENDING -> {
+
+                Color.parseColor(
+                    "#EF6C00"
+                )
+            }
+
+            else -> {
+
+                Color.parseColor(
+                    "#C62828"
                 )
             }
         }

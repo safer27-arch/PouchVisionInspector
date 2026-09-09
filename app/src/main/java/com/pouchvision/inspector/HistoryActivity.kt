@@ -852,10 +852,14 @@ Session 평균 Quality Score : %.1f / 100
 
                 """
 검사 일시 : %s
+Model : %s
+Line : %s
 평균 Quality Score : %.1f / 100
                 """.trimIndent(),
 
                 sessionRecord.dateTime,
+                sessionRecord.model.ifBlank { "-" },
+                sessionRecord.line.ifBlank { "-" },
                 sessionRecord.score
             )
 
@@ -1309,11 +1313,15 @@ Session 평균 Quality Score : %.1f / 100
 
                 """
 검사 일시 : %s
+Model : %s
+Line : %s
 Quality Score : %.1f / 100
 민감도 : %d%%
                 """.trimIndent(),
 
                 record.dateTime,
+                record.model.ifBlank { "-" },
+                record.line.ifBlank { "-" },
                 record.score,
                 record.sensitivity
             )
@@ -1585,6 +1593,8 @@ Quality Score : %.1f / 100
                 .setMessage(
                     """
 ${record.dateTime}
+Model : ${record.model.ifBlank { "-" }}
+Line : ${record.line.ifBlank { "-" }}
 Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 100
                     """.trimIndent()
                 )
@@ -1849,6 +1859,8 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
                 listOf(
                     "Record ID",
                     "검사일시",
+                    "Model",
+                    "Line",
                     "구분",
                     "검사항목",
                     "Quality Score",
@@ -1889,6 +1901,8 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
                     listOf(
                         record.id.toString(),
                         record.dateTime,
+                        record.model,
+                        record.line,
                         if (isTotalSession) "종합검사 요약" else "개별검사",
                         if (isTotalSession) "종합검사" else record.inspectionType,
                         String.format(Locale.US, "%.1f", record.score),

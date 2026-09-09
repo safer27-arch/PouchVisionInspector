@@ -192,6 +192,22 @@ class FormingActivity : AppCompatActivity() {
             finish()
         }
 
+        /*
+         * FORMING 촬영 표준화 가이드
+         *
+         * 검사 알고리즘이나 판정 기준은 변경하지 않고,
+         * 촬영 거리 / 각도 / 조명 / ROI 위치를
+         * 일정하게 맞출 수 있도록 안내합니다.
+         */
+        binding.btnFormingCaptureGuide.setOnClickListener {
+
+            CaptureGuideHelper.showGuideDialog(
+                context = this,
+                inspectionType = CaptureGuideHelper.TYPE_FORMING
+            )
+        }
+
+
         if (
             ContextCompat.checkSelfPermission(
                 this,
@@ -1747,6 +1763,15 @@ NG 후보 영역 : %d개
         hasInspectionResult =
             true
 
+        /*
+         * Telegram 자동 알림
+         *
+         * 설정한 전송 기준에 해당하는 판정이면
+         * 결과 이미지 + Model / Line / 검사 항목 / Score를
+         * 자동으로 전송합니다.
+         */
+        sendTelegramAlertIfNeeded()
+
         runOnUiThread {
 
             /*
@@ -1808,6 +1833,66 @@ NG 후보 영역 : %d개
                 Toast.makeText(
                     this,
                     "촬영 상태 재확인 권고\n${photoQuality.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    /*
+     * =========================================================
+     * FORMING Telegram 자동 알림
+     * =========================================================
+     */
+
+    private fun sendTelegramAlertIfNeeded() {
+
+        if (
+            !TelegramSettingsStore.isReady(
+                this
+            )
+        ) {
+            return
+        }
+
+        if (
+            !TelegramSettingsStore.shouldSendForJudgment(
+                context = this,
+                judgment = lastJudgment
+            )
+        ) {
+            return
+        }
+
+        TelegramSender.sendInspectionAlert(
+            context = this,
+            inspectionType = "FORMING",
+            score = lastFormingScore,
+            judgment = lastJudgment,
+            details = lastDetails,
+            resultBitmap = lastResultBitmap
+        ) { result ->
+
+            runOnUiThread {
+
+                val message =
+                    if (
+                        result.success
+                    ) {
+
+                        "FORMING Telegram 자동전송 완료\n" +
+                            "성공 ${result.successCount}개 / " +
+                            "실패 ${result.failureCount}개"
+
+                    } else {
+
+                        "FORMING Telegram 자동전송 실패\n" +
+                            result.message
+                    }
+
+                Toast.makeText(
+                    this,
+                    message,
                     Toast.LENGTH_LONG
                 ).show()
             }

@@ -1440,6 +1440,21 @@ Concentration : ${"%.1f".format(result.concentration)}
         hasInspectionResult =
             true
 
+        /*
+         * =====================================================
+         * Telegram 자동 알림
+         * =====================================================
+         *
+         * 설정 화면의 전송 기준에 해당하는 판정일 때만
+         * 결과 사진 + Model / Line / 검사 항목 / Score를 전송합니다.
+         *
+         * 예:
+         * - 불량만 전송
+         * - 한계정상 + 불량
+         * - 주의 이상 전체
+         */
+        sendTelegramAlertIfNeeded()
+
         runOnUiThread {
 
             binding.imagePreview.setImageBitmap(
@@ -1485,6 +1500,78 @@ ${photoQualityText}
                 Toast.makeText(
                     this,
                     "촬영 상태 재확인 권고\n${photoQuality.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    /*
+     * =========================================================
+     * Bottom Corner Telegram 자동 알림
+     * =========================================================
+     */
+
+    private fun sendTelegramAlertIfNeeded() {
+
+        /*
+         * Telegram이 OFF이거나
+         * Token / Chat ID가 준비되지 않은 경우에는
+         * 검사 기능에 아무 영향 없이 그냥 종료합니다.
+         */
+        if (
+            !TelegramSettingsStore.isReady(
+                this
+            )
+        ) {
+            return
+        }
+
+        /*
+         * 현재 판정이 사용자가 선택한 전송 기준에
+         * 해당하지 않으면 전송하지 않습니다.
+         */
+        if (
+            !TelegramSettingsStore.shouldSendForJudgment(
+                context = this,
+                judgment = lastResultJudgment
+            )
+        ) {
+            return
+        }
+
+        val resultBitmap =
+            lastResultBitmap
+
+        TelegramSender.sendInspectionAlert(
+            context = this,
+            inspectionType = "BOTTOM CORNER",
+            score = lastResultScore,
+            judgment = lastResultJudgment,
+            details = lastResultDetails,
+            resultBitmap = resultBitmap
+        ) { result ->
+
+            runOnUiThread {
+
+                val message =
+                    if (
+                        result.success
+                    ) {
+
+                        "Telegram 자동전송 완료\\n" +
+                            "성공 ${result.successCount}개 / " +
+                            "실패 ${result.failureCount}개"
+
+                    } else {
+
+                        "Telegram 자동전송 실패\\n" +
+                            result.message
+                    }
+
+                Toast.makeText(
+                    this,
+                    message,
                     Toast.LENGTH_LONG
                 ).show()
             }

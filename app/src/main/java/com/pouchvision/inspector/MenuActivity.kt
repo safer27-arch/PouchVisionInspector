@@ -441,6 +441,22 @@ class MenuActivity : AppCompatActivity() {
 
         /*
          * =====================================================
+         * Telegram 알림 설정
+         * =====================================================
+         */
+        binding.btnTelegramSettings
+            .setOnClickListener {
+
+                startActivity(
+                    Intent(
+                        this,
+                        TelegramSettingsActivity::class.java
+                    )
+                )
+            }
+
+        /*
+         * =====================================================
          * 검사 이력
          * =====================================================
          */

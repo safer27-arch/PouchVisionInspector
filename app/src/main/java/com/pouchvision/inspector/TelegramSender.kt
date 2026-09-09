@@ -379,6 +379,210 @@ Telegram 연결 테스트 메시지입니다.
 
     /*
      * =========================================================
+     * 실패한 Telegram 이력 재전송
+     * =========================================================
+     *
+     * - 원래 FAILED 기록을 그대로 사용합니다.
+     * - 새 이력 레코드를 추가하지 않습니다.
+     * - 재전송 성공 시 기존 FAILED → SUCCESS로 변경됩니다.
+     * - 실패 시 FAILED 상태를 유지합니다.
+     * - 현재 앱에 저장된 Bot Token / Chat ID를 사용합니다.
+     * =========================================================
+     */
+
+    fun retryDelivery(
+        context: Context,
+        record: TelegramDeliveryStore.DeliveryRecord,
+        callback: (SendResult) -> Unit
+    ) {
+
+        val settings =
+            TelegramSettingsStore.load(
+                context
+            )
+
+        if (
+            settings.botToken.isBlank()
+        ) {
+
+            callback(
+                SendResult(
+                    success = false,
+                    successCount = 0,
+                    failureCount = 0,
+                    message = "Bot Token이 등록되지 않았습니다."
+                )
+            )
+
+            return
+        }
+
+        if (
+            settings.chatIds.isEmpty()
+        ) {
+
+            callback(
+                SendResult(
+                    success = false,
+                    successCount = 0,
+                    failureCount = 0,
+                    message = "Chat ID가 등록되지 않았습니다."
+                )
+            )
+
+            return
+        }
+
+        /*
+         * 수동 재전송은 자동 알림 ON/OFF와 무관하게 허용합니다.
+         * 사용자가 이력 화면에서 직접 눌렀기 때문입니다.
+         */
+        TelegramDeliveryStore.markRetryStarted(
+            context = context,
+            recordId = record.id
+        )
+
+        val message =
+            buildString {
+
+                append(
+                    "🔁 Pouch 품질 알림 재전송"
+                )
+
+                append(
+                    "\n\nModel : "
+                )
+
+                append(
+                    record.model
+                )
+
+                append(
+                    "\nLine : "
+                )
+
+                append(
+                    record.line
+                )
+
+                append(
+                    "\n검사항목 : "
+                )
+
+                append(
+                    record.inspectionType
+                )
+
+                append(
+                    "\n판정 : "
+                )
+
+                append(
+                    record.judgment
+                )
+
+                append(
+                    "\nQuality Score : "
+                )
+
+                append(
+                    String.format(
+                        "%.1f",
+                        record.score
+                    )
+                )
+
+                append(
+                    "\n원 전송시간 : "
+                )
+
+                append(
+                    record.dateTime
+                )
+            }
+                .take(
+                    950
+                )
+
+        Thread {
+
+            try {
+
+                val retryImage =
+                    TelegramDeliveryStore.getRetryImageFile(
+                        record
+                    )
+
+                val result =
+                    if (
+                        retryImage != null
+                    ) {
+
+                        sendPhotoToAll(
+                            botToken = settings.botToken,
+                            chatIds = settings.chatIds,
+                            photoFile = retryImage,
+                            caption = message
+                        )
+
+                    } else {
+
+                        sendTextToAll(
+                            botToken = settings.botToken,
+                            chatIds = settings.chatIds,
+                            text = message
+                        )
+                    }
+
+                TelegramDeliveryStore.updateResult(
+                    context = context,
+                    recordId = record.id,
+                    success = result.success,
+                    successCount = result.successCount,
+                    failureCount = result.failureCount,
+                    message = result.message
+                )
+
+                callback(
+                    result
+                )
+
+            } catch (
+                e: Exception
+            ) {
+
+                val result =
+                    SendResult(
+                        success = false,
+                        successCount = 0,
+                        failureCount = settings.chatIds.size,
+                        message =
+                            "Telegram 재전송 오류: " +
+                                (
+                                    e.message
+                                        ?: "알 수 없는 오류"
+                                    )
+                    )
+
+                TelegramDeliveryStore.updateResult(
+                    context = context,
+                    recordId = record.id,
+                    success = false,
+                    successCount = result.successCount,
+                    failureCount = result.failureCount,
+                    message = result.message
+                )
+
+                callback(
+                    result
+                )
+            }
+
+        }.start()
+    }
+
+    /*
+     * =========================================================
      * 검사 메시지 구성
      * =========================================================
      */

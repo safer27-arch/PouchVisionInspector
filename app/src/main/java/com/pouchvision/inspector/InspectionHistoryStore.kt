@@ -83,6 +83,21 @@ object InspectionHistoryStore {
          * 과거 이력과 기존 단독 검사는 빈 문자열로 유지됩니다.
          */
         val sessionId: String =
+            "",
+
+        /*
+         * 생산 조건
+         *
+         * Model / Line 선택 기능 추가 이후 저장되는 검사 결과에는
+         * 당시 선택되어 있던 생산 조건을 함께 보관합니다.
+         *
+         * 과거 이력에는 해당 값이 없으므로 빈 문자열을 기본값으로
+         * 사용하여 기존 데이터와 호환되도록 합니다.
+         */
+        val model: String =
+            "",
+
+        val line: String =
             ""
     )
 
@@ -160,6 +175,21 @@ object InspectionHistoryStore {
                     Locale.getDefault()
                 )
 
+            /*
+             * =================================================
+             * 현재 생산 조건(Model / Line)
+             * =================================================
+             *
+             * 모든 검사 화면이 InspectionHistoryStore.save()를
+             * 공통으로 사용하므로 여기에서 한 번만 처리하면
+             * Bottom Corner / Seal / Forming / Tab / 분해검사 /
+             * 종합검사 결과에 동일하게 적용됩니다.
+             */
+            val productionContext =
+                ProductionContextStore.getCurrent(
+                    context
+                )
+
             val record =
                 JSONObject()
 
@@ -212,6 +242,19 @@ object InspectionHistoryStore {
             record.put(
                 "sessionId",
                 sessionId
+            )
+
+            /*
+             * 생산 조건 저장
+             */
+            record.put(
+                "model",
+                productionContext.model
+            )
+
+            record.put(
+                "line",
+                productionContext.line
             )
 
             /*
@@ -464,6 +507,22 @@ object InspectionHistoryStore {
                         sessionId =
                             item.optString(
                                 "sessionId",
+                                ""
+                            ),
+
+                        /*
+                         * 기존 이력에는 model / line이 없으므로
+                         * 빈 문자열로 자동 처리합니다.
+                         */
+                        model =
+                            item.optString(
+                                "model",
+                                ""
+                            ),
+
+                        line =
+                            item.optString(
+                                "line",
                                 ""
                             )
                     )

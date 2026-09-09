@@ -99,6 +99,12 @@ class HistoryActivity : AppCompatActivity() {
 
         private const val FILTER_TOTAL_SESSION =
             "종합검사 묶음"
+
+        private const val FILTER_ALL_MODELS =
+            "전체 Model"
+
+        private const val FILTER_ALL_LINES =
+            "전체 Line"
     }
 
     private val inspectionTypes =
@@ -127,7 +133,7 @@ class HistoryActivity : AppCompatActivity() {
             binding.root
         )
 
-        setupSpinner()
+        setupFilters()
 
         binding.btnHistoryRefresh
             .setOnClickListener {
@@ -168,26 +174,134 @@ class HistoryActivity : AppCompatActivity() {
      * =========================================================
      */
 
-    private fun setupSpinner() {
+    private fun setupFilters() {
 
-        val adapter =
+        /*
+         * =====================================================
+         * 검사 항목
+         * =====================================================
+         */
+        val typeAdapter =
             ArrayAdapter(
                 this,
                 android.R.layout.simple_spinner_item,
                 inspectionTypes
             )
 
-        adapter.setDropDownViewResource(
+        typeAdapter.setDropDownViewResource(
             android.R.layout.simple_spinner_dropdown_item
         )
 
         binding.spinnerInspectionType.adapter =
-            adapter
+            typeAdapter
 
-        binding.spinnerInspectionType
-            .setSelection(
-                0
+        binding.spinnerInspectionType.setSelection(
+            0
+        )
+
+        /*
+         * =====================================================
+         * Model
+         * =====================================================
+         */
+        val modelItems =
+            mutableListOf<String>()
+
+        modelItems.add(
+            FILTER_ALL_MODELS
+        )
+
+        modelItems.addAll(
+            ProductionContextStore.getModels(
+                this
             )
+        )
+
+        val modelAdapter =
+            ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                modelItems
+            )
+
+        modelAdapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        binding.spinnerHistoryModel.adapter =
+            modelAdapter
+
+        binding.spinnerHistoryModel.setSelection(
+            0
+        )
+
+        /*
+         * 전체 Model 상태에서는 모든 등록 Line을 보여줍니다.
+         */
+        updateHistoryLineSpinner(
+            model = FILTER_ALL_MODELS,
+            preferredLine = FILTER_ALL_LINES
+        )
+
+        /*
+         * =====================================================
+         * Listener
+         * =====================================================
+         */
+        binding.spinnerHistoryModel
+            .onItemSelectedListener =
+
+            object :
+                AdapterView.OnItemSelectedListener {
+
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+
+                    val selectedModel =
+                        binding.spinnerHistoryModel
+                            .selectedItem
+                            ?.toString()
+                            ?: FILTER_ALL_MODELS
+
+                    updateHistoryLineSpinner(
+                        model = selectedModel,
+                        preferredLine = FILTER_ALL_LINES
+                    )
+
+                    loadHistory()
+                }
+
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {
+                }
+            }
+
+        binding.spinnerHistoryLine
+            .onItemSelectedListener =
+
+            object :
+                AdapterView.OnItemSelectedListener {
+
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+
+                    loadHistory()
+                }
+
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {
+                }
+            }
 
         binding.spinnerInspectionType
             .onItemSelectedListener =
@@ -214,15 +328,189 @@ class HistoryActivity : AppCompatActivity() {
 
     /*
      * =========================================================
+     * History용 Model별 Line Spinner 갱신
+     * =========================================================
+     */
+
+    private fun updateHistoryLineSpinner(
+        model: String,
+        preferredLine: String =
+            FILTER_ALL_LINES
+    ) {
+
+        val lines =
+            if (
+                model ==
+                FILTER_ALL_MODELS
+            ) {
+
+                ProductionContextStore
+                    .getModels(
+                        this
+                    )
+                    .flatMap { modelName ->
+
+                        ProductionContextStore
+                            .getLinesForModel(
+                                modelName
+                            )
+                    }
+                    .distinct()
+                    .sortedWith(
+                        compareBy<String> {
+
+                            it.removePrefix(
+                                "Line "
+                            )
+                                .toIntOrNull()
+                                ?: Int.MAX_VALUE
+                        }
+                            .thenBy {
+                                it
+                            }
+                    )
+
+            } else {
+
+                ProductionContextStore
+                    .getLinesForModel(
+                        model
+                    )
+            }
+
+        val items =
+            mutableListOf<String>()
+
+        items.add(
+            FILTER_ALL_LINES
+        )
+
+        items.addAll(
+            lines
+        )
+
+        val adapter =
+            ArrayAdapter(
+                this,
+                android.R.layout.simple_spinner_item,
+                items
+            )
+
+        adapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        binding.spinnerHistoryLine.adapter =
+            adapter
+
+        val preferredPosition =
+            items.indexOf(
+                preferredLine
+            )
+
+        binding.spinnerHistoryLine.setSelection(
+            if (
+                preferredPosition >= 0
+            ) {
+                preferredPosition
+            } else {
+                0
+            }
+        )
+    }
+
+    /*
+     * =========================================================
+     * 현재 Model / Line 필터 적용
+     * =========================================================
+     */
+
+    private fun applyProductionFilter(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ):
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            > {
+
+        val selectedModel =
+            binding.spinnerHistoryModel
+                .selectedItem
+                ?.toString()
+                ?: FILTER_ALL_MODELS
+
+        val selectedLine =
+            binding.spinnerHistoryLine
+                .selectedItem
+                ?.toString()
+                ?: FILTER_ALL_LINES
+
+        return records.filter { record ->
+
+            val modelMatches =
+                selectedModel ==
+                    FILTER_ALL_MODELS ||
+                    record.model.equals(
+                        selectedModel,
+                        ignoreCase = true
+                    )
+
+            val lineMatches =
+                selectedLine ==
+                    FILTER_ALL_LINES ||
+                    record.line.equals(
+                        selectedLine,
+                        ignoreCase = true
+                    )
+
+            modelMatches &&
+                lineMatches
+        }
+    }
+
+    /*
+     * =========================================================
+     * 화면 표시용 생산 조건 필터명
+     * =========================================================
+     */
+
+    private fun currentProductionFilterText(): String {
+
+        val selectedModel =
+            binding.spinnerHistoryModel
+                .selectedItem
+                ?.toString()
+                ?: FILTER_ALL_MODELS
+
+        val selectedLine =
+            binding.spinnerHistoryLine
+                .selectedItem
+                ?.toString()
+                ?: FILTER_ALL_LINES
+
+        return "$selectedModel  |  $selectedLine"
+    }
+
+    /*
+     * =========================================================
      * 검사 이력 불러오기
      * =========================================================
      */
 
     private fun loadHistory() {
 
-        val allRecords =
+        val storedRecords =
             InspectionHistoryStore.load(
                 this
+            )
+
+        val allRecords =
+            applyProductionFilter(
+                storedRecords
             )
 
         val selectedType =
@@ -463,6 +751,7 @@ class HistoryActivity : AppCompatActivity() {
 
                     """
 현재 필터 : 전체 검사
+생산 조건 : %s
 
 종합검사 Session : %d회
 단독 검사 결과 : %d건
@@ -479,6 +768,7 @@ class HistoryActivity : AppCompatActivity() {
    중복을 피하기 위해 종합검사 카드 안에서 묶어 표시합니다.
                     """.trimIndent(),
 
+                    currentProductionFilterText(),
                     totalSessionCount,
                     ordinaryRecords.size,
                     imageCount,
@@ -497,6 +787,7 @@ class HistoryActivity : AppCompatActivity() {
 
                     """
 현재 필터 : %s
+생산 조건 : %s
 저장된 검사 결과 : %d건
 결과 사진 있음 : %d건
 
@@ -509,6 +800,7 @@ class HistoryActivity : AppCompatActivity() {
                     """.trimIndent(),
 
                     selectedType,
+                    currentProductionFilterText(),
                     ordinaryRecords.size,
                     imageCount,
                     normalCount,
@@ -609,6 +901,7 @@ class HistoryActivity : AppCompatActivity() {
 
                 """
 현재 필터 : 종합검사 묶음
+생산 조건 : %s
 
 종합검사 Session : %d회
 
@@ -623,6 +916,7 @@ Session 평균 Quality Score : %.1f / 100
 5개 검사 결과와 저장 사진을 함께 확인할 수 있습니다.
                 """.trimIndent(),
 
+                currentProductionFilterText(),
                 sessions.size,
                 normalCount,
                 warningCount,
@@ -1761,16 +2055,21 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
                 ?.toString()
                 ?: FILTER_ALL
 
+        val productionRecords =
+            applyProductionFilter(
+                allRecords
+            )
+
         val exportRecords =
             when (selectedType) {
 
                 FILTER_ALL -> {
                     /* PC 분석용 원본 데이터이므로 전체 행을 내보냅니다. */
-                    allRecords
+                    productionRecords
                 }
 
                 FILTER_TOTAL_SESSION -> {
-                    allRecords.filter {
+                    productionRecords.filter {
                         it.inspectionType.equals(
                             TYPE_TOTAL_SESSION,
                             ignoreCase = true
@@ -1779,7 +2078,7 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
                 }
 
                 else -> {
-                    allRecords.filter {
+                    productionRecords.filter {
                         it.inspectionType.equals(
                             selectedType,
                             ignoreCase = true
@@ -1810,7 +2109,9 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
             ).format(Date())
 
         val filterName =
-            sanitizeFileName(selectedType)
+            sanitizeFileName(
+                "${currentProductionFilterText()}_${selectedType}"
+            )
 
         csvCreateLauncher.launch(
             "PouchVision_${filterName}_$timestamp.csv"
@@ -2034,9 +2335,14 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
                 ?.toString()
                 ?: FILTER_ALL
 
+        val productionRecords =
+            applyProductionFilter(
+                allRecords
+            )
+
         val sourceRecords =
             trendSourceRecords(
-                allRecords = allRecords,
+                allRecords = productionRecords,
                 selectedType = selectedType
             )
 
@@ -2195,7 +2501,7 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
             this
         )
             .setTitle(
-                "Quality Score Trend · ${trendDisplayName(selectedType)}"
+                "Quality Score Trend · ${trendDisplayName(selectedType)}\n${currentProductionFilterText()}"
             )
             .setView(
                 root

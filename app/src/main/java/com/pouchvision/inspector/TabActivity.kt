@@ -1966,6 +1966,15 @@ NG 후보 영역 : %d개
         hasInspectionResult =
             true
 
+        /*
+         * Telegram 자동 알림
+         *
+         * 설정한 전송 기준에 해당하는 판정이면
+         * 결과 이미지 + Model / Line / 검사 항목 / Score를
+         * 자동으로 전송합니다.
+         */
+        sendTelegramAlertIfNeeded()
+
         runOnUiThread {
 
             binding.tabImagePreview.setImageBitmap(
@@ -2024,6 +2033,66 @@ NG 후보 영역 : %d개
                 Toast.makeText(
                     this,
                     "촬영 상태 재확인 권고\n${photoQuality.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    /*
+     * =========================================================
+     * TAB Telegram 자동 알림
+     * =========================================================
+     */
+
+    private fun sendTelegramAlertIfNeeded() {
+
+        if (
+            !TelegramSettingsStore.isReady(
+                this
+            )
+        ) {
+            return
+        }
+
+        if (
+            !TelegramSettingsStore.shouldSendForJudgment(
+                context = this,
+                judgment = lastJudgment
+            )
+        ) {
+            return
+        }
+
+        TelegramSender.sendInspectionAlert(
+            context = this,
+            inspectionType = "TAB",
+            score = lastTabScore,
+            judgment = lastJudgment,
+            details = lastDetails,
+            resultBitmap = lastResultBitmap
+        ) { result ->
+
+            runOnUiThread {
+
+                val message =
+                    if (
+                        result.success
+                    ) {
+
+                        "TAB Telegram 자동전송 완료\n" +
+                            "성공 ${result.successCount}개 / " +
+                            "실패 ${result.failureCount}개"
+
+                    } else {
+
+                        "TAB Telegram 자동전송 실패\n" +
+                            result.message
+                    }
+
+                Toast.makeText(
+                    this,
+                    message,
                     Toast.LENGTH_LONG
                 ).show()
             }

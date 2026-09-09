@@ -23,6 +23,10 @@ class TelegramSettingsActivity : AppCompatActivity() {
             saveSettings()
         }
 
+        binding.btnTelegramTest.setOnClickListener {
+            sendTestMessage()
+        }
+
         binding.btnTelegramBack.setOnClickListener {
             finish()
         }
@@ -126,6 +130,111 @@ class TelegramSettingsActivity : AppCompatActivity() {
         ).show()
     }
 
+    private fun sendTestMessage() {
+        val token = binding.editBotToken.text
+            ?.toString()
+            ?.trim()
+            .orEmpty()
+
+        val chatIds = binding.editChatIds.text
+            ?.toString()
+            .orEmpty()
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+
+        val policy = TelegramSettingsStore.AlertPolicy.values().getOrElse(
+            binding.spinnerAlertPolicy.selectedItemPosition
+        ) {
+            TelegramSettingsStore.AlertPolicy.NG_ONLY
+        }
+
+        if (token.isBlank()) {
+            Toast.makeText(
+                this,
+                "Bot Token을 입력해주세요.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        if (chatIds.isEmpty()) {
+            Toast.makeText(
+                this,
+                "Chat ID를 1개 이상 입력해주세요.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        if (!TelegramSettingsStore.saveBotToken(this, token)) {
+            Toast.makeText(
+                this,
+                "Bot Token 암호화 저장에 실패했습니다.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        TelegramSettingsStore.replaceChatIds(
+            this,
+            chatIds
+        )
+
+        TelegramSettingsStore.setAlertPolicy(
+            this,
+            policy
+        )
+
+        TelegramSettingsStore.setSendImage(
+            this,
+            binding.switchSendImage.isChecked
+        )
+
+        TelegramSettingsStore.setEnabled(
+            this,
+            binding.switchTelegramEnabled.isChecked
+        )
+
+        binding.tvTelegramStatus.text =
+            "Telegram 테스트 메시지 전송 중..."
+
+        binding.btnTelegramTest.isEnabled =
+            false
+
+        TelegramSender.sendTestMessage(
+            context = this
+        ) { result ->
+
+            runOnUiThread {
+
+                binding.btnTelegramTest.isEnabled =
+                    true
+
+                binding.tvTelegramStatus.text =
+                    buildString {
+                        append(
+                            if (result.success) {
+                                "✅ Telegram 테스트 성공"
+                            } else {
+                                "⚠ Telegram 테스트 실패"
+                            }
+                        )
+                        append("\n")
+                        append(result.message)
+                    }
+
+                Toast.makeText(
+                    this,
+                    result.message,
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
     private fun updateStatusText() {
         val settings = TelegramSettingsStore.load(this)
 
@@ -138,8 +247,8 @@ class TelegramSettingsActivity : AppCompatActivity() {
             append("\n전송 기준 : ${settings.alertPolicy.displayName}")
             append("\n결과 이미지 : ")
             append(if (settings.sendImage) "전송" else "미전송")
-            append("\n\n※ 현재 단계는 설정 저장 기능입니다.")
-            append("\n※ 실제 Telegram 전송은 다음 단계에서 연결합니다.")
+            append("\n\n※ 테스트 메시지로 Bot / Chat 연결을 확인할 수 있습니다.")
+            append("\n※ 실제 NG 자동전송은 다음 단계에서 검사 화면과 연결합니다.")
         }
     }
 }

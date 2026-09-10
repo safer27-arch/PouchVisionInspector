@@ -315,6 +315,25 @@ Telegram 연결 테스트 메시지입니다.
                         failureCount = result.failureCount,
                         message = result.message
                     )
+
+                    /*
+                     * 네트워크 단절 / Timeout / Telegram 일시 장애인 경우에만
+                     * 네트워크 복구 후 자동 재전송을 예약합니다.
+                     *
+                     * HTTP 400, 잘못된 Chat ID/Token 등 설정 오류는
+                     * TelegramRetryWorker에서 재시도 대상으로 보지 않습니다.
+                     */
+                    if (
+                        !result.success &&
+                        TelegramRetryWorker.isRetryableFailure(
+                            result.message
+                        )
+                    ) {
+
+                        TelegramRetryWorker.schedule(
+                            context
+                        )
+                    }
                 }
 
                 callback?.invoke(
@@ -351,6 +370,17 @@ Telegram 연결 테스트 메시지입니다.
                         failureCount = errorResult.failureCount,
                         message = errorResult.message
                     )
+
+                    if (
+                        TelegramRetryWorker.isRetryableFailure(
+                            errorResult.message
+                        )
+                    ) {
+
+                        TelegramRetryWorker.schedule(
+                            context
+                        )
+                    }
                 }
 
                 callback?.invoke(
@@ -543,6 +573,30 @@ Telegram 연결 테스트 메시지입니다.
                     message = result.message
                 )
 
+                if (
+                    !result.success &&
+                    TelegramRetryWorker.isRetryableFailure(
+                        result.message
+                    )
+                ) {
+
+                    val updated =
+                        TelegramDeliveryStore.find(
+                            context = context,
+                            recordId = record.id
+                        )
+
+                    if (
+                        updated != null &&
+                        updated.retryCount < 3
+                    ) {
+
+                        TelegramRetryWorker.schedule(
+                            context
+                        )
+                    }
+                }
+
                 callback(
                     result
                 )
@@ -572,6 +626,29 @@ Telegram 연결 테스트 메시지입니다.
                     failureCount = result.failureCount,
                     message = result.message
                 )
+
+                if (
+                    TelegramRetryWorker.isRetryableFailure(
+                        result.message
+                    )
+                ) {
+
+                    val updated =
+                        TelegramDeliveryStore.find(
+                            context = context,
+                            recordId = record.id
+                        )
+
+                    if (
+                        updated != null &&
+                        updated.retryCount < 3
+                    ) {
+
+                        TelegramRetryWorker.schedule(
+                            context
+                        )
+                    }
+                }
 
                 callback(
                     result

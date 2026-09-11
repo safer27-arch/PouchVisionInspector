@@ -573,31 +573,8 @@ Telegram 연결 테스트 메시지입니다.
                     message = result.message
                 )
 
-                if (
-                    !result.success &&
-                    TelegramRetryWorker.isRetryableFailure(
-                        result.message
-                    )
-                ) {
-
-                    val updated =
-                        TelegramDeliveryStore.find(
-                            context = context,
-                            recordId = record.id
-                        )
-
-                    if (
-                        updated != null &&
-                        updated.retryCount < 3
-                    ) {
-
-                        TelegramRetryWorker.schedule(
-                            context
-                        )
-                    }
-                }
-
-                callback(
+                /* 자동 재시도 예약은 TelegramRetryWorker 한 곳에서만 관리합니다. */
+callback(
                     result
                 )
 
@@ -627,30 +604,8 @@ Telegram 연결 테스트 메시지입니다.
                     message = result.message
                 )
 
-                if (
-                    TelegramRetryWorker.isRetryableFailure(
-                        result.message
-                    )
-                ) {
-
-                    val updated =
-                        TelegramDeliveryStore.find(
-                            context = context,
-                            recordId = record.id
-                        )
-
-                    if (
-                        updated != null &&
-                        updated.retryCount < 3
-                    ) {
-
-                        TelegramRetryWorker.schedule(
-                            context
-                        )
-                    }
-                }
-
-                callback(
+                /* 재전송 실패 시에도 여기서는 Worker를 새로 예약하지 않습니다. */
+callback(
                     result
                 )
             }

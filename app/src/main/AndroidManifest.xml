@@ -3,7 +3,7 @@
     <!-- 카메라 사용 -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Telegram Bot API 전송을 위한 인터넷 사용 -->
+    <!-- Telegram Bot API / 네트워크 기능 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature
@@ -28,6 +28,11 @@
 
         <activity
             android:name=".TelegramSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".InspectionSpecSettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

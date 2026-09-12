@@ -804,6 +804,12 @@ class DashboardActivity :
             inspectionRecords
         )
 
+        addLongTermTrendSummary(
+            allRecords = allRecords,
+            selectedModel = selectedModel,
+            selectedLine = selectedLine
+        )
+
         addJudgmentSummary(
             inspectionRecords
         )
@@ -1495,6 +1501,762 @@ class DashboardActivity :
         rootContent.addView(
             card
         )
+    }
+
+    /*
+     * =========================================================
+     * 장기 품질 추세
+     * =========================================================
+     *
+     * - 최근 7일: 일별 검사 건수 / 평균 Score / 이상 판정률
+     * - 최근 4주: 주별 검사 건수 / 평균 Score / 이상 판정률
+     *
+     * 현재 Dashboard의 Model / Line 필터를 그대로 적용합니다.
+     * 기간 버튼(오늘/7일/이번 달)과는 별개로 장기 변화를 보기 위한
+     * 고정 범위 요약입니다.
+     * =========================================================
+     */
+
+    private fun addLongTermTrendSummary(
+        allRecords:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >,
+        selectedModel: String,
+        selectedLine: String
+    ) {
+
+        rootContent.addView(
+            sectionTitle(
+                "장기 품질 추세"
+            )
+        )
+
+        val filtered =
+            allRecords
+                .filter { record ->
+
+                    val isInspection =
+                        !record.inspectionType.equals(
+                            TYPE_TOTAL_SESSION,
+                            ignoreCase = true
+                        )
+
+                    val modelMatches =
+                        selectedModel ==
+                            FILTER_ALL_MODELS ||
+                            record.model.equals(
+                                selectedModel,
+                                ignoreCase = true
+                            )
+
+                    val lineMatches =
+                        selectedLine ==
+                            FILTER_ALL_LINES ||
+                            record.line.equals(
+                                selectedLine,
+                                ignoreCase = true
+                            )
+
+                    isInspection &&
+                        modelMatches &&
+                        lineMatches
+                }
+
+        val card =
+            createCard()
+
+        val intro =
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "최근 7일 일별 + 최근 4주 주별 추세\n" +
+                        "※ 이상 판정률 = 주의 / 한계정상 / 불량 비율"
+
+                textSize =
+                    13f
+
+                setTextColor(
+                    Color.parseColor(
+                        "#627D98"
+                    )
+                )
+            }
+
+        card.addView(
+            intro
+        )
+
+        val dailyTitle =
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "최근 7일 · 일별"
+
+                textSize =
+                    16f
+
+                setTypeface(
+                    typeface,
+                    Typeface.BOLD
+                )
+
+                setTextColor(
+                    Color.parseColor(
+                        "#102A43"
+                    )
+                )
+
+                setPadding(
+                    0,
+                    dp(14),
+                    0,
+                    dp(6)
+                )
+            }
+
+        card.addView(
+            dailyTitle
+        )
+
+        val dailyText =
+            TextView(
+                this
+            )
+
+        dailyText.text =
+            buildDailyTrendText(
+                records = filtered
+            )
+
+        dailyText.textSize =
+            14f
+
+        dailyText.setTextColor(
+            Color.parseColor(
+                "#334E68"
+            )
+        )
+
+        dailyText.setLineSpacing(
+            0f,
+            1.18f
+        )
+
+        card.addView(
+            dailyText
+        )
+
+        val weeklyTitle =
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "최근 4주 · 주별"
+
+                textSize =
+                    16f
+
+                setTypeface(
+                    typeface,
+                    Typeface.BOLD
+                )
+
+                setTextColor(
+                    Color.parseColor(
+                        "#102A43"
+                    )
+                )
+
+                setPadding(
+                    0,
+                    dp(16),
+                    0,
+                    dp(6)
+                )
+            }
+
+        card.addView(
+            weeklyTitle
+        )
+
+        val weeklyText =
+            TextView(
+                this
+            )
+
+        weeklyText.text =
+            buildWeeklyTrendText(
+                records = filtered
+            )
+
+        weeklyText.textSize =
+            14f
+
+        weeklyText.setTextColor(
+            Color.parseColor(
+                "#334E68"
+            )
+        )
+
+        weeklyText.setLineSpacing(
+            0f,
+            1.18f
+        )
+
+        card.addView(
+            weeklyText
+        )
+
+        val signal =
+            buildLongTermSignal(
+                records = filtered
+            )
+
+        if (
+            signal.isNotBlank()
+        ) {
+
+            val signalView =
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        signal
+
+                    textSize =
+                        14f
+
+                    setTypeface(
+                        typeface,
+                        Typeface.BOLD
+                    )
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#B54708"
+                        )
+                    )
+
+                    setPadding(
+                        0,
+                        dp(14),
+                        0,
+                        0
+                    )
+                }
+
+            card.addView(
+                signalView
+            )
+        }
+
+        rootContent.addView(
+            card
+        )
+    }
+
+    private fun buildDailyTrendText(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ): String {
+
+        val now =
+            Calendar.getInstance()
+
+        return buildString {
+
+            for (
+                offset in 6 downTo 0
+            ) {
+
+                val day =
+                    (
+                        now.clone() as
+                            Calendar
+                        )
+
+                day.add(
+                    Calendar.DAY_OF_YEAR,
+                    -offset
+                )
+
+                day.set(
+                    Calendar.HOUR_OF_DAY,
+                    0
+                )
+
+                day.set(
+                    Calendar.MINUTE,
+                    0
+                )
+
+                day.set(
+                    Calendar.SECOND,
+                    0
+                )
+
+                day.set(
+                    Calendar.MILLISECOND,
+                    0
+                )
+
+                val start =
+                    day.timeInMillis
+
+                day.add(
+                    Calendar.DAY_OF_YEAR,
+                    1
+                )
+
+                val end =
+                    day.timeInMillis
+
+                val dayRecords =
+                    records.filter {
+                        it.id >=
+                            start &&
+                        it.id <
+                            end
+                    }
+
+                val labelCalendar =
+                    Calendar.getInstance()
+                        .apply {
+                            timeInMillis =
+                                start
+                        }
+
+                val label =
+                    String.format(
+                        Locale.getDefault(),
+                        "%02d/%02d",
+                        labelCalendar.get(
+                            Calendar.MONTH
+                        ) + 1,
+                        labelCalendar.get(
+                            Calendar.DAY_OF_MONTH
+                        )
+                    )
+
+                if (
+                    dayRecords.isEmpty()
+                ) {
+
+                    append(
+                        "$label  ·  0건"
+                    )
+
+                } else {
+
+                    val average =
+                        dayRecords
+                            .map {
+                                it.score
+                            }
+                            .average()
+
+                    val issueCount =
+                        dayRecords.count {
+                            judgmentSeverity(
+                                it.judgment
+                            ) >=
+                                2
+                        }
+
+                    val issueRate =
+                        issueCount
+                            .toDouble() /
+                            dayRecords.size
+                                .toDouble() *
+                            100.0
+
+                    append(
+                        "$label  ·  ${dayRecords.size}건  ·  Avg ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                average
+                            )
+                        }  ·  이상 ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.0f",
+                                issueRate
+                            )
+                        }%"
+                    )
+                }
+
+                if (
+                    offset >
+                    0
+                ) {
+
+                    append(
+                        "\n"
+                    )
+                }
+            }
+        }
+    }
+
+    private fun buildWeeklyTrendText(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ): String {
+
+        val currentWeekStart =
+            Calendar.getInstance()
+                .apply {
+
+                    firstDayOfWeek =
+                        Calendar.MONDAY
+
+                    set(
+                        Calendar.DAY_OF_WEEK,
+                        Calendar.MONDAY
+                    )
+
+                    set(
+                        Calendar.HOUR_OF_DAY,
+                        0
+                    )
+
+                    set(
+                        Calendar.MINUTE,
+                        0
+                    )
+
+                    set(
+                        Calendar.SECOND,
+                        0
+                    )
+
+                    set(
+                        Calendar.MILLISECOND,
+                        0
+                    )
+                }
+
+        return buildString {
+
+            for (
+                weekOffset in 3 downTo 0
+            ) {
+
+                val startCalendar =
+                    (
+                        currentWeekStart.clone() as
+                            Calendar
+                        )
+
+                startCalendar.add(
+                    Calendar.WEEK_OF_YEAR,
+                    -weekOffset
+                )
+
+                val endCalendar =
+                    (
+                        startCalendar.clone() as
+                            Calendar
+                        )
+
+                endCalendar.add(
+                    Calendar.WEEK_OF_YEAR,
+                    1
+                )
+
+                val weekRecords =
+                    records.filter {
+                        it.id >=
+                            startCalendar.timeInMillis &&
+                        it.id <
+                            endCalendar.timeInMillis
+                    }
+
+                val endLabel =
+                    (
+                        endCalendar.clone() as
+                            Calendar
+                        ).apply {
+                            add(
+                                Calendar.DAY_OF_YEAR,
+                                -1
+                            )
+                        }
+
+                val label =
+                    String.format(
+                        Locale.getDefault(),
+                        "%02d/%02d~%02d/%02d",
+                        startCalendar.get(
+                            Calendar.MONTH
+                        ) + 1,
+                        startCalendar.get(
+                            Calendar.DAY_OF_MONTH
+                        ),
+                        endLabel.get(
+                            Calendar.MONTH
+                        ) + 1,
+                        endLabel.get(
+                            Calendar.DAY_OF_MONTH
+                        )
+                    )
+
+                if (
+                    weekRecords.isEmpty()
+                ) {
+
+                    append(
+                        "$label  ·  0건"
+                    )
+
+                } else {
+
+                    val average =
+                        weekRecords
+                            .map {
+                                it.score
+                            }
+                            .average()
+
+                    val issueCount =
+                        weekRecords.count {
+                            judgmentSeverity(
+                                it.judgment
+                            ) >=
+                                2
+                        }
+
+                    val issueRate =
+                        issueCount
+                            .toDouble() /
+                            weekRecords.size
+                                .toDouble() *
+                            100.0
+
+                    append(
+                        "$label  ·  ${weekRecords.size}건  ·  Avg ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                average
+                            )
+                        }  ·  이상 ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.0f",
+                                issueRate
+                            )
+                        }%"
+                    )
+                }
+
+                if (
+                    weekOffset >
+                    0
+                ) {
+
+                    append(
+                        "\n"
+                    )
+                }
+            }
+        }
+    }
+
+    private fun buildLongTermSignal(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ): String {
+
+        val dayStart =
+            Calendar.getInstance()
+                .apply {
+
+                    set(
+                        Calendar.HOUR_OF_DAY,
+                        0
+                    )
+
+                    set(
+                        Calendar.MINUTE,
+                        0
+                    )
+
+                    set(
+                        Calendar.SECOND,
+                        0
+                    )
+
+                    set(
+                        Calendar.MILLISECOND,
+                        0
+                    )
+                }
+
+        val recentStart =
+            (
+                dayStart.clone() as
+                    Calendar
+                ).apply {
+                add(
+                    Calendar.DAY_OF_YEAR,
+                    -2
+                )
+            }
+                .timeInMillis
+
+        val previousStart =
+            (
+                dayStart.clone() as
+                    Calendar
+                ).apply {
+                add(
+                    Calendar.DAY_OF_YEAR,
+                    -5
+                )
+            }
+                .timeInMillis
+
+        val tomorrow =
+            (
+                dayStart.clone() as
+                    Calendar
+                ).apply {
+                add(
+                    Calendar.DAY_OF_YEAR,
+                    1
+                )
+            }
+                .timeInMillis
+
+        val recent3 =
+            records.filter {
+                it.id >=
+                    recentStart &&
+                it.id <
+                    tomorrow
+            }
+
+        val previous3 =
+            records.filter {
+                it.id >=
+                    previousStart &&
+                it.id <
+                    recentStart
+            }
+
+        if (
+            recent3.isEmpty() ||
+            previous3.isEmpty()
+        ) {
+
+            return ""
+        }
+
+        val recentAverage =
+            recent3
+                .map {
+                    it.score
+                }
+                .average()
+
+        val previousAverage =
+            previous3
+                .map {
+                    it.score
+                }
+                .average()
+
+        val drop =
+            previousAverage -
+                recentAverage
+
+        val recentIssueRate =
+            recent3.count {
+                judgmentSeverity(
+                    it.judgment
+                ) >=
+                    2
+            }
+                .toDouble() /
+                recent3.size
+                    .toDouble() *
+                100.0
+
+        val previousIssueRate =
+            previous3.count {
+                judgmentSeverity(
+                    it.judgment
+                ) >=
+                    2
+            }
+                .toDouble() /
+                previous3.size
+                    .toDouble() *
+                100.0
+
+        return when {
+
+            drop >=
+                10.0 -> {
+
+                "🚨 최근 3일 평균 Score가 이전 3일 대비 ${
+                    String.format(
+                        Locale.getDefault(),
+                        "%.1f",
+                        drop
+                    )
+                }점 하락했습니다."
+            }
+
+            drop >=
+                5.0 -> {
+
+                "⚠ 최근 3일 평균 Score가 이전 3일 대비 ${
+                    String.format(
+                        Locale.getDefault(),
+                        "%.1f",
+                        drop
+                    )
+                }점 하락했습니다."
+            }
+
+            recentIssueRate -
+                previousIssueRate >=
+                20.0 -> {
+
+                "⚠ 최근 3일 이상 판정률이 이전 3일 대비 ${
+                    String.format(
+                        Locale.getDefault(),
+                        "%.0f",
+                        recentIssueRate -
+                            previousIssueRate
+                    )
+                }%p 증가했습니다."
+            }
+
+            else ->
+                ""
+        }
     }
 
     /*

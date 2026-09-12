@@ -37,7 +37,7 @@
             android:screenOrientation="portrait" />
 
         <activity
-            android:name=".SpecSummaryActivity"
+            android:name=".InspectionSpecSummaryActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

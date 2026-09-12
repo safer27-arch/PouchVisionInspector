@@ -29,6 +29,7 @@ import java.util.Locale
  * - 저장 / 기본값 복원 구분
  * - 변경 전 기준값
  * - 변경 후 기준값
+ * - Model / Line / 검사 항목 / 변경 유형 필터
  *
  * 중요
  * - 이 화면은 기준값을 수정하지 않습니다.
@@ -41,15 +42,20 @@ class InspectionSpecChangeHistoryActivity : AppCompatActivity() {
     private lateinit var spinnerModel: Spinner
     private lateinit var spinnerLine: Spinner
     private lateinit var spinnerInspection: Spinner
+    private lateinit var spinnerAction: Spinner
 
     private var selectedModel: String = ALL_MODELS
     private var selectedLine: String = ALL_LINES
     private var selectedInspectionType: InspectionSpecStore.InspectionType? = null
+    private var selectedAction: InspectionSpecChangeHistoryStore.ChangeAction? = null
 
     companion object {
         private const val ALL_MODELS = "전체 Model"
         private const val ALL_LINES = "전체 Line"
         private const val ALL_INSPECTIONS = "전체 검사 항목"
+        private const val ALL_ACTIONS = "전체 변경 유형"
+        private const val ACTION_SAVED = "기준 저장"
+        private const val ACTION_RESET = "기본값 복원"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -249,9 +255,14 @@ class InspectionSpecChangeHistoryActivity : AppCompatActivity() {
                     selectedInspectionType == null ||
                         record.inspectionType == selectedInspectionType
 
+                val actionMatches =
+                    selectedAction == null ||
+                        record.action == selectedAction
+
                 modelMatches &&
                     lineMatches &&
-                    inspectionMatches
+                    inspectionMatches &&
+                    actionMatches
             }
 
         historyContainer.removeAllViews()
@@ -402,6 +413,32 @@ class InspectionSpecChangeHistoryActivity : AppCompatActivity() {
             )
         )
 
+        card.addView(
+            createFieldLabel(
+                "변경 유형"
+            ),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(10)
+            }
+        )
+
+        spinnerAction =
+            Spinner(this).apply {
+                minimumHeight =
+                    dp(48)
+            }
+
+        card.addView(
+            spinnerAction,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(48)
+            )
+        )
+
         val models =
             mutableListOf(
                 ALL_MODELS
@@ -438,6 +475,15 @@ class InspectionSpecChangeHistoryActivity : AppCompatActivity() {
         spinnerInspection.adapter =
             createVisibleSpinnerAdapter(
                 inspectionItems
+            )
+
+        spinnerAction.adapter =
+            createVisibleSpinnerAdapter(
+                listOf(
+                    ALL_ACTIONS,
+                    ACTION_SAVED,
+                    ACTION_RESET
+                )
             )
 
         spinnerModel.onItemSelectedListener =
@@ -552,6 +598,55 @@ class InspectionSpecChangeHistoryActivity : AppCompatActivity() {
                     parent: AdapterView<*>?
                 ) {
                     selectedInspectionType =
+                        null
+
+                    if (
+                        ::historyContainer.isInitialized
+                    ) {
+                        refreshHistory()
+                    }
+                }
+            }
+
+        spinnerAction.onItemSelectedListener =
+            object :
+                AdapterView.OnItemSelectedListener {
+
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    val selectedLabel =
+                        parent?.getItemAtPosition(
+                            position
+                        )?.toString()
+                            ?: ALL_ACTIONS
+
+                    selectedAction =
+                        when (selectedLabel) {
+                            ACTION_SAVED ->
+                                InspectionSpecChangeHistoryStore.ChangeAction.SAVED
+
+                            ACTION_RESET ->
+                                InspectionSpecChangeHistoryStore.ChangeAction.RESET_TO_DEFAULT
+
+                            else ->
+                                null
+                        }
+
+                    if (
+                        ::historyContainer.isInitialized
+                    ) {
+                        refreshHistory()
+                    }
+                }
+
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {
+                    selectedAction =
                         null
 
                     if (
@@ -768,7 +863,7 @@ class InspectionSpecChangeHistoryActivity : AppCompatActivity() {
                 if (
                     hasAnyHistory
                 ) {
-                    "선택한 Model / Line / 검사 항목 조건에 해당하는 변경 기록이 없습니다.\n\n필터를 변경하면 다른 이력을 확인할 수 있습니다."
+                    "선택한 Model / Line / 검사 항목 / 변경 유형 조건에 해당하는 변경 기록이 없습니다.\n\n필터를 변경하면 다른 이력을 확인할 수 있습니다."
                 } else {
                     "아직 변경 기록이 없습니다.\n\n검사 기준 설정에서 기준값을 저장하거나 기본값으로 복원하면 이곳에 자동 기록됩니다."
                 }

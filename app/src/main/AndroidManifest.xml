@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 카메라 사용 -->
+    <!-- Camera -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Telegram Bot API / 네트워크 기능 -->
+    <!-- Telegram Bot API / network -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature
@@ -38,6 +38,11 @@
 
         <activity
             android:name=".InspectionSpecSummaryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".InspectionSpecChangeHistoryActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

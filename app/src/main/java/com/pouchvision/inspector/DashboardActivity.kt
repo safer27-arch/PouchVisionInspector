@@ -509,19 +509,10 @@ class DashboardActivity :
             )
         )
 
-        val modelAdapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+        spinnerModel.adapter =
+            createVisibleSpinnerAdapter(
                 modelItems
             )
-
-        modelAdapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
-
-        spinnerModel.adapter =
-            modelAdapter
 
         /*
          * Dashboard 최초 진입 시
@@ -654,19 +645,10 @@ class DashboardActivity :
             lines
         )
 
-        val adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+        spinnerLine.adapter =
+            createVisibleSpinnerAdapter(
                 items
             )
-
-        adapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
-
-        spinnerLine.adapter =
-            adapter
 
         val preferredPosition =
             items.indexOf(
@@ -1767,6 +1749,119 @@ class DashboardActivity :
      * =========================================================
      */
 
+    /*
+     * =========================================================
+     * Spinner 가시성 고정 Adapter
+     * =========================================================
+     *
+     * Samsung / Android 다크모드 또는 제조사 테마와 무관하게
+     * Model / Line 선택값과 드롭다운 목록을 항상
+     * 진한 글씨 + 밝은 배경으로 표시합니다.
+     * =========================================================
+     */
+
+    private fun createVisibleSpinnerAdapter(
+        items: List<String>
+    ): ArrayAdapter<String> {
+
+        return object :
+            ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_item,
+                items
+            ) {
+
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: android.view.ViewGroup
+            ): View {
+
+                val view =
+                    super.getView(
+                        position,
+                        convertView,
+                        parent
+                    )
+
+                styleSpinnerView(
+                    view,
+                    isDropDown = false
+                )
+
+                return view
+            }
+
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: android.view.ViewGroup
+            ): View {
+
+                val view =
+                    super.getDropDownView(
+                        position,
+                        convertView,
+                        parent
+                    )
+
+                styleSpinnerView(
+                    view,
+                    isDropDown = true
+                )
+
+                return view
+            }
+        }.apply {
+
+            setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+            )
+        }
+    }
+
+    private fun styleSpinnerView(
+        view: View,
+        isDropDown: Boolean
+    ) {
+
+        if (
+            view is TextView
+        ) {
+
+            view.setTextColor(
+                Color.parseColor(
+                    "#102A43"
+                )
+            )
+
+            view.textSize =
+                16f
+
+            view.gravity =
+                Gravity.CENTER_VERTICAL
+
+            view.setPadding(
+                dp(14),
+                0,
+                dp(14),
+                0
+            )
+
+            view.setBackgroundColor(
+                Color.parseColor(
+                    if (
+                        isDropDown
+                    ) {
+                        "#FFFFFF"
+                    } else {
+                        "#F4F6F8"
+                    }
+                )
+            )
+        }
+    }
+
     private fun sectionTitle(
         title: String
     ): TextView {
@@ -1973,6 +2068,17 @@ class DashboardActivity :
             isAllCaps =
                 false
 
+            setTextColor(
+                Color.WHITE
+            )
+
+            backgroundTintList =
+                ColorStateList.valueOf(
+                    Color.parseColor(
+                        "#335C81"
+                    )
+                )
+
             setOnClickListener {
                 onClick()
             }
@@ -2011,6 +2117,17 @@ class DashboardActivity :
 
             isAllCaps =
                 false
+
+            setTextColor(
+                Color.WHITE
+            )
+
+            backgroundTintList =
+                ColorStateList.valueOf(
+                    Color.parseColor(
+                        "#102F4A"
+                    )
+                )
 
             setOnClickListener {
                 onClick()

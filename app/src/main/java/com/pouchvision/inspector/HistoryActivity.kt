@@ -133,6 +133,31 @@ class HistoryActivity : AppCompatActivity() {
             binding.root
         )
 
+        /*
+         * =====================================================
+         * History 화면 공통 가시성
+         * =====================================================
+         */
+        binding.btnHistoryRefresh.setTextColor(
+            Color.WHITE
+        )
+        binding.btnHistoryRefresh.backgroundTintList =
+            ColorStateList.valueOf(
+                Color.parseColor(
+                    "#102A43"
+                )
+            )
+
+        binding.btnHistoryBack.setTextColor(
+            Color.WHITE
+        )
+        binding.btnHistoryBack.backgroundTintList =
+            ColorStateList.valueOf(
+                Color.parseColor(
+                    "#486581"
+                )
+            )
+
         setupFilters()
 
         binding.btnHistoryRefresh
@@ -182,15 +207,9 @@ class HistoryActivity : AppCompatActivity() {
          * =====================================================
          */
         val typeAdapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+            createVisibleSpinnerAdapter(
                 inspectionTypes
             )
-
-        typeAdapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
 
         binding.spinnerInspectionType.adapter =
             typeAdapter
@@ -218,15 +237,9 @@ class HistoryActivity : AppCompatActivity() {
         )
 
         val modelAdapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+            createVisibleSpinnerAdapter(
                 modelItems
             )
-
-        modelAdapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
 
         binding.spinnerHistoryModel.adapter =
             modelAdapter
@@ -390,15 +403,9 @@ class HistoryActivity : AppCompatActivity() {
         )
 
         val adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+            createVisibleSpinnerAdapter(
                 items
             )
-
-        adapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
 
         binding.spinnerHistoryLine.adapter =
             adapter
@@ -3874,6 +3881,118 @@ Quality Score : ${String.format(Locale.getDefault(), "%.1f", record.score)} / 10
                     "#C62828"
                 )
             }
+        }
+    }
+
+    /*
+     * =========================================================
+     * Spinner 가시성 고정 Adapter
+     * =========================================================
+     *
+     * Samsung / Android 다크모드와 관계없이
+     * 선택값과 드롭다운 목록을 진한 글자 + 밝은 배경으로 표시합니다.
+     * =========================================================
+     */
+
+    private fun createVisibleSpinnerAdapter(
+        items: List<String>
+    ): ArrayAdapter<String> {
+
+        return object :
+            ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_item,
+                items
+            ) {
+
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: android.view.ViewGroup
+            ): View {
+
+                val view =
+                    super.getView(
+                        position,
+                        convertView,
+                        parent
+                    )
+
+                styleSpinnerView(
+                    view,
+                    isDropDown = false
+                )
+
+                return view
+            }
+
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: android.view.ViewGroup
+            ): View {
+
+                val view =
+                    super.getDropDownView(
+                        position,
+                        convertView,
+                        parent
+                    )
+
+                styleSpinnerView(
+                    view,
+                    isDropDown = true
+                )
+
+                return view
+            }
+        }.apply {
+
+            setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+            )
+        }
+    }
+
+    private fun styleSpinnerView(
+        view: View,
+        isDropDown: Boolean
+    ) {
+
+        if (
+            view is TextView
+        ) {
+
+            view.setTextColor(
+                Color.parseColor(
+                    "#102A43"
+                )
+            )
+
+            view.textSize =
+                15f
+
+            view.gravity =
+                Gravity.CENTER_VERTICAL
+
+            view.setPadding(
+                dp(12),
+                0,
+                dp(12),
+                0
+            )
+
+            view.setBackgroundColor(
+                Color.parseColor(
+                    if (
+                        isDropDown
+                    ) {
+                        "#FFFFFF"
+                    } else {
+                        "#F4F6F8"
+                    }
+                )
+            )
         }
     }
 

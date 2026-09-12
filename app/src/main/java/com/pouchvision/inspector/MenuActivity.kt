@@ -441,6 +441,22 @@ class MenuActivity : AppCompatActivity() {
 
         /*
          * =====================================================
+         * Spec Summary
+         * =====================================================
+         */
+        binding.btnInspectionSpecSummary
+            .setOnClickListener {
+
+                startActivity(
+                    Intent(
+                        this,
+                        InspectionSpecSummaryActivity::class.java
+                    )
+                )
+            }
+
+        /*
+         * =====================================================
          * 검사 기준 설정
          * =====================================================
          */

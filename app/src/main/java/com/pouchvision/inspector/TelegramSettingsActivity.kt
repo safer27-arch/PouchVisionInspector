@@ -1,7 +1,13 @@
 package com.pouchvision.inspector
 
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.pouchvision.inspector.databinding.ActivityTelegramSettingsBinding
@@ -17,6 +23,7 @@ class TelegramSettingsActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupPolicySpinner()
+        applyVisibilityStyle()
         loadCurrentSettings()
 
         binding.btnSaveTelegramSettings.setOnClickListener {
@@ -36,16 +43,98 @@ class TelegramSettingsActivity : AppCompatActivity() {
         val policies = TelegramSettingsStore.AlertPolicy.values().toList()
         val labels = policies.map { it.displayName }
 
-        val adapter = ArrayAdapter(
+        binding.spinnerAlertPolicy.adapter =
+            createVisibleSpinnerAdapter(labels)
+    }
+
+    /*
+     * =========================================================
+     * 화면 가시성 고정
+     * =========================================================
+     *
+     * Samsung 다크모드/테마와 관계없이
+     * 밝은 카드 + 진한 글씨 + 명확한 버튼 대비를 유지합니다.
+     */
+    private fun applyVisibilityStyle() {
+        binding.editBotToken.setTextColor(Color.parseColor("#102A43"))
+        binding.editBotToken.setHintTextColor(Color.parseColor("#829AB1"))
+
+        binding.editChatIds.setTextColor(Color.parseColor("#102A43"))
+        binding.editChatIds.setHintTextColor(Color.parseColor("#829AB1"))
+
+        binding.tvTelegramStatus.setTextColor(Color.parseColor("#486581"))
+
+        binding.switchTelegramEnabled.setTextColor(Color.parseColor("#102A43"))
+        binding.switchSendImage.setTextColor(Color.parseColor("#102A43"))
+
+        setNavyButton(binding.btnSaveTelegramSettings, "#102A43")
+        setNavyButton(binding.btnTelegramTest, "#123E63")
+        setNavyButton(binding.btnTelegramBack, "#486581")
+    }
+
+    private fun setNavyButton(
+        button: android.widget.Button,
+        backgroundColor: String
+    ) {
+        button.setTextColor(Color.WHITE)
+        button.backgroundTintList =
+            ColorStateList.valueOf(Color.parseColor(backgroundColor))
+    }
+
+    private fun createVisibleSpinnerAdapter(
+        items: List<String>
+    ): ArrayAdapter<String> {
+
+        return object : ArrayAdapter<String>(
             this,
             android.R.layout.simple_spinner_item,
-            labels
-        )
-        adapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
-        )
+            items
+        ) {
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+                val view = super.getView(position, convertView, parent)
+                styleSpinnerText(view, false)
+                return view
+            }
 
-        binding.spinnerAlertPolicy.adapter = adapter
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+                val view = super.getDropDownView(position, convertView, parent)
+                styleSpinnerText(view, true)
+                return view
+            }
+        }.apply {
+            setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+            )
+        }
+    }
+
+    private fun styleSpinnerText(
+        view: View,
+        isDropDown: Boolean
+    ) {
+        if (view is TextView) {
+            view.setTextColor(Color.parseColor("#102A43"))
+            view.textSize = 16f
+            view.gravity = Gravity.CENTER_VERTICAL
+            view.setPadding(dp(14), 0, dp(14), 0)
+            view.setBackgroundColor(
+                Color.parseColor(
+                    if (isDropDown) "#FFFFFF" else "#F4F6F8"
+                )
+            )
+        }
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 
     private fun loadCurrentSettings() {

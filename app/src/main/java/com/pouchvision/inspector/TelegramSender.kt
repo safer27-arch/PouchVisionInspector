@@ -129,6 +129,49 @@ Telegram 연결 테스트 메시지입니다.
      * =========================================================
      */
 
+    fun sendDashboardSummary(
+        context: Context,
+        message: String,
+        callback: ((SendResult) -> Unit)? = null
+    ) {
+        val settings = TelegramSettingsStore.load(context)
+
+        if (!settings.enabled || !settings.dashboardSummaryEnabled) {
+            callback?.invoke(
+                SendResult(
+                    success = false,
+                    successCount = 0,
+                    failureCount = 0,
+                    message = "Dashboard 정기 Summary가 OFF 상태입니다."
+                )
+            )
+            return
+        }
+
+        if (settings.botToken.isBlank() || settings.chatIds.isEmpty()) {
+            callback?.invoke(
+                SendResult(
+                    success = false,
+                    successCount = 0,
+                    failureCount = 0,
+                    message = "Telegram Token 또는 Chat ID 설정이 필요합니다."
+                )
+            )
+            return
+        }
+
+        Thread {
+            val result =
+                sendTextToAll(
+                    botToken = settings.botToken,
+                    chatIds = settings.chatIds,
+                    text = message.take(3900)
+                )
+
+            callback?.invoke(result)
+        }.start()
+    }
+
     fun sendInspectionAlert(
         context: Context,
         inspectionType: String,

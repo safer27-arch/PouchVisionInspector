@@ -145,6 +145,103 @@
                 android:textSize="15sp"/>
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginEnd="14dp"
+            android:background="#FFFFFF"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Dashboard 정기 Summary"
+                android:textColor="#102A43"
+                android:textSize="17sp"
+                android:textStyle="bold"/>
+
+            <Switch
+                android:id="@+id/switchDashboardSummary"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="6dp"
+                android:text="정기 Summary 자동 전송"
+                android:textColor="#102A43"
+                android:textSize="15sp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="전송 주기"
+                android:textColor="#334E68"
+                android:textSize="14sp"
+                android:textStyle="bold"/>
+
+            <Spinner
+                android:id="@+id/spinnerDashboardInterval"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="4dp"
+                android:background="#F4F6F8"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"/>
+
+            <Switch
+                android:id="@+id/switchDashboardZeroWarning"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="검사 0건이면 미실시 경고"
+                android:textColor="#102A43"
+                android:textSize="14sp"/>
+
+            <Switch
+                android:id="@+id/switchDashboardMissingWarning"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="일부 검사 항목 0건이면 누락 경고"
+                android:textColor="#102A43"
+                android:textSize="14sp"/>
+
+            <Switch
+                android:id="@+id/switchDashboardLowCountWarning"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="전체 검사 횟수 부족 경고"
+                android:textColor="#102A43"
+                android:textSize="14sp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="최소 검사 건수"
+                android:textColor="#334E68"
+                android:textSize="14sp"
+                android:textStyle="bold"/>
+
+            <Spinner
+                android:id="@+id/spinnerDashboardMinCount"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="4dp"
+                android:background="#F4F6F8"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="※ 현재 선택된 Model / Line의 최근 주기 데이터를 집계합니다.&#10;※ 기본값: 6시간 / 최소 4건 / 미실시·누락·부족 경고 ON"
+                android:textColor="#627D98"
+                android:textSize="11sp"/>
+        </LinearLayout>
+
         <TextView
             android:id="@+id/tvTelegramStatus"
             android:layout_width="match_parent"
@@ -166,7 +263,9 @@
             android:layout_marginStart="14dp"
             android:layout_marginTop="12dp"
             android:layout_marginEnd="14dp"
+            android:backgroundTint="#102A43"
             android:text="Telegram 설정 저장"
+            android:textColor="#FFFFFF"
             android:textSize="15sp"
             android:textStyle="bold"/>
 
@@ -177,7 +276,9 @@
             android:layout_marginStart="14dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="14dp"
+            android:backgroundTint="#335C81"
             android:text="테스트 메시지 보내기"
+            android:textColor="#FFFFFF"
             android:textSize="15sp"
             android:textStyle="bold"/>
 
@@ -189,7 +290,10 @@
             android:layout_marginTop="8dp"
             android:layout_marginEnd="14dp"
             android:layout_marginBottom="24dp"
+            android:backgroundTint="#486581"
             android:text="메뉴로 돌아가기"
-            android:textSize="15sp"/>
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"/>
     </LinearLayout>
 </ScrollView>

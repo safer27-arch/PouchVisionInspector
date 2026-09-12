@@ -35,6 +35,20 @@ class TelegramSettingsActivity : AppCompatActivity() {
             sendTestMessage()
         }
 
+        binding.btnDashboardSummaryTest.setOnClickListener {
+            saveSettings()
+
+            DashboardSummaryWorker.sendTestNow(
+                this
+            )
+
+            Toast.makeText(
+                this,
+                "Dashboard Summary 테스트 전송을 요청했습니다.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
         binding.btnTelegramBack.setOnClickListener {
             finish()
         }
@@ -111,6 +125,7 @@ class TelegramSettingsActivity : AppCompatActivity() {
 
         setNavyButton(binding.btnSaveTelegramSettings, "#102A43")
         setNavyButton(binding.btnTelegramTest, "#123E63")
+        setNavyButton(binding.btnDashboardSummaryTest, "#0F6B50")
         setNavyButton(binding.btnTelegramBack, "#486581")
     }
 

@@ -2290,79 +2290,378 @@ class DashboardActivity :
                         record.line.equals(selectedLine, ignoreCase = true))
             }
 
-        val now = Calendar.getInstance()
-        val start = (now.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+        val now =
+            Calendar.getInstance()
 
-        // 현재 진행 중인 시간대까지 계획 슬롯으로 포함합니다.
-        val plannedSlots = now.get(Calendar.HOUR_OF_DAY) + 1
-        val completedHours = mutableSetOf<Int>()
+        /*
+         * 2개조 고정
+         * 주간조 : 07:00 ~ 19:00
+         * 야간조 : 19:00 ~ 다음날 07:00
+         *
+         * 아직 끝나지 않은 현재 60분 구간은 "누락"으로 잡지 않습니다.
+         * 예: 22:10이면 19~20, 20~21, 21~22까지만 계획 대상으로 계산.
+         */
+        val currentHour =
+            now.get(
+                Calendar.HOUR_OF_DAY
+            )
+
+        val isDayShift =
+            currentHour in
+                7..18
+
+        val shiftName =
+            if (
+                isDayShift
+            ) {
+                "주간조"
+            } else {
+                "야간조"
+            }
+
+        val shiftStart =
+            (
+                now.clone() as
+                    Calendar
+                ).apply {
+
+                if (
+                    isDayShift
+                ) {
+
+                    set(
+                        Calendar.HOUR_OF_DAY,
+                        7
+                    )
+
+                } else {
+
+                    if (
+                        currentHour <
+                        7
+                    ) {
+                        add(
+                            Calendar.DAY_OF_YEAR,
+                            -1
+                        )
+                    }
+
+                    set(
+                        Calendar.HOUR_OF_DAY,
+                        19
+                    )
+                }
+
+                set(
+                    Calendar.MINUTE,
+                    0
+                )
+
+                set(
+                    Calendar.SECOND,
+                    0
+                )
+
+                set(
+                    Calendar.MILLISECOND,
+                    0
+                )
+            }
+
+        val shiftEnd =
+            (
+                shiftStart.clone() as
+                    Calendar
+                ).apply {
+
+                add(
+                    Calendar.HOUR_OF_DAY,
+                    12
+                )
+            }
+
+        val elapsedWholeHours =
+            (
+                (
+                    now.timeInMillis -
+                        shiftStart.timeInMillis
+                    ) /
+                    (60L * 60L * 1000L)
+                )
+                .toInt()
+                .coerceIn(
+                    0,
+                    12
+                )
+
+        val plannedSlots =
+            elapsedWholeHours
+
+        val completedSlots =
+            mutableSetOf<
+                Int
+            >()
 
         records.forEach { record ->
-            if (record.id >= start.timeInMillis && record.id <= now.timeInMillis) {
-                val c = Calendar.getInstance().apply { timeInMillis = record.id }
-                completedHours.add(c.get(Calendar.HOUR_OF_DAY))
+
+            if (
+                record.id >=
+                shiftStart.timeInMillis &&
+                record.id <
+                now.timeInMillis
+            ) {
+
+                val slotIndex =
+                    (
+                        (
+                            record.id -
+                                shiftStart.timeInMillis
+                            ) /
+                            (60L * 60L * 1000L)
+                        )
+                        .toInt()
+
+                if (
+                    slotIndex in
+                    0 until
+                    plannedSlots
+                ) {
+
+                    completedSlots.add(
+                        slotIndex
+                    )
+                }
             }
         }
 
-        val actualSlots = completedHours.size
+        val actualSlots =
+            completedSlots.size
+
         val compliance =
-            if (plannedSlots > 0) actualSlots.toDouble() / plannedSlots.toDouble() * 100.0
-            else 0.0
+            if (
+                plannedSlots >
+                0
+            ) {
 
-        val missing = (0 until plannedSlots).filter { it !in completedHours }
+                actualSlots
+                    .toDouble() /
+                    plannedSlots
+                        .toDouble() *
+                    100.0
 
-        val card = createCard()
+            } else {
 
-        val main = TextView(this).apply {
-            text =
-                "관리 기준 : 60분마다 최소 1회\n" +
-                "오늘 계획 : ${plannedSlots}회  |  실시 : ${actualSlots}회\n" +
-                "검사 준수율 : ${String.format(Locale.getDefault(), "%.1f", compliance)}%"
-            textSize = 16f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(
-                when {
-                    compliance >= 90.0 -> Color.parseColor("#2E7D32")
-                    compliance >= 70.0 -> Color.parseColor("#E67E00")
-                    else -> Color.parseColor("#C62828")
+                100.0
+            }
+
+        val missingSlots =
+            (
+                0 until
+                    plannedSlots
+                )
+                .filter {
+                    it !in
+                        completedSlots
                 }
+
+        val timeFormat =
+            SimpleDateFormat(
+                "MM/dd HH:mm",
+                Locale.getDefault()
             )
-            setLineSpacing(0f, 1.18f)
-        }
-        card.addView(main)
 
-        val missingText = TextView(this).apply {
-            text =
-                if (missing.isEmpty()) {
-                    "\n✅ 현재까지 누락 시간대 없음"
-                } else {
-                    val labels = missing.takeLast(8).joinToString(", ") {
-                        String.format(Locale.getDefault(), "%02d:00~%02d:00", it, (it + 1) % 24)
+        val card =
+            createCard()
+
+        val main =
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "$shiftName  |  " +
+                        "${timeFormat.format(shiftStart.time)} ~ " +
+                        "${timeFormat.format(shiftEnd.time)}\n" +
+                        "관리 기준 : 60분마다 최소 1회\n" +
+                        "현재까지 계획 : ${plannedSlots}회  |  실시 : ${actualSlots}회\n" +
+                        "검사 준수율 : ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                compliance
+                            )
+                        }%"
+
+                textSize =
+                    16f
+
+                setTypeface(
+                    typeface,
+                    Typeface.BOLD
+                )
+
+                setTextColor(
+                    when {
+
+                        compliance >=
+                            90.0 ->
+                            Color.parseColor(
+                                "#2E7D32"
+                            )
+
+                        compliance >=
+                            70.0 ->
+                            Color.parseColor(
+                                "#E67E00"
+                            )
+
+                        else ->
+                            Color.parseColor(
+                                "#C62828"
+                            )
                     }
-                    val more = if (missing.size > 8) "\n외 ${missing.size - 8}개 시간대" else ""
-                    "\n⚠ 누락 시간대\n$labels$more"
-                }
-            textSize = 14f
-            setTextColor(Color.parseColor("#486581"))
-            setLineSpacing(0f, 1.18f)
-        }
-        card.addView(missingText)
+                )
 
-        val guide = TextView(this).apply {
-            text =
-                "\n※ 현재 버전은 00:00부터 현재 시각까지 60분 단위로 계산합니다.\n" +
-                "※ 다음 단계에서 실제 근무시간/교대시간을 설정값으로 연결할 수 있습니다."
-            textSize = 12f
-            setTextColor(Color.parseColor("#829AB1"))
-        }
-        card.addView(guide)
+                setLineSpacing(
+                    0f,
+                    1.18f
+                )
+            }
 
-        rootContent.addView(card)
+        card.addView(
+            main
+        )
+
+        val missingText =
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    if (
+                        plannedSlots ==
+                        0
+                    ) {
+
+                        "\n현재 교대조가 시작된 지 1시간이 지나지 않았습니다."
+
+                    } else if (
+                        missingSlots.isEmpty()
+                    ) {
+
+                        "\n✅ 현재까지 누락 시간대 없음"
+
+                    } else {
+
+                        val labels =
+                            missingSlots
+                                .takeLast(
+                                    8
+                                )
+                                .joinToString(
+                                    ", "
+                                ) { slot ->
+
+                                    val slotStart =
+                                        (
+                                            shiftStart.clone() as
+                                                Calendar
+                                            ).apply {
+
+                                            add(
+                                                Calendar.HOUR_OF_DAY,
+                                                slot
+                                            )
+                                        }
+
+                                    val slotEnd =
+                                        (
+                                            slotStart.clone() as
+                                                Calendar
+                                            ).apply {
+
+                                            add(
+                                                Calendar.HOUR_OF_DAY,
+                                                1
+                                            )
+                                        }
+
+                                    String.format(
+                                        Locale.getDefault(),
+                                        "%02d:00~%02d:00",
+                                        slotStart.get(
+                                            Calendar.HOUR_OF_DAY
+                                        ),
+                                        slotEnd.get(
+                                            Calendar.HOUR_OF_DAY
+                                        )
+                                    )
+                                }
+
+                        val more =
+                            if (
+                                missingSlots.size >
+                                8
+                            ) {
+
+                                "\n외 ${
+                                    missingSlots.size -
+                                        8
+                                }개 시간대"
+
+                            } else {
+
+                                ""
+                            }
+
+                        "\n⚠ 누락 시간대\n$labels$more"
+                    }
+
+                textSize =
+                    14f
+
+                setTextColor(
+                    Color.parseColor(
+                        "#486581"
+                    )
+                )
+
+                setLineSpacing(
+                    0f,
+                    1.18f
+                )
+            }
+
+        card.addView(
+            missingText
+        )
+
+        val guide =
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "\n※ 주간조 07:00~19:00 / 야간조 19:00~다음날 07:00\n" +
+                        "※ 완료된 60분 구간만 계획/누락으로 계산합니다."
+
+                textSize =
+                    12f
+
+                setTextColor(
+                    Color.parseColor(
+                        "#829AB1"
+                    )
+                )
+            }
+
+        card.addView(
+            guide
+        )
+
+        rootContent.addView(
+            card
+        )
     }
 
     /*

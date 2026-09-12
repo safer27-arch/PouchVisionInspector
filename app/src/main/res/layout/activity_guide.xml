@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -29,7 +28,7 @@
                 android:text="검사 안내"
                 android:textColor="#FFFFFF"
                 android:textSize="22sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvGuideSubtitle"
@@ -38,10 +37,9 @@
                 android:layout_marginTop="4dp"
                 android:text="Inspection Guide"
                 android:textColor="#D9E2EC"
-                android:textSize="13sp"/>
+                android:textSize="13sp" />
 
         </LinearLayout>
-
 
         <!-- 샘플 이미지 -->
         <LinearLayout
@@ -61,7 +59,7 @@
                 android:text="정상 / 주의 / 불량 예시"
                 android:textColor="#102A43"
                 android:textSize="17sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <ImageView
                 android:id="@+id/imgGuideSample"
@@ -70,7 +68,7 @@
                 android:layout_marginTop="6dp"
                 android:adjustViewBounds="true"
                 android:scaleType="fitCenter"
-                android:contentDescription="검사 샘플 이미지"/>
+                android:contentDescription="검사 샘플 이미지" />
 
             <TextView
                 android:id="@+id/tvSampleNotice"
@@ -81,10 +79,9 @@
                 android:text="※ 이해를 돕기 위한 시뮬레이션 예시입니다."
                 android:textColor="#C62828"
                 android:textSize="12sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
         </LinearLayout>
-
 
         <!-- 검사 목적 -->
         <LinearLayout
@@ -103,7 +100,7 @@
                 android:text="검사 목적"
                 android:textColor="#102A43"
                 android:textSize="17sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvGuidePurpose"
@@ -112,10 +109,9 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#486581"
                 android:textSize="14sp"
-                android:lineSpacingExtra="3dp"/>
+                android:lineSpacingExtra="3dp" />
 
         </LinearLayout>
-
 
         <!-- ROI 위치 -->
         <LinearLayout
@@ -134,7 +130,7 @@
                 android:text="권장 ROI 위치"
                 android:textColor="#102A43"
                 android:textSize="17sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvGuideRoi"
@@ -143,10 +139,9 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#486581"
                 android:textSize="14sp"
-                android:lineSpacingExtra="3dp"/>
+                android:lineSpacingExtra="3dp" />
 
         </LinearLayout>
-
 
         <!-- 판정 포인트 -->
         <LinearLayout
@@ -165,7 +160,7 @@
                 android:text="주요 판정 포인트"
                 android:textColor="#102A43"
                 android:textSize="17sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvGuidePoints"
@@ -174,10 +169,9 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#486581"
                 android:textSize="14sp"
-                android:lineSpacingExtra="3dp"/>
+                android:lineSpacingExtra="3dp" />
 
         </LinearLayout>
-
 
         <!-- 검사 방법 -->
         <LinearLayout
@@ -196,7 +190,7 @@
                 android:text="검사 방법"
                 android:textColor="#102A43"
                 android:textSize="17sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvGuideMethod"
@@ -205,10 +199,9 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#486581"
                 android:textSize="14sp"
-                android:lineSpacingExtra="3dp"/>
+                android:lineSpacingExtra="3dp" />
 
         </LinearLayout>
-
 
         <!-- 중요 주의 -->
         <TextView
@@ -222,8 +215,7 @@
             android:text="※ 현재 샘플의 정상·주의·불량 이미지는 검사 방법을 설명하기 위한 시뮬레이션입니다. 실제 양산 OK/NG 판정은 현장 승인 Spec, Master Sample 및 실제 불량품 검증을 통해 기준을 설정해야 합니다."
             android:textColor="#7A4F01"
             android:textSize="12sp"
-            android:lineSpacingExtra="2dp"/>
-
+            android:lineSpacingExtra="2dp" />
 
         <Button
             android:id="@+id/btnGuideBack"
@@ -234,7 +226,10 @@
             android:layout_marginEnd="12dp"
             android:layout_marginBottom="24dp"
             android:text="메뉴로 돌아가기"
-            android:textSize="15sp"/>
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:backgroundTint="#102A43" />
 
     </LinearLayout>
 

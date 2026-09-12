@@ -29,9 +29,15 @@ class DashboardSummaryWorker(
                 applicationContext
             )
 
+        val testMode =
+            inputData.getBoolean(
+                "test_mode",
+                false
+            )
+
         if (
             !settings.enabled ||
-            !settings.dashboardSummaryEnabled ||
+            (!settings.dashboardSummaryEnabled && !testMode) ||
             settings.botToken.isBlank() ||
             settings.chatIds.isEmpty()
         ) {
@@ -90,7 +96,8 @@ class DashboardSummaryWorker(
 
         TelegramSender.sendDashboardSummary(
             context = applicationContext,
-            message = message
+            message = message,
+            allowWhenSummaryOff = testMode
         ) {
             sendResult =
                 it
@@ -484,6 +491,37 @@ class DashboardSummaryWorker(
 
         private const val UNIQUE_WORK_NAME =
             "pouch_dashboard_summary"
+
+        fun sendTestNow(
+            context: Context
+        ) {
+
+            val constraints =
+                Constraints.Builder()
+                    .setRequiredNetworkType(
+                        NetworkType.CONNECTED
+                    )
+                    .build()
+
+            val request =
+                androidx.work.OneTimeWorkRequestBuilder<DashboardSummaryWorker>()
+                    .setInputData(
+                        androidx.work.workDataOf(
+                            "test_mode" to true
+                        )
+                    )
+                    .setConstraints(
+                        constraints
+                    )
+                    .build()
+
+            WorkManager.getInstance(
+                context.applicationContext
+            )
+                .enqueue(
+                    request
+                )
+        }
 
         fun applySchedule(
             context: Context

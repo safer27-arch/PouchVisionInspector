@@ -1108,7 +1108,7 @@ class DashboardActivity :
 
         for (
             type in
-            INSPECTION_TYPES
+            inspectionOrder
         ) {
 
             val itemRecords =

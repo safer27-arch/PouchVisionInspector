@@ -367,6 +367,48 @@ class MenuActivity : AppCompatActivity() {
                 "전송 이력 : 성공 ${successCount}  |  대기 ${pendingCount}  |  실패 ${failedCount}"
             }
 
+        val summaryStatusText =
+            if (
+                settings.dashboardSummaryEnabled
+            ) {
+                "Dashboard Summary : ON  |  ${settings.dashboardSummaryIntervalHours}시간"
+            } else {
+                "Dashboard Summary : OFF"
+            }
+
+        val latestSummary =
+            deliveryRecords
+                .firstOrNull {
+                    it.inspectionType ==
+                        "DASHBOARD SUMMARY"
+                }
+
+        val latestSummaryText =
+            if (
+                latestSummary ==
+                null
+            ) {
+                "최근 Summary 전송 : 아직 없음"
+            } else {
+
+                val statusLabel =
+                    when (
+                        latestSummary.status
+                    ) {
+
+                        TelegramDeliveryStore.STATUS_SUCCESS ->
+                            "성공"
+
+                        TelegramDeliveryStore.STATUS_PENDING ->
+                            "전송중"
+
+                        else ->
+                            "실패 ⚠"
+                    }
+
+                "최근 Summary 전송 : ${latestSummary.dateTime}  |  $statusLabel"
+            }
+
         val failureGuide =
             if (failedCount > 0) {
 
@@ -380,6 +422,8 @@ class MenuActivity : AppCompatActivity() {
         binding.tvTelegramStatus.text =
             "현재 생산 : ${current.model}  |  ${current.line}\n" +
                 "$statusText\n" +
+                "$summaryStatusText\n" +
+                "$latestSummaryText\n" +
                 deliveryText +
                 failureGuide
     }

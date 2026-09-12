@@ -367,6 +367,35 @@ class DashboardSummaryWorker(
                 records.isNotEmpty()
             ) {
 
+                val riskSignals =
+                    buildRiskSignals(
+                        records
+                    )
+
+                if (
+                    riskSignals.isNotEmpty()
+                ) {
+
+                    append(
+                        "\n\n🚦 품질 위험 신호"
+                    )
+
+                    riskSignals
+                        .take(
+                            5
+                        )
+                        .forEach { signal ->
+
+                            append(
+                                "\n"
+                            )
+
+                            append(
+                                signal
+                            )
+                        }
+                }
+
                 append(
                     "\n\n검사별 평균"
                 )
@@ -423,6 +452,267 @@ class DashboardSummaryWorker(
                 }
             }
         }
+    }
+
+    private fun buildRiskSignals(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ): List<String> {
+
+        val inspectionTypes =
+            listOf(
+                "BOTTOM CORNER",
+                "SEAL",
+                "FORMING",
+                "TAB",
+                "DISASSEMBLY"
+            )
+
+        val result =
+            mutableListOf<
+                Pair<
+                    Int,
+                    String
+                >
+            >()
+
+        inspectionTypes.forEach { type ->
+
+            val itemRecords =
+                records
+                    .filter {
+                        normalizeType(
+                            it.inspectionType
+                        ) ==
+                            type
+                    }
+                    .sortedBy {
+                        it.id
+                    }
+
+            if (
+                itemRecords.isEmpty()
+            ) {
+                return@forEach
+            }
+
+            val latest =
+                itemRecords.last()
+
+            val latestSeverity =
+                severity(
+                    latest.judgment
+                )
+
+            if (
+                latestSeverity >=
+                4
+            ) {
+
+                result.add(
+                    4 to
+                        "🚨 $type : 최근 불량 · Score ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                latest.score
+                            )
+                        }"
+                )
+
+            } else if (
+                latestSeverity ==
+                3
+            ) {
+
+                result.add(
+                    3 to
+                        "⚠️ $type : 최근 한계정상 · Score ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                latest.score
+                            )
+                        }"
+                )
+            }
+
+            if (
+                itemRecords.size >=
+                3
+            ) {
+
+                val last3 =
+                    itemRecords
+                        .takeLast(
+                            3
+                        )
+
+                val falling =
+                    last3[0].score >
+                        last3[1].score &&
+                    last3[1].score >
+                        last3[2].score
+
+                if (
+                    falling
+                ) {
+
+                    val drop =
+                        last3.first().score -
+                            last3.last().score
+
+                    result.add(
+                        3 to
+                            "📉 $type : 3회 연속 Score 하락 · ${
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%.1f",
+                                    last3.first().score
+                                )
+                            } → ${
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%.1f",
+                                    last3.last().score
+                                )
+                            } (▼${
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%.1f",
+                                    drop
+                                )
+                            })"
+                    )
+                }
+            }
+
+            if (
+                itemRecords.size >=
+                6
+            ) {
+
+                val previous3 =
+                    itemRecords
+                        .dropLast(
+                            3
+                        )
+                        .takeLast(
+                            3
+                        )
+                        .map {
+                            it.score
+                        }
+                        .average()
+
+                val recent3 =
+                    itemRecords
+                        .takeLast(
+                            3
+                        )
+                        .map {
+                            it.score
+                        }
+                        .average()
+
+                val drop =
+                    previous3 -
+                        recent3
+
+                if (
+                    drop >=
+                    5.0
+                ) {
+
+                    val level =
+                        if (
+                            drop >=
+                            10.0
+                        ) {
+                            4
+                        } else {
+                            3
+                        }
+
+                    result.add(
+                        level to
+                            "${if (level == 4) "🚨" else "⚠️"} $type : 최근 3회 평균 악화 · ${
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%.1f",
+                                    previous3
+                                )
+                            } → ${
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%.1f",
+                                    recent3
+                                )
+                            }"
+                    )
+                }
+            }
+
+            if (
+                itemRecords.size >=
+                4
+            ) {
+
+                val issueCount =
+                    itemRecords.count {
+                        severity(
+                            it.judgment
+                        ) >=
+                            2
+                    }
+
+                val issueRate =
+                    issueCount
+                        .toDouble() /
+                        itemRecords.size
+                        .toDouble() *
+                        100.0
+
+                if (
+                    issueRate >=
+                    50.0
+                ) {
+
+                    val level =
+                        if (
+                            issueRate >=
+                            75.0
+                        ) {
+                            4
+                        } else {
+                            3
+                        }
+
+                    result.add(
+                        level to
+                            "${if (level == 4) "🚨" else "⚠️"} $type : 이상 판정 비율 ${
+                                String.format(
+                                    Locale.getDefault(),
+                                    "%.0f",
+                                    issueRate
+                                )
+                            }% (${issueCount}/${itemRecords.size})"
+                    )
+                }
+            }
+        }
+
+        return result
+            .sortedByDescending {
+                it.first
+            }
+            .map {
+                it.second
+            }
+            .distinct()
     }
 
     private fun normalizeType(

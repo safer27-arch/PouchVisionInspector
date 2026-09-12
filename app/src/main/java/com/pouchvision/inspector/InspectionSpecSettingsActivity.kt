@@ -542,6 +542,16 @@ class InspectionSpecSettingsActivity :
         resetButton.textSize =
             15f
 
+        resetButton.setTextColor(
+            Color.WHITE
+        )
+
+        resetButton.setBackgroundColor(
+            Color.parseColor(
+                "#335C81"
+            )
+        )
+
         resetButton.setOnClickListener {
 
             confirmReset()
@@ -572,6 +582,16 @@ class InspectionSpecSettingsActivity :
 
         backButton.textSize =
             15f
+
+        backButton.setTextColor(
+            Color.WHITE
+        )
+
+        backButton.setBackgroundColor(
+            Color.parseColor(
+                "#486581"
+            )
+        )
 
         backButton.setOnClickListener {
 
@@ -655,16 +675,9 @@ class InspectionSpecSettingsActivity :
             )
 
         spinnerModel.adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+            createVisibleSpinnerAdapter(
                 models
-            ).apply {
-
-                setDropDownViewResource(
-                    android.R.layout.simple_spinner_dropdown_item
-                )
-            }
+            )
 
         val inspections =
             InspectionSpecStore.InspectionType
@@ -674,16 +687,9 @@ class InspectionSpecSettingsActivity :
                 }
 
         spinnerInspection.adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+            createVisibleSpinnerAdapter(
                 inspections
-            ).apply {
-
-                setDropDownViewResource(
-                    android.R.layout.simple_spinner_dropdown_item
-                )
-            }
+            )
 
         spinnerModel.onItemSelectedListener =
             object :
@@ -838,16 +844,9 @@ class InspectionSpecSettingsActivity :
             )
 
         spinnerLine.adapter =
-            ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
+            createVisibleSpinnerAdapter(
                 lines
-            ).apply {
-
-                setDropDownViewResource(
-                    android.R.layout.simple_spinner_dropdown_item
-                )
-            }
+            )
 
         if (
             preferredLine != null
@@ -1197,6 +1196,18 @@ Quality Score 기준입니다.
             textSize =
                 17f
 
+            setTextColor(
+                Color.parseColor(
+                    "#102A43"
+                )
+            )
+
+            setHintTextColor(
+                Color.parseColor(
+                    "#829AB1"
+                )
+            )
+
             setPadding(
                 dp(14),
                 0,
@@ -1270,6 +1281,118 @@ Quality Score 기준입니다.
                 "기준값 순서를 확인해주세요.\n" +
                     "Quality Score는 정상 > 주의 > 불량 경계 순서여야 하며 0~100 범위입니다."
             }
+        }
+    }
+
+    /*
+     * =========================================================
+     * Spinner 가시성 고정 Adapter
+     * =========================================================
+     *
+     * 휴대폰 다크모드 / 제조사 테마와 무관하게
+     * 선택값과 드롭다운 항목을 진한 글씨 + 밝은 배경으로 표시합니다.
+     * =========================================================
+     */
+
+    private fun createVisibleSpinnerAdapter(
+        items: List<String>
+    ): ArrayAdapter<String> {
+
+        return object :
+            ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_item,
+                items
+            ) {
+
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: android.view.ViewGroup
+            ): View {
+
+                val view =
+                    super.getView(
+                        position,
+                        convertView,
+                        parent
+                    )
+
+                styleSpinnerTextView(
+                    view,
+                    isDropDown = false
+                )
+
+                return view
+            }
+
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: android.view.ViewGroup
+            ): View {
+
+                val view =
+                    super.getDropDownView(
+                        position,
+                        convertView,
+                        parent
+                    )
+
+                styleSpinnerTextView(
+                    view,
+                    isDropDown = true
+                )
+
+                return view
+            }
+        }.apply {
+
+            setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+            )
+        }
+    }
+
+    private fun styleSpinnerTextView(
+        view: View,
+        isDropDown: Boolean
+    ) {
+
+        if (
+            view is TextView
+        ) {
+
+            view.setTextColor(
+                Color.parseColor(
+                    "#102A43"
+                )
+            )
+
+            view.textSize =
+                17f
+
+            view.gravity =
+                Gravity.CENTER_VERTICAL
+
+            view.setPadding(
+                dp(14),
+                0,
+                dp(14),
+                0
+            )
+
+            view.setBackgroundColor(
+                Color.parseColor(
+                    if (
+                        isDropDown
+                    ) {
+                        "#FFFFFF"
+                    } else {
+                        "#F0F4F8"
+                    }
+                )
+            )
         }
     }
 

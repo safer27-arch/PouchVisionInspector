@@ -1,17 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.PouchVisionInspector"
-        parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <!--
+        ============================================================
+        Pouch Vision Inspector - Global Visibility Theme
+        ============================================================
 
+        목적
+        - 휴대폰이 다크 모드여도 앱은 항상 밝은 산업용 UI로 표시
+        - Spinner / EditText / 기본 TextView의 글자가 흰색으로 바뀌는 문제 방지
+        - 기존 XML에서 의도적으로 지정한 흰색 Header/Button 글자는 그대로 유지
+        - 모든 화면의 기본 글자색 / Hint / Surface 색상을 통일
+
+        주의
+        - 각 화면에서 android:textColor를 직접 지정한 경우에는
+          해당 화면의 지정값이 이 전역값보다 우선합니다.
+        ============================================================
+    -->
+
+    <style
+        name="Theme.PouchVisionInspector"
+        parent="Theme.MaterialComponents.Light.NoActionBar">
+
+        <!-- Brand / Main -->
         <item name="colorPrimary">#102A43</item>
         <item name="colorPrimaryVariant">#102A43</item>
         <item name="colorOnPrimary">#FFFFFF</item>
 
+        <!-- Accent -->
+        <item name="colorSecondary">#00B8A9</item>
+        <item name="colorSecondaryVariant">#009688</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorAccent">#00B8A9</item>
+
+        <!-- Global light surfaces -->
+        <item name="android:windowBackground">#F4F6F8</item>
+        <item name="colorBackground">#F4F6F8</item>
+        <item name="colorOnBackground">#102A43</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#102A43</item>
+
+        <!-- Global text visibility -->
+        <item name="android:textColorPrimary">#102A43</item>
+        <item name="android:textColorSecondary">#486581</item>
+        <item name="android:textColorHint">#829AB1</item>
+        <item name="android:editTextColor">#102A43</item>
+
+        <!-- AppCompat / Material text -->
+        <item name="textColorPrimary">#102A43</item>
+        <item name="textColorSecondary">#486581</item>
+
+        <!-- Controls -->
+        <item name="colorControlNormal">#486581</item>
+        <item name="colorControlActivated">#00B8A9</item>
+        <item name="colorControlHighlight">#D9E2EC</item>
+
+        <!-- System bars -->
         <item name="android:statusBarColor">#102A43</item>
         <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">true</item>
 
+        <!-- Prevent Android from auto-darkening our manually designed light UI -->
+        <item name="android:forceDarkAllowed">false</item>
+
+        <!-- Typography -->
         <item name="android:fontFamily">sans</item>
+
     </style>
 
 </resources>

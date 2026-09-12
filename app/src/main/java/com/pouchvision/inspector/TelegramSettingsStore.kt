@@ -31,6 +31,14 @@ object TelegramSettingsStore {
     private const val KEY_ALERT_POLICY = "telegram_alert_policy"
     private const val KEY_SEND_IMAGE = "telegram_send_image"
 
+    // Dashboard 정기 Summary
+    private const val KEY_DASHBOARD_SUMMARY_ENABLED = "dashboard_summary_enabled"
+    private const val KEY_DASHBOARD_SUMMARY_INTERVAL_HOURS = "dashboard_summary_interval_hours"
+    private const val KEY_DASHBOARD_ZERO_WARNING = "dashboard_zero_warning"
+    private const val KEY_DASHBOARD_MISSING_ITEM_WARNING = "dashboard_missing_item_warning"
+    private const val KEY_DASHBOARD_LOW_COUNT_WARNING = "dashboard_low_count_warning"
+    private const val KEY_DASHBOARD_MIN_COUNT = "dashboard_min_count"
+
     private const val KEYSTORE_NAME = "AndroidKeyStore"
     private const val KEY_ALIAS = "PouchVisionTelegramTokenKey"
 
@@ -47,7 +55,13 @@ object TelegramSettingsStore {
         val botToken: String,
         val chatIds: List<String>,
         val alertPolicy: AlertPolicy,
-        val sendImage: Boolean
+        val sendImage: Boolean,
+        val dashboardSummaryEnabled: Boolean,
+        val dashboardSummaryIntervalHours: Int,
+        val dashboardZeroWarning: Boolean,
+        val dashboardMissingItemWarning: Boolean,
+        val dashboardLowCountWarning: Boolean,
+        val dashboardMinCount: Int
     )
 
     fun load(
@@ -106,12 +120,39 @@ object TelegramSettingsStore {
                 true
             )
 
+        val dashboardSummaryEnabled =
+            prefs.getBoolean(KEY_DASHBOARD_SUMMARY_ENABLED, false)
+
+        val dashboardSummaryIntervalHours =
+            prefs.getInt(KEY_DASHBOARD_SUMMARY_INTERVAL_HOURS, 6)
+                .takeIf { it == 6 || it == 12 || it == 24 }
+                ?: 6
+
+        val dashboardZeroWarning =
+            prefs.getBoolean(KEY_DASHBOARD_ZERO_WARNING, true)
+
+        val dashboardMissingItemWarning =
+            prefs.getBoolean(KEY_DASHBOARD_MISSING_ITEM_WARNING, true)
+
+        val dashboardLowCountWarning =
+            prefs.getBoolean(KEY_DASHBOARD_LOW_COUNT_WARNING, true)
+
+        val dashboardMinCount =
+            prefs.getInt(KEY_DASHBOARD_MIN_COUNT, 4)
+                .coerceAtLeast(1)
+
         return TelegramSettings(
             enabled = enabled,
             botToken = token,
             chatIds = chatIds,
             alertPolicy = policy,
-            sendImage = sendImage
+            sendImage = sendImage,
+            dashboardSummaryEnabled = dashboardSummaryEnabled,
+            dashboardSummaryIntervalHours = dashboardSummaryIntervalHours,
+            dashboardZeroWarning = dashboardZeroWarning,
+            dashboardMissingItemWarning = dashboardMissingItemWarning,
+            dashboardLowCountWarning = dashboardLowCountWarning,
+            dashboardMinCount = dashboardMinCount
         )
     }
 
@@ -428,6 +469,32 @@ object TelegramSettingsStore {
                 KEY_SEND_IMAGE,
                 sendImage
             )
+            .apply()
+    }
+
+    fun setDashboardSummarySettings(
+        context: Context,
+        enabled: Boolean,
+        intervalHours: Int,
+        zeroWarning: Boolean,
+        missingItemWarning: Boolean,
+        lowCountWarning: Boolean,
+        minCount: Int
+    ) {
+        context.getSharedPreferences(
+            PREF_NAME,
+            Context.MODE_PRIVATE
+        )
+            .edit()
+            .putBoolean(KEY_DASHBOARD_SUMMARY_ENABLED, enabled)
+            .putInt(
+                KEY_DASHBOARD_SUMMARY_INTERVAL_HOURS,
+                if (intervalHours == 12 || intervalHours == 24) intervalHours else 6
+            )
+            .putBoolean(KEY_DASHBOARD_ZERO_WARNING, zeroWarning)
+            .putBoolean(KEY_DASHBOARD_MISSING_ITEM_WARNING, missingItemWarning)
+            .putBoolean(KEY_DASHBOARD_LOW_COUNT_WARNING, lowCountWarning)
+            .putInt(KEY_DASHBOARD_MIN_COUNT, minCount.coerceAtLeast(1))
             .apply()
     }
 

@@ -1004,12 +1004,37 @@ Tab : ${formatRecord(tab)}
         } else {
 
             target.text =
-                String.format(
-                    Locale.getDefault(),
-                    "완료  |  %.1f점  |  %s",
-                    record.score,
-                    record.judgment
-                )
+                if (
+                    type.equals(
+                        TYPE_BOTTOM,
+                        ignoreCase = true
+                    )
+                ) {
+
+                    val wrinkleScore =
+                        (100.0 - record.score)
+                            .coerceIn(
+                                0.0,
+                                100.0
+                            )
+
+                    String.format(
+                        Locale.getDefault(),
+                        "완료  |  Wrinkle %.1f  |  Quality %.1f  |  %s",
+                        wrinkleScore,
+                        record.score,
+                        record.judgment
+                    )
+
+                } else {
+
+                    String.format(
+                        Locale.getDefault(),
+                        "완료  |  Quality %.1f  |  %s",
+                        record.score,
+                        record.judgment
+                    )
+                }
 
             target.setTextColor(
                 judgmentColor(
@@ -1033,6 +1058,14 @@ Tab : ${formatRecord(tab)}
         val completedCount =
             completedRecords.size
 
+        val production =
+            ProductionContextStore.getCurrent(
+                this
+            )
+
+        val productionHeader =
+            "Model : ${production.model}\nLine : ${production.line}"
+
         if (
             completedCount ==
             0
@@ -1041,6 +1074,8 @@ Tab : ${formatRecord(tab)}
             binding.tvTotalSummary.text =
                 """
 종합검사 준비
+
+$productionHeader
 
 진행 상태 : 0 / 5
 
@@ -1140,9 +1175,12 @@ Bottom Corner의 '검사' 버튼을 누르면
                     """
 종합검사 완료
 
+%s
+
 진행 상태 : 5 / 5
-평균 Score : %.1f / 100
+평균 Quality Score : %.1f / 100
 종합 판정 : %s
+판정 방식 : Worst Case
 
 ────────────────
 
@@ -1160,14 +1198,12 @@ Bottom Corner의 '검사' 버튼을 누르면
 종합검사 1회 Summary가
 검사 이력에 함께 저장됩니다.
 
-다음 단계에서 History 화면에서
-이 5개 검사와 결과 사진을 하나의 묶음으로 볼 수 있게 연결합니다.
-
 ※ 현재 판정은 영상 기반 검사 보조 결과입니다.
 ※ 실제 양산 OK/NG 판정에는
    Spec, Master Sample 및 불량품 검증이 필요합니다.
                     """.trimIndent(),
 
+                    productionHeader,
                     averageScore,
                     finalJudgment,
                     bottomText,
@@ -1214,9 +1250,12 @@ Bottom Corner의 '검사' 버튼을 누르면
                     """
 종합검사 진행 중
 
+%s
+
 진행 상태 : %d / 5
-현재 평균 Score : %.1f / 100
+현재 평균 Quality Score : %.1f / 100
 현재 판정 : %s
+판정 방식 : Worst Case
 
 다음 검사 : %s
 
@@ -1237,6 +1276,7 @@ Bottom Corner의 '검사' 버튼을 누르면
 다음 검사가 자동으로 시작됩니다.
                     """.trimIndent(),
 
+                    productionHeader,
                     completedCount,
                     averageScore,
                     finalJudgment,
@@ -1296,14 +1336,129 @@ Bottom Corner의 '검사' 버튼을 누르면
 
         } else {
 
+            val specText =
+                compactSpecText(
+                    type
+                )
+
+            if (
+                type.equals(
+                    TYPE_BOTTOM,
+                    ignoreCase = true
+                )
+            ) {
+
+                val wrinkleScore =
+                    (100.0 - record.score)
+                        .coerceIn(
+                            0.0,
+                            100.0
+                        )
+
+                String.format(
+                    Locale.getDefault(),
+                    "%s\n  Wrinkle Score : %.1f / 100\n  Quality Score : %.1f / 100\n  판정 : %s\n  적용 Spec : %s",
+                    displayTypeName(
+                        type
+                    ),
+                    wrinkleScore,
+                    record.score,
+                    record.judgment,
+                    specText
+                )
+
+            } else {
+
+                String.format(
+                    Locale.getDefault(),
+                    "%s\n  Quality Score : %.1f / 100\n  판정 : %s\n  적용 Spec : %s",
+                    displayTypeName(
+                        type
+                    ),
+                    record.score,
+                    record.judgment,
+                    specText
+                )
+            }
+        }
+    }
+
+    private fun compactSpecText(
+        type: String
+    ): String {
+
+        val inspectionType =
+            when {
+
+                type.equals(
+                    TYPE_BOTTOM,
+                    ignoreCase = true
+                ) ->
+                    InspectionSpecStore.InspectionType.BOTTOM_CORNER
+
+                type.equals(
+                    TYPE_SEAL,
+                    ignoreCase = true
+                ) ->
+                    InspectionSpecStore.InspectionType.SEAL
+
+                type.equals(
+                    TYPE_FORMING,
+                    ignoreCase = true
+                ) ->
+                    InspectionSpecStore.InspectionType.FORMING
+
+                type.equals(
+                    TYPE_TAB,
+                    ignoreCase = true
+                ) ->
+                    InspectionSpecStore.InspectionType.TAB
+
+                type.equals(
+                    TYPE_DISASSEMBLY,
+                    ignoreCase = true
+                ) ->
+                    InspectionSpecStore.InspectionType.DISASSEMBLY
+
+                else ->
+                    return "-"
+            }
+
+        val spec =
+            InspectionSpecStore.getCurrent(
+                context = this,
+                inspectionType = inspectionType
+            )
+
+        return if (
+            spec.scoreDirection ==
+            InspectionSpecStore.ScoreDirection.LOWER_IS_BETTER
+        ) {
+
+            "Wrinkle <${formatSpecValue(spec.normalBoundary)} / <${formatSpecValue(spec.warningBoundary)} / <${formatSpecValue(spec.limitBoundary)} / 그 이상 불량"
+
+        } else {
+
+            "Quality ≥${formatSpecValue(spec.normalBoundary)} / ≥${formatSpecValue(spec.warningBoundary)} / ≥${formatSpecValue(spec.limitBoundary)} / 그 미만 불량"
+        }
+    }
+
+    private fun formatSpecValue(
+        value: Double
+    ): String {
+
+        return if (
+            value % 1.0 == 0.0
+        ) {
+
+            value.toInt().toString()
+
+        } else {
+
             String.format(
                 Locale.getDefault(),
-                "%s : %.1f점 / %s",
-                displayTypeName(
-                    type
-                ),
-                record.score,
-                record.judgment
+                "%.1f",
+                value
             )
         }
     }
@@ -1313,12 +1468,37 @@ Bottom Corner의 '검사' 버튼을 누르면
         InspectionHistoryStore.InspectionRecord
     ): String {
 
-        return String.format(
-            Locale.getDefault(),
-            "%.1f점 / %s",
-            record.score,
-            record.judgment
-        )
+        return if (
+            record.inspectionType.equals(
+                TYPE_BOTTOM,
+                ignoreCase = true
+            )
+        ) {
+
+            val wrinkleScore =
+                (100.0 - record.score)
+                    .coerceIn(
+                        0.0,
+                        100.0
+                    )
+
+            String.format(
+                Locale.getDefault(),
+                "Wrinkle %.1f / Quality %.1f / %s",
+                wrinkleScore,
+                record.score,
+                record.judgment
+            )
+
+        } else {
+
+            String.format(
+                Locale.getDefault(),
+                "Quality %.1f / %s",
+                record.score,
+                record.judgment
+            )
+        }
     }
 
     /*

@@ -369,9 +369,103 @@ object InspectionSpecStore {
                 "${prefix}_limit",
                 spec.limitBoundary.toRawBits()
             )
+            .putLong(
+                "${prefix}_updated_at",
+                System.currentTimeMillis()
+            )
             .apply()
 
         return true
+    }
+
+    /*
+     * =========================================================
+     * 사용자 설정 여부 / 마지막 변경 시간
+     * =========================================================
+     *
+     * SPEC SUMMARY 화면에서
+     * - 기본값 사용
+     * - 사용자 설정 기준
+     * - 마지막 변경 일시
+     * 를 명확하게 표시하기 위한 정보입니다.
+     * =========================================================
+     */
+
+    fun hasCustomSpec(
+        context: Context,
+        model: String,
+        line: String,
+        inspectionType: InspectionType
+    ): Boolean {
+
+        val prefix =
+            keyPrefix(
+                model = model,
+                line = line,
+                inspectionType = inspectionType
+            )
+
+        val prefs =
+            context.getSharedPreferences(
+                PREF_NAME,
+                Context.MODE_PRIVATE
+            )
+
+        return prefs.contains(
+            "${prefix}_normal"
+        ) &&
+            prefs.contains(
+                "${prefix}_warning"
+            ) &&
+            prefs.contains(
+                "${prefix}_limit"
+            )
+    }
+
+    fun getLastUpdatedMillis(
+        context: Context,
+        model: String,
+        line: String,
+        inspectionType: InspectionType
+    ): Long? {
+
+        if (
+            !hasCustomSpec(
+                context = context,
+                model = model,
+                line = line,
+                inspectionType = inspectionType
+            )
+        ) {
+            return null
+        }
+
+        val prefix =
+            keyPrefix(
+                model = model,
+                line = line,
+                inspectionType = inspectionType
+            )
+
+        val prefs =
+            context.getSharedPreferences(
+                PREF_NAME,
+                Context.MODE_PRIVATE
+            )
+
+        val value =
+            prefs.getLong(
+                "${prefix}_updated_at",
+                0L
+            )
+
+        return if (
+            value > 0L
+        ) {
+            value
+        } else {
+            null
+        }
     }
 
     /*
@@ -407,6 +501,9 @@ object InspectionSpecStore {
             )
             .remove(
                 "${prefix}_limit"
+            )
+            .remove(
+                "${prefix}_updated_at"
             )
             .apply()
     }

@@ -97,13 +97,14 @@ class DashboardSummaryWorker(
         TelegramSender.sendDashboardSummary(
             context = applicationContext,
             message = message,
-            allowWhenSummaryOff = testMode
-        ) {
-            sendResult =
-                it
+            callback = { result ->
+                sendResult =
+                    result
 
-            latch.countDown()
-        }
+                latch.countDown()
+            },
+            allowWhenSummaryOff = testMode
+        )
 
         val completed =
             try {

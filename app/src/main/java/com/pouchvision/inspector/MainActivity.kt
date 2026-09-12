@@ -1374,11 +1374,31 @@ class MainActivity : AppCompatActivity() {
                     100.0
                 )
 
+        /*
+         * =====================================================
+         * Model / Line별 판정 기준 적용
+         * =====================================================
+         *
+         * Bottom Corner는 Wrinkle Score가 낮을수록 양호합니다.
+         * 현재 선택된 Model / Line의 기준값을 읽어 판정합니다.
+         */
+        val inspectionSpec =
+            InspectionSpecStore.getCurrent(
+                context = this,
+                inspectionType =
+                    InspectionSpecStore.InspectionType.BOTTOM_CORNER
+            )
+
+        val specJudgment =
+            inspectionSpec.judge(
+                result.wrinkleScore
+            )
+
         lastResultScore =
             qualityScore
 
         lastResultJudgment =
-            result.judgment
+            specJudgment
 
         lastResultDetails =
             """
@@ -1386,7 +1406,7 @@ Bottom Corner 전용 판정
 
 Wrinkle Score : ${"%.1f".format(result.wrinkleScore)} / 100
 Quality Score : ${"%.1f".format(qualityScore)} / 100
-판정 : ${result.judgment}
+판정 : $specJudgment
 
 Line Density : ${"%.1f".format(result.lineDensity)}%
 Local Contrast : ${"%.1f".format(result.localContrast)}
@@ -1395,11 +1415,11 @@ Concentration : ${"%.1f".format(result.concentration)}
 
 민감도 : ${sensitivity}%
 
-※ 정상 / 주의 / 한계정상은 현재 확보된 실제 샘플을
-   기준으로 한 초기 튜닝값입니다.
+현재 Model / Line 판정 기준
+${inspectionSpec.criteriaText()}
 
-※ 불량 후보 기준은 실제 불량 샘플이 아직 없어
-   현재 한계정상 수준을 초과하는 경우를 임시 기준으로 사용합니다.
+※ 기준값은 [검사 기준 설정]에서 Model / Line별로 변경할 수 있습니다.
+※ 실제 양산 적용 전 승인된 Master Sample / Spec과 비교 검증이 필요합니다.
             """.trimIndent()
 
         lastResultDetails +=
@@ -1471,7 +1491,7 @@ BOTTOM CORNER 검사 완료
 Wrinkle Score : ${"%.1f".format(result.wrinkleScore)} / 100
 Quality Score : ${"%.1f".format(qualityScore)} / 100
 
-판정 : ${result.judgment}
+판정 : $specJudgment
 
 주름 후보 영역 : ${result.regions.size}개
 
@@ -1481,11 +1501,8 @@ Concentration : ${"%.1f".format(result.concentration)}
 
 민감도 : ${sensitivity}%
 
-판정 기준
-정상       : Wrinkle Score < 27
-주의       : 27 ~ 46.9
-한계정상   : 47 ~ 67.9
-불량 후보  : 68 이상
+현재 Model / Line 판정 기준
+${inspectionSpec.criteriaText()}
 
 ※ 넓고 완만한 음영은 가급적 감점하도록 설계했습니다.
 ※ 빨간 표시 = 주름 의심 후보이며 확정 불량은 아닙니다.

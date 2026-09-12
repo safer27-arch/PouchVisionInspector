@@ -85,6 +85,15 @@ class DashboardSummaryWorker(
                 minCount = settings.dashboardMinCount
             )
 
+        val summaryDeliveryRecordId =
+            TelegramDeliveryStore.createDashboardSummaryPending(
+                context = applicationContext,
+                model = production.model,
+                line = production.line,
+                intervalHours = settings.dashboardSummaryIntervalHours,
+                testMode = testMode
+            )
+
         val latch =
             CountDownLatch(
                 1
@@ -124,11 +133,35 @@ class DashboardSummaryWorker(
         if (
             !completed
         ) {
+
+            TelegramDeliveryStore.updateResult(
+                context = applicationContext,
+                recordId = summaryDeliveryRecordId,
+                success = false,
+                successCount = 0,
+                failureCount = settings.chatIds.size,
+                message = "Dashboard Summary 전송 시간 초과"
+            )
+
             return Result.retry()
         }
 
+        val finalResult =
+            sendResult
+
+        TelegramDeliveryStore.updateResult(
+            context = applicationContext,
+            recordId = summaryDeliveryRecordId,
+            success = finalResult?.success == true,
+            successCount = finalResult?.successCount ?: 0,
+            failureCount = finalResult?.failureCount ?: settings.chatIds.size,
+            message =
+                finalResult?.message
+                    ?: "Dashboard Summary 전송 결과 없음"
+        )
+
         return if (
-            sendResult?.success ==
+            finalResult?.success ==
             true
         ) {
             Result.success()

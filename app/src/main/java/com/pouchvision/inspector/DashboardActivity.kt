@@ -1,8 +1,12 @@
 package com.pouchvision.inspector
 
+import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -792,11 +796,19 @@ class DashboardActivity :
             totalSessions = totalSessions
         )
 
+        addTrendSummary(
+            inspectionRecords
+        )
+
         addJudgmentSummary(
             inspectionRecords
         )
 
         addAttentionSummary(
+            inspectionRecords
+        )
+
+        addRecentIssueSummary(
             inspectionRecords
         )
 
@@ -1008,6 +1020,236 @@ class DashboardActivity :
                 setLineSpacing(
                     0f,
                     1.18f
+                )
+            }
+        )
+
+        rootContent.addView(
+            card
+        )
+    }
+
+    /*
+     * =========================================================
+     * 최근 Quality Score 추이
+     * =========================================================
+     *
+     * 외부 Chart Library 없이 Android Canvas만 사용합니다.
+     * 현재 선택한 기간 / Model / Line 조건에서 최근 30건을 표시합니다.
+     */
+    private fun addTrendSummary(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        rootContent.addView(
+            sectionTitle(
+                "최근 Quality Score 추이"
+            )
+        )
+
+        val recent =
+            records
+                .sortedBy {
+                    it.id
+                }
+                .takeLast(
+                    30
+                )
+
+        val card =
+            createCard()
+
+        if (
+            recent.isEmpty()
+        ) {
+
+            card.addView(
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        "현재 조건에 표시할 검사 데이터가 없습니다."
+
+                    textSize =
+                        14f
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#829AB1"
+                        )
+                    )
+                }
+            )
+
+            rootContent.addView(
+                card
+            )
+
+            return
+        }
+
+        val latest =
+            recent.last()
+
+        val average =
+            recent
+                .map {
+                    it.score
+                }
+                .average()
+
+        val previousAverage =
+            if (
+                recent.size >=
+                6
+            ) {
+
+                recent
+                    .dropLast(
+                        minOf(
+                            5,
+                            recent.size
+                        )
+                    )
+                    .takeLast(
+                        5
+                    )
+                    .map {
+                        it.score
+                    }
+                    .average()
+
+            } else {
+
+                average
+            }
+
+        val latestAverage =
+            recent
+                .takeLast(
+                    minOf(
+                        5,
+                        recent.size
+                    )
+                )
+                .map {
+                    it.score
+                }
+                .average()
+
+        val delta =
+            latestAverage -
+                previousAverage
+
+        val trendText =
+            when {
+
+                delta >=
+                    3.0 ->
+                    "최근 Score 상승"
+
+                delta <=
+                    -3.0 ->
+                    "최근 Score 하락"
+
+                else ->
+                    "최근 Score 안정"
+            }
+
+        card.addView(
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    String.format(
+                        Locale.getDefault(),
+                        "최근 %d건  |  평균 %.1f  |  최신 %.1f / %s",
+                        recent.size,
+                        average,
+                        latest.score,
+                        latest.judgment
+                    )
+
+                textSize =
+                    14f
+
+                setTextColor(
+                    Color.parseColor(
+                        "#486581"
+                    )
+                )
+            }
+        )
+
+        card.addView(
+            ScoreTrendView(
+                this
+            ).apply {
+
+                setRecords(
+                    recent
+                )
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(190)
+            ).apply {
+
+                topMargin =
+                    dp(10)
+
+                bottomMargin =
+                    dp(8)
+            }
+        )
+
+        card.addView(
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    String.format(
+                        Locale.getDefault(),
+                        "%s  |  최근 5건 평균 변화 %+,.1f점",
+                        trendText,
+                        delta
+                    )
+
+                textSize =
+                    14f
+
+                setTypeface(
+                    null,
+                    Typeface.BOLD
+                )
+
+                setTextColor(
+                    when {
+
+                        delta <=
+                            -3.0 ->
+                            Color.parseColor(
+                                "#C62828"
+                            )
+
+                        delta >=
+                            3.0 ->
+                            Color.parseColor(
+                                "#2E7D32"
+                            )
+
+                        else ->
+                            Color.parseColor(
+                                "#486581"
+                            )
+                    }
                 )
             }
         )
@@ -1308,6 +1550,147 @@ class DashboardActivity :
 
     /*
      * =========================================================
+     * 최근 이상 발생
+     * =========================================================
+     */
+    private fun addRecentIssueSummary(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        rootContent.addView(
+            sectionTitle(
+                "최근 이상 발생"
+            )
+        )
+
+        val issues =
+            records
+                .filter {
+
+                    judgmentSeverity(
+                        it.judgment
+                    ) >=
+                        2
+                }
+                .sortedByDescending {
+                    it.id
+                }
+                .take(
+                    5
+                )
+
+        val card =
+            createCard()
+
+        if (
+            issues.isEmpty()
+        ) {
+
+            card.addView(
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        "현재 조회 조건에서 주의 이상 발생 이력이 없습니다."
+
+                    textSize =
+                        14f
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#2E7D32"
+                        )
+                    )
+                }
+            )
+
+            rootContent.addView(
+                card
+            )
+
+            return
+        }
+
+        issues.forEachIndexed {
+                index,
+                record ->
+
+            card.addView(
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        String.format(
+                            Locale.getDefault(),
+                            "%d. %s  |  %.1f점  |  %s\n%s  ·  %s  ·  %s",
+                            index +
+                                1,
+                            displayTypeName(
+                                record.inspectionType
+                            ),
+                            record.score,
+                            record.judgment,
+                            record.dateTime,
+                            record.model.ifBlank {
+                                "-"
+                            },
+                            record.line.ifBlank {
+                                "-"
+                            }
+                        )
+
+                    textSize =
+                        14f
+
+                    setTextColor(
+                        if (
+                            record.judgment.contains(
+                                "불량"
+                            )
+                        ) {
+
+                            Color.parseColor(
+                                "#C62828"
+                            )
+
+                        } else {
+
+                            Color.parseColor(
+                                "#C46A00"
+                            )
+                        }
+                    )
+
+                    setPadding(
+                        0,
+                        if (
+                            index ==
+                            0
+                        ) {
+                            0
+                        } else {
+                            dp(10)
+                        },
+                        0,
+                        dp(8)
+                    )
+                }
+            )
+        }
+
+        rootContent.addView(
+            card
+        )
+    }
+
+    /*
+     * =========================================================
      * 검사 항목별 현황
      * =========================================================
      */
@@ -1424,6 +1807,11 @@ class DashboardActivity :
                     itemRecords.size.toDouble() *
                     100.0
 
+            val latestRecord =
+                itemRecords.maxByOrNull {
+                    it.id
+                }
+
             card.addView(
                 TextView(
                     this
@@ -1432,11 +1820,13 @@ class DashboardActivity :
                     text =
                         String.format(
                             Locale.getDefault(),
-                            "검사 %d건  |  평균 %.1f  |  주의 이상 %d건 (%.1f%%)",
+                            "검사 %d건  |  평균 %.1f  |  주의 이상 %d건 (%.1f%%)\n최신 : %.1f점 / %s",
                             itemRecords.size,
                             average,
                             issueCount,
-                            issueRate
+                            issueRate,
+                            latestRecord?.score ?: 0.0,
+                            latestRecord?.judgment ?: "-"
                         )
 
                     textSize =
@@ -2224,6 +2614,307 @@ class DashboardActivity :
 
             bottomMargin =
                 dp(bottom)
+        }
+    }
+
+    /*
+     * =========================================================
+     * 간단한 Score Trend View
+     * =========================================================
+     */
+    private class ScoreTrendView(
+        context: Context
+    ) : View(
+        context
+    ) {
+
+        private var records:
+            List<
+                InspectionHistoryStore
+                    .InspectionRecord
+                > =
+            emptyList()
+
+        private val gridPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#D9E2EC"
+                    )
+
+                strokeWidth =
+                    1f
+            }
+
+        private val linePaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#335C81"
+                    )
+
+                strokeWidth =
+                    5f
+
+                style =
+                    Paint.Style.STROKE
+
+                strokeJoin =
+                    Paint.Join.ROUND
+
+                strokeCap =
+                    Paint.Cap.ROUND
+            }
+
+        private val pointPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#102F4A"
+                    )
+
+                style =
+                    Paint.Style.FILL
+            }
+
+        private val textPaint =
+            Paint(
+                Paint.ANTI_ALIAS_FLAG
+            ).apply {
+
+                color =
+                    Color.parseColor(
+                        "#627D98"
+                    )
+
+                textSize =
+                    28f
+            }
+
+        fun setRecords(
+            source:
+            List<
+                InspectionHistoryStore
+                    .InspectionRecord
+                >
+        ) {
+
+            records =
+                source
+
+            invalidate()
+        }
+
+        override fun onDraw(
+            canvas: Canvas
+        ) {
+
+            super.onDraw(
+                canvas
+            )
+
+            if (
+                records.isEmpty()
+            ) {
+
+                return
+            }
+
+            val left =
+                70f
+
+            val right =
+                width.toFloat() -
+                    20f
+
+            val top =
+                18f
+
+            val bottom =
+                height.toFloat() -
+                    42f
+
+            val chartWidth =
+                (
+                    right -
+                        left
+                    )
+                    .coerceAtLeast(
+                        1f
+                    )
+
+            val chartHeight =
+                (
+                    bottom -
+                        top
+                    )
+                    .coerceAtLeast(
+                        1f
+                    )
+
+            listOf(
+                100f,
+                75f,
+                50f,
+                25f,
+                0f
+            ).forEach { score ->
+
+                val y =
+                    top +
+                        (
+                            100f -
+                                score
+                            ) /
+                        100f *
+                        chartHeight
+
+                canvas.drawLine(
+                    left,
+                    y,
+                    right,
+                    y,
+                    gridPaint
+                )
+
+                canvas.drawText(
+                    score
+                        .toInt()
+                        .toString(),
+                    6f,
+                    y +
+                        9f,
+                    textPaint
+                )
+            }
+
+            val path =
+                Path()
+
+            records.forEachIndexed {
+                    index,
+                    record ->
+
+                val x =
+                    if (
+                        records.size ==
+                        1
+                    ) {
+
+                        left +
+                            chartWidth /
+                            2f
+
+                    } else {
+
+                        left +
+                            index.toFloat() /
+                            (
+                                records.size -
+                                    1
+                                ).toFloat() *
+                            chartWidth
+                    }
+
+                val score =
+                    record.score
+                        .toFloat()
+                        .coerceIn(
+                            0f,
+                            100f
+                        )
+
+                val y =
+                    top +
+                        (
+                            100f -
+                                score
+                            ) /
+                        100f *
+                        chartHeight
+
+                if (
+                    index ==
+                    0
+                ) {
+
+                    path.moveTo(
+                        x,
+                        y
+                    )
+
+                } else {
+
+                    path.lineTo(
+                        x,
+                        y
+                    )
+                }
+            }
+
+            canvas.drawPath(
+                path,
+                linePaint
+            )
+
+            records.forEachIndexed {
+                    index,
+                    record ->
+
+                val x =
+                    if (
+                        records.size ==
+                        1
+                    ) {
+
+                        left +
+                            chartWidth /
+                            2f
+
+                    } else {
+
+                        left +
+                            index.toFloat() /
+                            (
+                                records.size -
+                                    1
+                                ).toFloat() *
+                            chartWidth
+                    }
+
+                val score =
+                    record.score
+                        .toFloat()
+                        .coerceIn(
+                            0f,
+                            100f
+                        )
+
+                val y =
+                    top +
+                        (
+                            100f -
+                                score
+                            ) /
+                        100f *
+                        chartHeight
+
+                canvas.drawCircle(
+                    x,
+                    y,
+                    6f,
+                    pointPaint
+                )
+            }
         }
     }
 

@@ -441,7 +441,7 @@ class MenuActivity : AppCompatActivity() {
 
         /*
          * =====================================================
-         * Spec Summary
+         * SPEC SUMMARY
          * =====================================================
          */
         binding.btnInspectionSpecSummary

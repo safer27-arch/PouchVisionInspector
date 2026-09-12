@@ -1829,24 +1829,25 @@ NG 후보 영역 : -
                     100.0
                 )
 
+        /*
+         * =====================================================
+         * Model / Line별 DISASSEMBLY 판정 기준 적용
+         * =====================================================
+         *
+         * 분해검사 Quality Score는 높을수록 양호합니다.
+         * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
+         */
+        val inspectionSpec =
+            InspectionSpecStore.getCurrent(
+                context = this,
+                inspectionType =
+                    InspectionSpecStore.InspectionType.DISASSEMBLY
+            )
+
         val judgment =
-            when {
-
-                qualityScore >=
-                    85.0 ->
-                    "정상 후보"
-
-                qualityScore >=
-                    70.0 ->
-                    "주의 후보"
-
-                qualityScore >=
-                    50.0 ->
-                    "한계정상 후보"
-
-                else ->
-                    "불량 후보"
-            }
+            inspectionSpec.judge(
+                qualityScore
+            )
 
         /*
          * 공용 DefectMarker
@@ -1920,7 +1921,9 @@ NG 후보 영역 : %d개
 
 
         lastDetails +=
-            "\n\n" +
+            "\n\n현재 Model / Line 판정 기준\n" +
+                inspectionSpec.criteriaText() +
+                "\n\n" +
                 photoQualityText
 
         if (!photoQuality.isUsable) {
@@ -2002,6 +2005,9 @@ NG 후보 영역 : %d개
 
 빨간 원/박스 = 국부 표면 변화가 큰 검사 후보 영역
 
+현재 Model / Line 판정 기준
+%s
+
 ※ 빨간 표시는 확정 NG가 아닙니다.
 ※ 전극 패턴, 분리막 무늬, 문자, 조명 반사도 후보로 검출될 수 있습니다.
 ※ 현재 수치는 영상 변화 기반 보조 지표입니다.
@@ -2016,7 +2022,8 @@ NG 후보 영역 : %d개
                     qualityScore,
                     judgment,
                     regionCount,
-                    regionSummary
+                    regionSummary,
+                    inspectionSpec.criteriaText()
                 )
 
             binding.tvDisassemblyMetrics.append(

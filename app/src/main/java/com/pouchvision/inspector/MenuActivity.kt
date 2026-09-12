@@ -441,6 +441,22 @@ class MenuActivity : AppCompatActivity() {
 
         /*
          * =====================================================
+         * 검사 기준 설정
+         * =====================================================
+         */
+        binding.btnInspectionSpecSettings
+            .setOnClickListener {
+
+                startActivity(
+                    Intent(
+                        this,
+                        InspectionSpecSettingsActivity::class.java
+                    )
+                )
+            }
+
+        /*
+         * =====================================================
          * Telegram 알림 설정
          * =====================================================
          */

@@ -2036,24 +2036,25 @@ Seal Score      : -
                             100.0
                         )
 
+                /*
+                 * =================================================
+                 * Model / Line별 SEAL 판정 기준 적용
+                 * =================================================
+                 *
+                 * SEAL Quality Score는 높을수록 양호합니다.
+                 * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
+                 */
+                val inspectionSpec =
+                    InspectionSpecStore.getCurrent(
+                        context = this,
+                        inspectionType =
+                            InspectionSpecStore.InspectionType.SEAL
+                    )
+
                 val judgment =
-                    when {
-
-                        sealScore >=
-                            85.0 ->
-                            "정상 후보"
-
-                        sealScore >=
-                            70.0 ->
-                            "주의 후보"
-
-                        sealScore >=
-                            50.0 ->
-                            "한계정상 후보"
-
-                        else ->
-                            "불량 후보"
-                    }
+                    inspectionSpec.judge(
+                        sealScore
+                    )
 
                 /*
                  * NG 후보 영역 표시
@@ -2127,7 +2128,9 @@ NG 후보 영역 : %d개
                     )
 
                 lastDetails +=
-                    "\n\n" +
+                    "\n\n현재 Model / Line 판정 기준\n" +
+                        inspectionSpec.criteriaText() +
+                        "\n\n" +
                         photoQualityText
 
                 if (!photoQuality.isUsable) {
@@ -2208,6 +2211,9 @@ NG 후보 영역 : %d개
 
 빨간 원/박스 = 국부 변화가 큰 검사 후보 영역
 
+현재 Model / Line 판정 기준
+%s
+
 ※ 빨간 표시는 확정 NG가 아닙니다.
 ※ 인쇄문자, 반사광, Pouch 경계선도 후보로 검출될 수 있습니다.
 ※ 민감도는 영상 검출 수준이며 실제 품질 Spec과 별도입니다.
@@ -2222,7 +2228,8 @@ NG 후보 영역 : %d개
                             judgment,
                             sensitivity,
                             regionCount,
-                            regionSummary
+                            regionSummary,
+                            inspectionSpec.criteriaText()
                         )
 
                     binding.tvSealMetrics.append(

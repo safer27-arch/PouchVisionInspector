@@ -796,6 +796,10 @@ class DashboardActivity :
             totalSessions = totalSessions
         )
 
+        addQualityRiskSignals(
+            inspectionRecords
+        )
+
         addTrendSummary(
             inspectionRecords
         )
@@ -1023,6 +1027,470 @@ class DashboardActivity :
                 )
             }
         )
+
+        rootContent.addView(
+            card
+        )
+    }
+
+    /*
+     * =========================================================
+     * 품질 위험 신호 / 조기경보
+     * =========================================================
+     *
+     * 현재 선택된 기간 / Model / Line 데이터만 사용합니다.
+     *
+     * 신호 예:
+     * - 최근 불량 또는 한계정상 발생
+     * - 최근 3회 연속 Score 하락
+     * - 최근 3건 평균이 직전 3건 평균보다 5점 이상 하락
+     * - 주의 이상 비율 50% 이상
+     *
+     * ML 학습 없이 저장된 검사 이력으로 예방 품질 신호를 만듭니다.
+     */
+    private fun addQualityRiskSignals(
+        records:
+        List<
+            InspectionHistoryStore
+                .InspectionRecord
+            >
+    ) {
+
+        rootContent.addView(
+            sectionTitle(
+                "품질 위험 신호"
+            )
+        )
+
+        val card =
+            createCard()
+
+        if (
+            records.isEmpty()
+        ) {
+
+            card.addView(
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        "현재 조건에 분석할 검사 데이터가 없습니다."
+
+                    textSize =
+                        14f
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#829AB1"
+                        )
+                    )
+                }
+            )
+
+            rootContent.addView(
+                card
+            )
+
+            return
+        }
+
+        data class RiskSignal(
+            val level: Int,
+            val item: String,
+            val message: String
+        )
+
+        val signals =
+            mutableListOf<
+                RiskSignal
+                >()
+
+        for (
+            type in
+            INSPECTION_TYPES
+        ) {
+
+            val itemRecords =
+                records
+                    .filter {
+                        it.inspectionType.equals(
+                            type,
+                            ignoreCase = true
+                        )
+                    }
+                    .sortedBy {
+                        it.id
+                    }
+
+            if (
+                itemRecords.isEmpty()
+            ) {
+                continue
+            }
+
+            val latest =
+                itemRecords.last()
+
+            val issueCount =
+                itemRecords.count {
+                    judgmentSeverity(
+                        it.judgment
+                    ) >=
+                        2
+                }
+
+            val issueRate =
+                issueCount.toDouble() /
+                    itemRecords.size.toDouble() *
+                    100.0
+
+            /*
+             * 가장 최근 판정 자체가 위험한 경우
+             */
+            when {
+
+                latest.judgment.contains(
+                    "불량"
+                ) -> {
+
+                    signals.add(
+                        RiskSignal(
+                            level = 4,
+                            item =
+                                displayTypeName(
+                                    type
+                                ),
+                            message =
+                                String.format(
+                                    Locale.getDefault(),
+                                    "최근 불량 발생 · Score %.1f",
+                                    latest.score
+                                )
+                        )
+                    )
+                }
+
+                latest.judgment.contains(
+                    "한계"
+                ) -> {
+
+                    signals.add(
+                        RiskSignal(
+                            level = 3,
+                            item =
+                                displayTypeName(
+                                    type
+                                ),
+                            message =
+                                String.format(
+                                    Locale.getDefault(),
+                                    "최근 한계정상 발생 · Score %.1f",
+                                    latest.score
+                                )
+                        )
+                    )
+                }
+            }
+
+            /*
+             * 최근 3회 연속 Score 하락
+             */
+            if (
+                itemRecords.size >=
+                3
+            ) {
+
+                val last3 =
+                    itemRecords
+                        .takeLast(
+                            3
+                        )
+
+                if (
+                    last3[0].score >
+                    last3[1].score &&
+                    last3[1].score >
+                    last3[2].score
+                ) {
+
+                    val drop =
+                        last3[0].score -
+                            last3[2].score
+
+                    signals.add(
+                        RiskSignal(
+                            level = 3,
+                            item =
+                                displayTypeName(
+                                    type
+                                ),
+                            message =
+                                String.format(
+                                    Locale.getDefault(),
+                                    "3회 연속 Score 하락 · %.1f → %.1f (▼ %.1f)",
+                                    last3[0].score,
+                                    last3[2].score,
+                                    drop
+                                )
+                        )
+                    )
+                }
+            }
+
+            /*
+             * 최근 3건 평균 vs 직전 3건 평균
+             */
+            if (
+                itemRecords.size >=
+                6
+            ) {
+
+                val previous3 =
+                    itemRecords
+                        .dropLast(
+                            3
+                        )
+                        .takeLast(
+                            3
+                        )
+                        .map {
+                            it.score
+                        }
+                        .average()
+
+                val recent3 =
+                    itemRecords
+                        .takeLast(
+                            3
+                        )
+                        .map {
+                            it.score
+                        }
+                        .average()
+
+                val drop =
+                    previous3 -
+                        recent3
+
+                if (
+                    drop >=
+                    5.0
+                ) {
+
+                    signals.add(
+                        RiskSignal(
+                            level =
+                                if (
+                                    drop >=
+                                    10.0
+                                ) {
+                                    4
+                                } else {
+                                    3
+                                },
+                            item =
+                                displayTypeName(
+                                    type
+                                ),
+                            message =
+                                String.format(
+                                    Locale.getDefault(),
+                                    "최근 평균 악화 · %.1f → %.1f (▼ %.1f)",
+                                    previous3,
+                                    recent3,
+                                    drop
+                                )
+                        )
+                    )
+                }
+            }
+
+            /*
+             * 충분한 데이터가 쌓였을 때 이상률 확인
+             */
+            if (
+                itemRecords.size >=
+                4 &&
+                issueRate >=
+                50.0
+            ) {
+
+                signals.add(
+                    RiskSignal(
+                        level =
+                            if (
+                                issueRate >=
+                                75.0
+                            ) {
+                                4
+                            } else {
+                                2
+                            },
+                        item =
+                            displayTypeName(
+                                type
+                            ),
+                        message =
+                            String.format(
+                                Locale.getDefault(),
+                                "주의 이상 비율 %.0f%% (%d/%d건)",
+                                issueRate,
+                                issueCount,
+                                itemRecords.size
+                            )
+                    )
+                )
+            }
+        }
+
+        val sortedSignals =
+            signals
+                .sortedWith(
+                    compareByDescending<RiskSignal> {
+                        it.level
+                    }.thenBy {
+                        it.item
+                    }
+                )
+                .take(
+                    6
+                )
+
+        if (
+            sortedSignals.isEmpty()
+        ) {
+
+            card.addView(
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        "✓ 현재 조건에서 뚜렷한 품질 악화 신호가 없습니다.\n" +
+                            "검사 데이터가 누적되면 연속 하락과 평균 악화를 자동 감지합니다."
+
+                    textSize =
+                        14f
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#2E7D32"
+                        )
+                    )
+
+                    setTypeface(
+                        null,
+                        Typeface.BOLD
+                    )
+                }
+            )
+
+        } else {
+
+            sortedSignals.forEachIndexed {
+                    index,
+                    signal ->
+
+                val levelText =
+                    when (
+                        signal.level
+                    ) {
+
+                        4 ->
+                            "위험"
+
+                        3 ->
+                            "경고"
+
+                        else ->
+                            "주의"
+                    }
+
+                val levelColor =
+                    when (
+                        signal.level
+                    ) {
+
+                        4 ->
+                            Color.parseColor(
+                                "#C62828"
+                            )
+
+                        3 ->
+                            Color.parseColor(
+                                "#E65100"
+                            )
+
+                        else ->
+                            Color.parseColor(
+                                "#C49000"
+                            )
+                    }
+
+                card.addView(
+                    TextView(
+                        this
+                    ).apply {
+
+                        text =
+                            "[$levelText] ${signal.item}\n${signal.message}"
+
+                        textSize =
+                            15f
+
+                        setTypeface(
+                            null,
+                            Typeface.BOLD
+                        )
+
+                        setTextColor(
+                            levelColor
+                        )
+
+                        setPadding(
+                            0,
+                            if (
+                                index ==
+                                0
+                            ) {
+                                0
+                            } else {
+                                dp(12)
+                            },
+                            0,
+                            dp(8)
+                        )
+                    }
+                )
+            }
+
+            card.addView(
+                TextView(
+                    this
+                ).apply {
+
+                    text =
+                        "※ 위험 신호는 저장된 검사 이력의 변화 추세를 이용한 예방 관리용 지표입니다."
+
+                    textSize =
+                        12f
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#829AB1"
+                        )
+                    )
+
+                    setPadding(
+                        0,
+                        dp(8),
+                        0,
+                        0
+                    )
+                }
+            )
+        }
 
         rootContent.addView(
             card

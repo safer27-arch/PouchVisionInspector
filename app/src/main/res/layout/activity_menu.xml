@@ -124,6 +124,20 @@
                 android:textSize="14sp"
                 android:textStyle="bold"/>
 
+            <TextView
+                android:id="@+id/tvTelegramStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="#EAF2F8"
+                android:gravity="center"
+                android:lineSpacingExtra="3dp"
+                android:padding="10dp"
+                android:text="현재 생산 : - | -&#10;Telegram : 상태 확인 중"
+                android:textColor="#334E68"
+                android:textSize="13sp"
+                android:textStyle="bold"/>
+
         </LinearLayout>
 
         <!-- 안내 -->

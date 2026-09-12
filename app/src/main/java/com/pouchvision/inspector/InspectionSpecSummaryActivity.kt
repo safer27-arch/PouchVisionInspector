@@ -12,6 +12,9 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /*
  * =============================================================
@@ -135,7 +138,11 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
 
         root.addView(TextView(this).apply {
             text = """
-※ 이 화면은 현재 저장된 Model / Line별 검사 기준을 한눈에 확인하는 Summary 화면입니다.
+※ 초록색 [기본값 사용]은 해당 Model / Line에 별도 저장된 기준이 없는 상태입니다.
+
+※ 주황색 [사용자 설정 기준]은 해당 Model / Line에 사용자가 저장한 기준이 있는 상태입니다.
+
+※ 사용자 설정 기준에는 마지막 변경 일시가 함께 표시됩니다. 이전 버전에서 저장한 값은 한 번 다시 저장하면 변경 일시가 기록됩니다.
 
 ※ 실제 검사 판정은 각 검사 화면에서 현재 선택된 Model / Line 기준값을 사용합니다.
 
@@ -261,7 +268,14 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
                         inspectionType = type
                     )
 
-                    summaryContainer.addView(createSpecCard(spec), matchWrap())
+                    summaryContainer.addView(
+                        createSpecCard(
+                            spec = spec,
+                            model = model,
+                            line = line
+                        ),
+                        matchWrap()
+                    )
                     addGap(summaryContainer, 10)
                 } catch (e: Exception) {
                     summaryContainer.addView(createSpecErrorCard(type, e), matchWrap())
@@ -273,18 +287,104 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
         }
     }
 
-    private fun createSpecCard(spec: InspectionSpecStore.InspectionSpec): View {
+    private fun createSpecCard(
+        spec: InspectionSpecStore.InspectionSpec,
+        model: String,
+        line: String
+    ): View {
+
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(14))
             setBackgroundColor(Color.WHITE)
         }
 
+        /*
+         * SharedPreferences에 이 Model / Line / 검사 항목의
+         * 기준값이 실제 저장되어 있는지를 기준으로 사용자 설정 여부를 판단합니다.
+         * 저장된 값이 우연히 기본값과 같아도, 사용자가 저장했다면
+         * "사용자 설정 기준"으로 표시하여 추적성을 유지합니다.
+         */
+        val hasCustomSpec =
+            InspectionSpecStore.hasCustomSpec(
+                context = this,
+                model = model,
+                line = line,
+                inspectionType = spec.inspectionType
+            )
+
+        val lastUpdatedMillis =
+            InspectionSpecStore.getLastUpdatedMillis(
+                context = this,
+                model = model,
+                line = line,
+                inspectionType = spec.inspectionType
+            )
+
         card.addView(TextView(this).apply {
             text = spec.inspectionType.displayName
             textSize = 18f
             setTextColor(Color.parseColor("#102A43"))
             setTypeface(null, android.graphics.Typeface.BOLD)
+        })
+
+        card.addView(TextView(this).apply {
+            text = if (hasCustomSpec) {
+                "● 사용자 설정 기준"
+            } else {
+                "● 기본값 사용"
+            }
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(
+                Color.parseColor(
+                    if (hasCustomSpec) {
+                        "#A65A00"
+                    } else {
+                        "#0B6E4F"
+                    }
+                )
+            )
+            setPadding(
+                dp(10),
+                dp(7),
+                dp(10),
+                dp(7)
+            )
+            setBackgroundColor(
+                Color.parseColor(
+                    if (hasCustomSpec) {
+                        "#FFF3E0"
+                    } else {
+                        "#E8F5E9"
+                    }
+                )
+            )
+        })
+
+        card.addView(TextView(this).apply {
+            text = when {
+
+                !hasCustomSpec ->
+                    "기준 출처 : 앱 기본값"
+
+                lastUpdatedMillis != null ->
+                    "마지막 변경 : ${formatUpdatedTime(lastUpdatedMillis)}"
+
+                else ->
+                    "마지막 변경 : 기존 저장값 (변경 일시 기록 없음)"
+            }
+            textSize = 12.5f
+            setTextColor(
+                Color.parseColor(
+                    if (hasCustomSpec) {
+                        "#7A4A00"
+                    } else {
+                        "#486581"
+                    }
+                )
+            )
+            setPadding(0, dp(7), 0, 0)
         })
 
         card.addView(TextView(this).apply {
@@ -296,7 +396,7 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
             }
             textSize = 13f
             setTextColor(Color.parseColor("#627D98"))
-            setPadding(0, dp(4), 0, dp(10))
+            setPadding(0, dp(8), 0, dp(10))
         })
 
         card.addView(TextView(this).apply {
@@ -447,6 +547,22 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
             setDropDownViewResource(
                 android.R.layout.simple_spinner_dropdown_item
             )
+        }
+    }
+
+    private fun formatUpdatedTime(
+        millis: Long
+    ): String {
+
+        return try {
+            SimpleDateFormat(
+                "yyyy-MM-dd HH:mm",
+                Locale.getDefault()
+            ).format(
+                Date(millis)
+            )
+        } catch (e: Exception) {
+            "시간 표시 오류"
         }
     }
 

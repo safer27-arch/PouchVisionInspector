@@ -116,6 +116,8 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
         root.addView(Button(this).apply {
             text = "기준값 새로고침"
             textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#335C81"))
             setOnClickListener { refreshSummarySafely() }
         }, matchHeight(56))
 
@@ -124,6 +126,8 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
         root.addView(Button(this).apply {
             text = "메뉴로 돌아가기"
             textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#102A43"))
             setOnClickListener { finish() }
         }, matchHeight(56))
 
@@ -364,6 +368,9 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
 
         root.addView(Button(this).apply {
             text = "메뉴로 돌아가기"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#102A43"))
             setOnClickListener { finish() }
         }, matchHeight(56))
 

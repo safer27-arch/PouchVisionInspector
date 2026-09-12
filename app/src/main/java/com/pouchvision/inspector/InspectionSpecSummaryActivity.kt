@@ -1,5 +1,6 @@
 package com.pouchvision.inspector
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
@@ -127,6 +128,23 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
         addGap(root, 10)
 
         root.addView(Button(this).apply {
+            text = "기준 변경 이력 보기"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#0B7285"))
+            setOnClickListener {
+                startActivity(
+                    Intent(
+                        this@InspectionSpecSummaryActivity,
+                        InspectionSpecChangeHistoryActivity::class.java
+                    )
+                )
+            }
+        }, matchHeight(56))
+
+        addGap(root, 10)
+
+        root.addView(Button(this).apply {
             text = "메뉴로 돌아가기"
             textSize = 15f
             setTextColor(Color.WHITE)
@@ -146,7 +164,7 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
 
 ※ 실제 검사 판정은 각 검사 화면에서 현재 선택된 Model / Line 기준값을 사용합니다.
 
-※ 기준 변경은 [검사 기준 설정] 화면에서 진행합니다.
+※ 기준 변경은 [검사 기준 설정] 화면에서 진행하며, [기준 변경 이력 보기]에서 변경 기록을 확인할 수 있습니다.
             """.trimIndent()
             textSize = 13f
             setTextColor(Color.parseColor("#627D98"))

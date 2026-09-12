@@ -1,5 +1,5 @@
-<ScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -26,15 +26,14 @@
                 android:text="Pouch Vision Inspector"
                 android:textColor="#FFFFFF"
                 android:textSize="20sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Disassembly Inspection"
                 android:textColor="#D9E2EC"
-                android:textSize="12sp"/>
-
+                android:textSize="12sp" />
         </LinearLayout>
 
         <FrameLayout
@@ -51,7 +50,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 app:implementationMode="compatible"
-                app:scaleType="fitCenter"/>
+                app:scaleType="fitCenter" />
 
             <ImageView
                 android:id="@+id/disassemblyImagePreview"
@@ -60,7 +59,7 @@
                 android:background="#000000"
                 android:contentDescription="분해 검사 이미지"
                 android:scaleType="matrix"
-                android:visibility="gone"/>
+                android:visibility="gone" />
 
             <View
                 android:id="@+id/disassemblyRoiGuide"
@@ -68,7 +67,7 @@
                 android:layout_height="190dp"
                 android:layout_gravity="center"
                 android:background="@drawable/roi_border"
-                android:elevation="8dp"/>
+                android:elevation="8dp" />
 
             <TextView
                 android:id="@+id/tvDisassemblyGuide"
@@ -83,8 +82,7 @@
                 android:paddingBottom="6dp"
                 android:text="확인할 분해 영역에 ROI를 맞춰주세요"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"/>
-
+                android:textSize="12sp" />
         </FrameLayout>
 
         <LinearLayout
@@ -101,8 +99,10 @@
                 android:layout_height="46dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="2dp"
+                android:backgroundTint="#335C81"
                 android:text="가로 −"
-                android:textSize="12sp"/>
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnDisassemblyRoiWidthLarger"
@@ -111,8 +111,10 @@
                 android:layout_weight="1"
                 android:layout_marginStart="2dp"
                 android:layout_marginEnd="2dp"
+                android:backgroundTint="#335C81"
                 android:text="가로 +"
-                android:textSize="12sp"/>
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnDisassemblyRoiHeightSmaller"
@@ -121,8 +123,10 @@
                 android:layout_weight="1"
                 android:layout_marginStart="2dp"
                 android:layout_marginEnd="2dp"
+                android:backgroundTint="#335C81"
                 android:text="세로 −"
-                android:textSize="12sp"/>
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnDisassemblyRoiHeightLarger"
@@ -130,9 +134,10 @@
                 android:layout_height="46dp"
                 android:layout_weight="1"
                 android:layout_marginStart="2dp"
+                android:backgroundTint="#335C81"
                 android:text="세로 +"
-                android:textSize="12sp"/>
-
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -149,8 +154,10 @@
                 android:layout_height="46dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
+                android:backgroundTint="#486581"
                 android:text="ROI 중앙"
-                android:textSize="12sp"/>
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnDisassemblyImageReset"
@@ -158,9 +165,10 @@
                 android:layout_height="46dp"
                 android:layout_weight="1"
                 android:layout_marginStart="3dp"
+                android:backgroundTint="#486581"
                 android:text="사진 원래크기"
-                android:textSize="12sp"/>
-
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
@@ -171,7 +179,7 @@
             android:paddingBottom="4dp"
             android:text="사진: 두 손가락 확대/축소 · 확대 후 한 손가락 이동"
             android:textColor="#627D98"
-            android:textSize="11sp"/>
+            android:textSize="11sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -187,8 +195,10 @@
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="3dp"
+                android:backgroundTint="#335C81"
                 android:text="사진 촬영"
-                android:textSize="12sp"/>
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnDisassemblyGallery"
@@ -197,8 +207,10 @@
                 android:layout_weight="1"
                 android:layout_marginStart="3dp"
                 android:layout_marginEnd="3dp"
+                android:backgroundTint="#335C81"
                 android:text="갤러리"
-                android:textSize="12sp"/>
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnDisassemblyInspect"
@@ -206,9 +218,11 @@
                 android:layout_height="52dp"
                 android:layout_weight="1"
                 android:layout_marginStart="3dp"
+                android:backgroundTint="#0F766E"
                 android:text="분해 검사"
-                android:textSize="12sp"/>
-
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <Button
@@ -218,10 +232,11 @@
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
             android:layout_marginBottom="6dp"
+            android:backgroundTint="#486581"
             android:text="카메라 화면으로 돌아가기"
-            android:textSize="12sp"/>
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
 
-        <!-- 촬영 표준화 가이드 -->
         <Button
             android:id="@+id/btnDisassemblyCaptureGuide"
             android:layout_width="match_parent"
@@ -229,9 +244,11 @@
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
             android:layout_marginBottom="10dp"
+            android:backgroundTint="#335C81"
             android:text="분해검사 촬영 가이드"
+            android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -249,7 +266,7 @@
                 android:text="분해 검사 민감도"
                 android:textColor="#102A43"
                 android:textSize="16sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvDisassemblySensitivityValue"
@@ -260,7 +277,7 @@
                 android:text="현재 민감도 : 60%"
                 android:textColor="#102A43"
                 android:textSize="15sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -273,7 +290,7 @@
                     android:layout_height="wrap_content"
                     android:text="낮음"
                     android:textColor="#486581"
-                    android:textSize="12sp"/>
+                    android:textSize="12sp" />
 
                 <SeekBar
                     android:id="@+id/seekDisassemblySensitivity"
@@ -281,15 +298,14 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:max="100"
-                    android:progress="60"/>
+                    android:progress="60" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="높음"
                     android:textColor="#486581"
-                    android:textSize="12sp"/>
-
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <TextView
@@ -298,16 +314,17 @@
                 android:gravity="center"
                 android:text="민감도를 높이면 작은 표면 변화와 국부 Edge도 더 많이 검출합니다."
                 android:textColor="#627D98"
-                android:textSize="11sp"/>
+                android:textSize="11sp" />
 
             <Button
                 android:id="@+id/btnDisassemblySensitivityReset"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="6dp"
+                android:backgroundTint="#486581"
                 android:text="기본값 60%로 복원"
-                android:textSize="13sp"/>
-
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView
@@ -323,7 +340,7 @@
             android:text="카메라를 준비합니다."
             android:textColor="#102A43"
             android:textSize="14sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -341,7 +358,7 @@
                 android:text="분해 검사 확인 항목"
                 android:textColor="#102A43"
                 android:textSize="16sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -349,8 +366,7 @@
                 android:layout_marginTop="6dp"
                 android:text="• 전극 / 분리막 표면의 국부 변화&#10;• 주름 및 찢김 의심 영역&#10;• 비정상 Edge / 손상 흔적&#10;• 표면 균일도 변화"
                 android:textColor="#486581"
-                android:textSize="13sp"/>
-
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView
@@ -363,9 +379,9 @@
             android:layout_marginBottom="10dp"
             android:background="#FFFFFF"
             android:padding="14dp"
-            android:text="Surface Uniformity : -&#10;Edge Density       : -&#10;Strong Edge        : -&#10;Local Change       : -&#10;Quality Score      : -&#10;&#10;판정 : -"
+            android:text="Surface Uniformity : -&#10;Edge Density : -&#10;Strong Edge : -&#10;Local Change : -&#10;Quality Score : -&#10;&#10;판정 : -"
             android:textColor="#102A43"
-            android:textSize="14sp"/>
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/btnDisassemblySaveResult"
@@ -374,8 +390,11 @@
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
             android:layout_marginBottom="8dp"
+            android:backgroundTint="#0F766E"
             android:text="검사 결과 저장"
-            android:textSize="14sp"/>
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnDisassemblyBack"
@@ -384,8 +403,10 @@
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
             android:layout_marginBottom="18dp"
+            android:backgroundTint="#102A43"
             android:text="메뉴로 돌아가기"
-            android:textSize="13sp"/>
+            android:textColor="#FFFFFF"
+            android:textSize="13sp" />
 
     </LinearLayout>
 

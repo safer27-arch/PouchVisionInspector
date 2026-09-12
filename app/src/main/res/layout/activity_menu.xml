@@ -450,7 +450,7 @@
             android:layout_marginStart="14dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="14dp"
-            android:text="검사 기준 요약"
+            android:text="SPEC SUMMARY"
             android:textSize="15sp"
             android:textStyle="bold"/>
 

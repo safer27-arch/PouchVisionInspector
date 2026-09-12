@@ -45,9 +45,11 @@ class MenuActivity : AppCompatActivity() {
 
         /*
          * 다른 화면에서 돌아왔을 때도
-         * 현재 Model / Line 표시를 최신 상태로 유지합니다.
+         * 현재 Model / Line과 Telegram 설정 상태를
+         * 최신 상태로 유지합니다.
          */
         refreshCurrentProductionText()
+        refreshTelegramStatus()
     }
 
     /*
@@ -167,6 +169,7 @@ class MenuActivity : AppCompatActivity() {
             }
 
         refreshCurrentProductionText()
+        refreshTelegramStatus()
 
         /*
          * 선택 적용
@@ -207,6 +210,7 @@ class MenuActivity : AppCompatActivity() {
                 )
 
                 refreshCurrentProductionText()
+                refreshTelegramStatus()
 
                 Toast.makeText(
                     this,
@@ -285,6 +289,99 @@ class MenuActivity : AppCompatActivity() {
 
         binding.tvCurrentProductionContext.text =
             "현재 선택 : ${current.model}  |  ${current.line}"
+    }
+
+    /*
+     * =========================================================
+     * Telegram 현재 상태 표시
+     * =========================================================
+     *
+     * 설정 화면에서 돌아왔을 때 onResume()에서 다시 읽기 때문에
+     * 별도의 앱 재시작 없이 즉시 최신 상태가 표시됩니다.
+     */
+    private fun refreshTelegramStatus() {
+
+        val settings =
+            TelegramSettingsStore.load(
+                this
+            )
+
+        val ready =
+            TelegramSettingsStore.isReady(
+                this
+            )
+
+        val current =
+            ProductionContextStore.getCurrent(
+                this
+            )
+
+        val statusText =
+            when {
+
+                ready -> {
+                    "Telegram : ON  |  ${settings.alertPolicy.displayName}  |  " +
+                        "수신처 ${settings.chatIds.size}개"
+                }
+
+                settings.enabled -> {
+                    "Telegram : 설정 확인 필요  |  " +
+                        "Bot Token / Chat ID를 확인해주세요."
+                }
+
+                else -> {
+                    "Telegram : OFF"
+                }
+            }
+
+        val deliveryRecords =
+            TelegramDeliveryStore.load(
+                this
+            )
+
+        val successCount =
+            deliveryRecords.count {
+                it.status ==
+                    TelegramDeliveryStore.STATUS_SUCCESS
+            }
+
+        val pendingCount =
+            deliveryRecords.count {
+                it.status ==
+                    TelegramDeliveryStore.STATUS_PENDING
+            }
+
+        val failedCount =
+            deliveryRecords.count {
+                it.status ==
+                    TelegramDeliveryStore.STATUS_FAILED
+            }
+
+        val deliveryText =
+            if (deliveryRecords.isEmpty()) {
+
+                "전송 이력 : 아직 없음"
+
+            } else {
+
+                "전송 이력 : 성공 ${successCount}  |  대기 ${pendingCount}  |  실패 ${failedCount}"
+            }
+
+        val failureGuide =
+            if (failedCount > 0) {
+
+                "\n※ 실패 건은 '검사 이력' 화면에서 확인 및 재전송할 수 있습니다."
+
+            } else {
+
+                ""
+            }
+
+        binding.tvTelegramStatus.text =
+            "현재 생산 : ${current.model}  |  ${current.line}\n" +
+                "$statusText\n" +
+                deliveryText +
+                failureGuide
     }
 
     /*

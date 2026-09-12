@@ -111,9 +111,7 @@
                 android:layout_marginTop="12dp"
                 android:text="선택 적용"
                 android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#102A43"/>
+                android:textStyle="bold"/>
 
             <TextView
                 android:id="@+id/tvCurrentProductionContext"
@@ -161,9 +159,7 @@
             android:layout_marginBottom="10dp"
             android:text="종합검사"
             android:textSize="19sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#102A43"/>
+            android:textStyle="bold"/>
 
         <!-- 품질 Dashboard -->
         <Button
@@ -175,9 +171,7 @@
             android:layout_marginBottom="18dp"
             android:text="품질 Dashboard"
             android:textSize="17sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#102A43"/>
+            android:textStyle="bold"/>
 
         <!-- BOTTOM CORNER -->
         <LinearLayout
@@ -219,9 +213,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="검사 시작"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
                 <Button
                     android:id="@+id/btnBottomCornerGuide"
@@ -230,9 +222,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="검사 안내"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
             </LinearLayout>
 
@@ -278,9 +268,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="검사 시작"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
                 <Button
                     android:id="@+id/btnSealGuide"
@@ -289,9 +277,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="검사 안내"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
             </LinearLayout>
 
@@ -337,9 +323,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="검사 시작"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
                 <Button
                     android:id="@+id/btnFormingGuide"
@@ -348,9 +332,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="검사 안내"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
             </LinearLayout>
 
@@ -396,9 +378,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="검사 시작"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
                 <Button
                     android:id="@+id/btnTabGuide"
@@ -407,9 +387,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="검사 안내"
-                    android:textSize="14sp"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#102A43"/>
+                    android:textSize="14sp"/>
 
             </LinearLayout>
 
@@ -448,9 +426,7 @@
                 android:layout_height="52dp"
                 android:layout_marginTop="10dp"
                 android:text="분해 검사"
-                android:textSize="14sp"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#102A43"/>
+                android:textSize="14sp"/>
 
         </LinearLayout>
 
@@ -474,11 +450,9 @@
             android:layout_marginStart="14dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="14dp"
-            android:text="SPEC SUMMARY"
+            android:text="검사 기준 요약"
             android:textSize="15sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#102A43"/>
+            android:textStyle="bold"/>
 
         <Button
             android:id="@+id/btnInspectionSpecSettings"
@@ -489,9 +463,7 @@
             android:layout_marginEnd="14dp"
             android:text="검사 기준 설정"
             android:textSize="15sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#102A43"/>
+            android:textStyle="bold"/>
 
         <Button
             android:id="@+id/btnTelegramSettings"
@@ -501,9 +473,7 @@
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="10dp"
             android:text="Telegram 알림 설정"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#102A43"/>
+            android:textSize="16sp"/>
 
         <Button
             android:id="@+id/btnHistory"
@@ -513,9 +483,7 @@
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="24dp"
             android:text="검사 결과 · 이력"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#102A43"/>
+            android:textSize="16sp"/>
 
     </LinearLayout>
 

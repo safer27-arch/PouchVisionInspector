@@ -2,7 +2,6 @@ package com.pouchvision.inspector
 
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.view.View
 import android.widget.AdapterView
@@ -19,26 +18,27 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
 
     private lateinit var spinnerModel: Spinner
     private lateinit var spinnerLine: Spinner
-    private lateinit var tvCurrent: TextView
-    private lateinit var tvHeader: TextView
-    private lateinit var container: LinearLayout
-    private var suppressSelection = false
+    private lateinit var tvCurrentProduction: TextView
+    private lateinit var summaryContainer: LinearLayout
+    private var suppressSelectionEvent = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         supportActionBar?.hide()
-        setContentView(buildScreen())
-        setupSelectors()
-        selectCurrentProduction()
+        setContentView(createScreen())
+        setupModelSpinner()
+        restoreCurrentProductionSelection()
         refreshSummary()
     }
 
     override fun onResume() {
         super.onResume()
-        if (::container.isInitialized) refreshSummary()
+        if (::summaryContainer.isInitialized) {
+            refreshSummary()
+        }
     }
 
-    private fun buildScreen(): View {
+    private fun createScreen(): View {
         val scroll = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#F4F7FA"))
         }
@@ -48,130 +48,179 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
             setPadding(dp(20), dp(22), dp(20), dp(30))
         }
 
-        root.addView(text("검사 기준 요약", 30f, true, "#102A43"))
-        root.addView(text("Model / Line별 5개 Inspection Spec", 16f, false, "#486581").apply {
+        root.addView(TextView(this).apply {
+            text = "Spec Summary"
+            textSize = 30f
+            setTextColor(Color.parseColor("#102A43"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        })
+
+        root.addView(TextView(this).apply {
+            text = "Model / Line별 5개 검사 기준 요약"
+            textSize = 17f
+            setTextColor(Color.parseColor("#486581"))
             setPadding(0, dp(4), 0, dp(16))
         })
 
-        tvCurrent = text("", 14f, false, "#0B7285").apply {
-            setBackgroundColor(Color.parseColor("#E3F8FF"))
+        tvCurrentProduction = TextView(this).apply {
+            textSize = 14f
+            setTextColor(Color.parseColor("#0B7285"))
             setPadding(dp(14), dp(12), dp(14), dp(12))
+            setBackgroundColor(Color.parseColor("#E3F8FF"))
         }
-        root.addView(tvCurrent, matchWrap())
-        gap(root, 14)
+        root.addView(tvCurrentProduction, matchWrap())
 
-        val selector = LinearLayout(this).apply {
+        addGap(root, 14)
+
+        val selectionCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
             setBackgroundColor(Color.WHITE)
         }
-        selector.addView(text("조회 조건", 20f, true, "#102A43"))
-        gap(selector, 12)
-        selector.addView(text("Model", 15f, true, "#334E68"))
+
+        selectionCard.addView(TextView(this).apply {
+            text = "조회 대상 선택"
+            textSize = 20f
+            setTextColor(Color.parseColor("#102A43"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        })
+
+        addGap(selectionCard, 14)
+        addFieldLabel(selectionCard, "Model")
         spinnerModel = Spinner(this)
-        selector.addView(spinnerModel, matchHeight(56))
-        gap(selector, 10)
-        selector.addView(text("Line", 15f, true, "#334E68"))
+        selectionCard.addView(spinnerModel, matchHeight(56))
+
+        addGap(selectionCard, 12)
+        addFieldLabel(selectionCard, "Line")
         spinnerLine = Spinner(this)
-        selector.addView(spinnerLine, matchHeight(56))
-        gap(selector, 12)
+        selectionCard.addView(spinnerLine, matchHeight(56))
 
-        val currentButton = Button(this).apply {
-            text = "현재 생산 Model / Line 보기"
-            setOnClickListener {
-                selectCurrentProduction()
-                refreshSummary()
-            }
-        }
-        selector.addView(currentButton, matchHeight(52))
-        root.addView(selector, matchWrap())
-        gap(root, 14)
+        root.addView(selectionCard, matchWrap())
+        addGap(root, 14)
 
-        tvHeader = text("", 19f, true, "#102A43").apply {
-            setPadding(0, 0, 0, dp(10))
-        }
-        root.addView(tvHeader)
-
-        container = LinearLayout(this).apply {
+        summaryContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
-        root.addView(container, matchWrap())
+        root.addView(summaryContainer, matchWrap())
 
-        val editButton = Button(this).apply {
-            text = "검사 기준 수정"
+        addGap(root, 14)
+
+        root.addView(Button(this).apply {
+            text = "검사 기준 설정으로 이동"
             textSize = 16f
             setTextColor(Color.WHITE)
             setBackgroundColor(Color.parseColor("#12344D"))
             setOnClickListener {
-                startActivity(Intent(this@InspectionSpecSummaryActivity, InspectionSpecSettingsActivity::class.java))
+                startActivity(
+                    Intent(
+                        this@InspectionSpecSummaryActivity,
+                        InspectionSpecSettingsActivity::class.java
+                    )
+                )
             }
-        }
-        root.addView(editButton, matchHeight(58))
-        gap(root, 10)
+        }, matchHeight(58))
+
+        addGap(root, 10)
 
         root.addView(Button(this).apply {
-            text = "새로고침"
+            text = "기준값 새로고침"
+            textSize = 15f
             setOnClickListener { refreshSummary() }
-        }, matchHeight(54))
-        gap(root, 10)
+        }, matchHeight(56))
+
+        addGap(root, 10)
 
         root.addView(Button(this).apply {
             text = "메뉴로 돌아가기"
+            textSize = 15f
             setOnClickListener { finish() }
-        }, matchHeight(54))
-        gap(root, 16)
+        }, matchHeight(56))
 
-        root.addView(text(
-            "※ 기준값은 Model / Line별로 독립 저장됩니다.\n" +
-                "※ BOTTOM CORNER는 Wrinkle Score가 낮을수록 양호합니다.\n" +
-                "※ 나머지 4개 검사는 Quality Score가 높을수록 양호합니다.\n" +
-                "※ 실제 양산 적용 전 승인된 Master Sample / Spec과 비교 검증이 필요합니다.",
-            13f, false, "#627D98"
-        ).apply {
-            setBackgroundColor(Color.parseColor("#FFF8E1"))
+        addGap(root, 18)
+
+        root.addView(TextView(this).apply {
+            text = "※ Summary는 현재 저장된 Model / Line별 판정 기준을 조회하는 화면입니다.\n" +
+                "※ BOTTOM CORNER는 점수가 낮을수록 양호합니다.\n" +
+                "※ SEAL / FORMING / TAB / DISASSEMBLY는 Quality Score가 높을수록 양호합니다.\n" +
+                "※ 실제 양산 기준은 승인된 Master Sample / Spec 검증 후 확정해야 합니다."
+            textSize = 13f
+            setTextColor(Color.parseColor("#627D98"))
             setPadding(dp(12), dp(12), dp(12), dp(12))
+            setBackgroundColor(Color.parseColor("#FFF8E1"))
         }, matchWrap())
 
         scroll.addView(root)
         return scroll
     }
 
-    private fun setupSelectors() {
+    private fun setupModelSpinner() {
         val models = ProductionContextStore.getModels(this)
-        spinnerModel.adapter = adapter(models)
 
-        spinnerModel.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (suppressSelection) return
-                updateLines(null)
-                refreshSummary()
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        spinnerModel.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            models
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
 
-        spinnerLine.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (!suppressSelection) refreshSummary()
+        spinnerModel.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    if (suppressSelectionEvent) return
+                    updateLineSpinner(null)
+                    refreshSummary()
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             }
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-        }
+
+        spinnerLine.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    if (suppressSelectionEvent) return
+                    refreshSummary()
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
     }
 
-    private fun selectCurrentProduction() {
+    private fun restoreCurrentProductionSelection() {
         val current = ProductionContextStore.getCurrent(this)
-        tvCurrent.text = "현재 검사 생산 조건 : ${current.model} / ${current.line}"
+        tvCurrentProduction.text =
+            "현재 검사 생산 조건 : ${current.model} / ${current.line}"
 
         val models = ProductionContextStore.getModels(this)
-        suppressSelection = true
-        spinnerModel.setSelection(models.indexOf(current.model).coerceAtLeast(0))
-        updateLines(current.line)
-        suppressSelection = false
+        val modelIndex = models.indexOf(current.model).coerceAtLeast(0)
+
+        suppressSelectionEvent = true
+        spinnerModel.setSelection(modelIndex)
+        updateLineSpinner(current.line)
+        suppressSelectionEvent = false
     }
 
-    private fun updateLines(preferredLine: String?) {
-        val model = spinnerModel.selectedItem?.toString().orEmpty()
+    private fun updateLineSpinner(preferredLine: String?) {
+        val model = selectedModel()
         val lines = ProductionContextStore.getLinesForModel(model)
-        spinnerLine.adapter = adapter(lines)
+
+        spinnerLine.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            lines
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
 
         if (preferredLine != null) {
             val index = lines.indexOf(preferredLine)
@@ -180,82 +229,130 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
     }
 
     private fun refreshSummary() {
-        if (!::container.isInitialized) return
+        if (!::summaryContainer.isInitialized) return
 
-        val model = spinnerModel.selectedItem?.toString()?.trim().orEmpty()
-        val line = spinnerLine.selectedItem?.toString()?.trim().orEmpty()
+        val model = selectedModel()
+        val line = selectedLine()
         if (model.isBlank() || line.isBlank()) return
 
-        tvHeader.text = "$model / $line 검사 기준"
-        container.removeAllViews()
+        summaryContainer.removeAllViews()
+
+        summaryContainer.addView(TextView(this).apply {
+            text = "$model / $line"
+            textSize = 22f
+            setTextColor(Color.parseColor("#102A43"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(dp(2), 0, 0, dp(10))
+        })
 
         InspectionSpecStore.InspectionType.values().forEach { type ->
-            val spec = InspectionSpecStore.get(this, model, line, type)
-            container.addView(specCard(spec), matchWrap().apply { bottomMargin = dp(10) })
+            val spec = InspectionSpecStore.get(
+                context = this,
+                model = model,
+                line = line,
+                inspectionType = type
+            )
+            addSpecCard(type, spec)
         }
     }
 
-    private fun specCard(spec: InspectionSpecStore.InspectionSpec): View {
+    private fun addSpecCard(
+        type: InspectionSpecStore.InspectionType,
+        spec: InspectionSpecStore.InspectionSpec
+    ) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(14))
+            setPadding(dp(16), dp(14), dp(16), dp(14))
             setBackgroundColor(Color.WHITE)
         }
 
-        card.addView(text(spec.inspectionType.displayName, 18f, true, "#102A43"))
-
-        val direction = when (spec.scoreDirection) {
-            InspectionSpecStore.ScoreDirection.LOWER_IS_BETTER -> "Wrinkle Score · 낮을수록 양호"
-            InspectionSpecStore.ScoreDirection.HIGHER_IS_BETTER -> "Quality Score · 높을수록 양호"
+        card.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(10)
         }
-        card.addView(text(direction, 13f, false, "#627D98").apply {
+
+        card.addView(TextView(this).apply {
+            text = type.displayName
+            textSize = 18f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.parseColor("#102A43"))
+        })
+
+        card.addView(TextView(this).apply {
+            text = when (spec.scoreDirection) {
+                InspectionSpecStore.ScoreDirection.LOWER_IS_BETTER ->
+                    "Score 방향 : 낮을수록 양호"
+                InspectionSpecStore.ScoreDirection.HIGHER_IS_BETTER ->
+                    "Score 방향 : 높을수록 양호"
+            }
+            textSize = 13f
+            setTextColor(Color.parseColor("#627D98"))
             setPadding(0, dp(4), 0, dp(8))
         })
 
-        card.addView(text(
-            "정상 기준 : ${format(spec.normalBoundary)}\n" +
-                "주의 기준 : ${format(spec.warningBoundary)}\n" +
-                "한계/불량 경계 : ${format(spec.limitBoundary)}",
-            15f, false, "#334E68"
-        ))
+        card.addView(TextView(this).apply {
+            text = spec.criteriaText()
+            textSize = 15f
+            setTextColor(Color.parseColor("#334E68"))
+            setLineSpacing(0f, 1.15f)
+        })
 
-        card.addView(text("\n${spec.criteriaText()}", 13f, false, "#486581"))
-        return card
+        card.addView(TextView(this).apply {
+            text = "기준값 : ${format(spec.normalBoundary)} / " +
+                "${format(spec.warningBoundary)} / ${format(spec.limitBoundary)}"
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.parseColor("#0B7285"))
+            setPadding(0, dp(10), 0, 0)
+        })
+
+        summaryContainer.addView(card)
     }
 
-    private fun adapter(items: List<String>): ArrayAdapter<String> {
-        return ArrayAdapter(this, android.R.layout.simple_spinner_item, items).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+    private fun selectedModel(): String =
+        spinnerModel.selectedItem?.toString()?.trim().orEmpty()
+
+    private fun selectedLine(): String =
+        spinnerLine.selectedItem?.toString()?.trim().orEmpty()
+
+    private fun format(value: Double): String =
+        if (value % 1.0 == 0.0) {
+            value.toInt().toString()
+        } else {
+            String.format(Locale.getDefault(), "%.1f", value)
         }
+
+    private fun addFieldLabel(parent: LinearLayout, text: String) {
+        parent.addView(TextView(this).apply {
+            this.text = text
+            textSize = 15f
+            setTextColor(Color.parseColor("#334E68"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, dp(6))
+        })
     }
 
-    private fun text(value: String, size: Float, bold: Boolean, color: String): TextView {
-        return TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(Color.parseColor(color))
-            if (bold) setTypeface(null, Typeface.BOLD)
-        }
+    private fun addGap(parent: LinearLayout, heightDp: Int) {
+        parent.addView(
+            View(this),
+            LinearLayout.LayoutParams(1, dp(heightDp))
+        )
     }
 
-    private fun format(value: Double): String {
-        return if (value % 1.0 == 0.0) value.toInt().toString()
-        else String.format(Locale.getDefault(), "%.1f", value)
-    }
+    private fun matchWrap() =
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
 
-    private fun gap(parent: LinearLayout, heightDp: Int) {
-        parent.addView(View(this), LinearLayout.LayoutParams(1, dp(heightDp)))
-    }
+    private fun matchHeight(heightDp: Int) =
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(heightDp)
+        )
 
-    private fun matchWrap() = LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        LinearLayout.LayoutParams.WRAP_CONTENT
-    )
-
-    private fun matchHeight(heightDp: Int) = LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        dp(heightDp)
-    )
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 }

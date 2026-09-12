@@ -99,6 +99,8 @@
 
             <Button
                 android:id="@+id/btnRoiWidthSmaller"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -108,6 +110,8 @@
 
             <Button
                 android:id="@+id/btnRoiWidthLarger"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -118,6 +122,8 @@
 
             <Button
                 android:id="@+id/btnRoiHeightSmaller"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -128,6 +134,8 @@
 
             <Button
                 android:id="@+id/btnRoiHeightLarger"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -148,6 +156,8 @@
 
             <Button
                 android:id="@+id/btnRoiReset"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#486581"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -157,6 +167,8 @@
 
             <Button
                 android:id="@+id/btnImageReset"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#486581"
                 android:layout_width="0dp"
                 android:layout_height="46dp"
                 android:layout_weight="1"
@@ -188,6 +200,8 @@
 
             <Button
                 android:id="@+id/btnCapture"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
@@ -197,6 +211,8 @@
 
             <Button
                 android:id="@+id/btnGallery"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
@@ -207,6 +223,8 @@
 
             <Button
                 android:id="@+id/btnInspect"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#0B7285"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
                 android:layout_weight="1"
@@ -219,6 +237,8 @@
         <!-- 카메라 화면 복귀 -->
         <Button
             android:id="@+id/btnCameraMode"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#486581"
             android:layout_width="match_parent"
             android:layout_height="44dp"
             android:layout_marginStart="10dp"
@@ -230,6 +250,8 @@
         <!-- 촬영 표준화 가이드 -->
         <Button
             android:id="@+id/btnCaptureGuide"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#335C81"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginStart="10dp"
@@ -310,6 +332,8 @@
 
             <Button
                 android:id="@+id/btnSensitivityReset"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#627D98"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="6dp"
@@ -337,6 +361,8 @@
         <!-- 결과 저장 -->
         <Button
             android:id="@+id/btnSaveResult"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#102A43"
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginStart="10dp"

@@ -23,6 +23,7 @@ class TelegramSettingsActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupPolicySpinner()
+        setupDashboardSpinners()
         applyVisibilityStyle()
         loadCurrentSettings()
 
@@ -47,6 +48,43 @@ class TelegramSettingsActivity : AppCompatActivity() {
             createVisibleSpinnerAdapter(labels)
     }
 
+    private val dashboardIntervals =
+        listOf(
+            6,
+            12,
+            24
+        )
+
+    private val dashboardMinCounts =
+        listOf(
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            8,
+            10,
+            12
+        )
+
+    private fun setupDashboardSpinners() {
+
+        binding.spinnerDashboardInterval.adapter =
+            createVisibleSpinnerAdapter(
+                dashboardIntervals.map {
+                    "${it}시간"
+                }
+            )
+
+        binding.spinnerDashboardMinCount.adapter =
+            createVisibleSpinnerAdapter(
+                dashboardMinCounts.map {
+                    "${it}건"
+                }
+            )
+    }
+
     /*
      * =========================================================
      * 화면 가시성 고정
@@ -66,6 +104,10 @@ class TelegramSettingsActivity : AppCompatActivity() {
 
         binding.switchTelegramEnabled.setTextColor(Color.parseColor("#102A43"))
         binding.switchSendImage.setTextColor(Color.parseColor("#102A43"))
+        binding.switchDashboardSummary.setTextColor(Color.parseColor("#102A43"))
+        binding.switchDashboardZeroWarning.setTextColor(Color.parseColor("#102A43"))
+        binding.switchDashboardMissingWarning.setTextColor(Color.parseColor("#102A43"))
+        binding.switchDashboardLowCountWarning.setTextColor(Color.parseColor("#102A43"))
 
         setNavyButton(binding.btnSaveTelegramSettings, "#102A43")
         setNavyButton(binding.btnTelegramTest, "#123E63")
@@ -145,6 +187,36 @@ class TelegramSettingsActivity : AppCompatActivity() {
         binding.editChatIds.setText(settings.chatIds.joinToString("\n"))
         binding.switchSendImage.isChecked = settings.sendImage
 
+        binding.switchDashboardSummary.isChecked =
+            settings.dashboardSummaryEnabled
+
+        binding.switchDashboardZeroWarning.isChecked =
+            settings.dashboardZeroWarning
+
+        binding.switchDashboardMissingWarning.isChecked =
+            settings.dashboardMissingItemWarning
+
+        binding.switchDashboardLowCountWarning.isChecked =
+            settings.dashboardLowCountWarning
+
+        val intervalIndex =
+            dashboardIntervals.indexOf(
+                settings.dashboardSummaryIntervalHours
+            )
+
+        if (intervalIndex >= 0) {
+            binding.spinnerDashboardInterval.setSelection(intervalIndex)
+        }
+
+        val minCountIndex =
+            dashboardMinCounts.indexOf(
+                settings.dashboardMinCount
+            )
+
+        if (minCountIndex >= 0) {
+            binding.spinnerDashboardMinCount.setSelection(minCountIndex)
+        }
+
         val policyIndex = TelegramSettingsStore.AlertPolicy
             .values()
             .indexOf(settings.alertPolicy)
@@ -209,6 +281,34 @@ class TelegramSettingsActivity : AppCompatActivity() {
             binding.switchSendImage.isChecked
         )
         TelegramSettingsStore.setEnabled(this, enabled)
+
+        val dashboardInterval =
+            dashboardIntervals.getOrElse(
+                binding.spinnerDashboardInterval.selectedItemPosition
+            ) {
+                6
+            }
+
+        val dashboardMinCount =
+            dashboardMinCounts.getOrElse(
+                binding.spinnerDashboardMinCount.selectedItemPosition
+            ) {
+                4
+            }
+
+        TelegramSettingsStore.setDashboardSummarySettings(
+            context = this,
+            enabled = binding.switchDashboardSummary.isChecked,
+            intervalHours = dashboardInterval,
+            zeroWarning = binding.switchDashboardZeroWarning.isChecked,
+            missingItemWarning = binding.switchDashboardMissingWarning.isChecked,
+            lowCountWarning = binding.switchDashboardLowCountWarning.isChecked,
+            minCount = dashboardMinCount
+        )
+
+        DashboardSummaryWorker.applySchedule(
+            this
+        )
 
         updateStatusText()
 
@@ -336,6 +436,12 @@ class TelegramSettingsActivity : AppCompatActivity() {
             append("\n전송 기준 : ${settings.alertPolicy.displayName}")
             append("\n결과 이미지 : ")
             append(if (settings.sendImage) "전송" else "미전송")
+            append("\nDashboard Summary : ")
+            append(if (settings.dashboardSummaryEnabled) "ON" else "OFF")
+            if (settings.dashboardSummaryEnabled) {
+                append(" / ${settings.dashboardSummaryIntervalHours}시간")
+                append(" / 최소 ${settings.dashboardMinCount}건")
+            }
             append("\n\n※ 테스트 메시지로 Bot / Chat 연결을 확인할 수 있습니다.")
             append("\n※ 실제 NG 자동전송은 다음 단계에서 검사 화면과 연결합니다.")
         }

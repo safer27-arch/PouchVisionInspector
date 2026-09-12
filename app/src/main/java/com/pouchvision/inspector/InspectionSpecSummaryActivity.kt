@@ -187,12 +187,21 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
                 setTypeface(null, android.graphics.Typeface.BOLD)
             })
             addView(TextView(this@InspectionSpecSummaryActivity).apply {
-                text = when (spec.scoreDirection) {
-                    InspectionSpecStore.ScoreDirection.LOWER_IS_BETTER -> "점수 방향 : 낮을수록 양호"
-                    InspectionSpecStore.ScoreDirection.HIGHER_IS_BETTER -> "점수 방향 : 높을수록 양호"
+                val scoreName = if (type == InspectionSpecStore.InspectionType.BOTTOM_CORNER) {
+                    "Wrinkle Score"
+                } else {
+                    "Quality Score"
                 }
+
+                val directionText = when (spec.scoreDirection) {
+                    InspectionSpecStore.ScoreDirection.LOWER_IS_BETTER -> "낮을수록 양호"
+                    InspectionSpecStore.ScoreDirection.HIGHER_IS_BETTER -> "높을수록 양호"
+                }
+
+                text = "판정 점수 : $scoreName  ·  $directionText"
                 textSize = 13f
-                setTextColor(Color.parseColor("#627D98"))
+                setTextColor(Color.parseColor("#0B7285"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 setPadding(0, dp(4), 0, dp(8))
             })
             addView(TextView(this@InspectionSpecSummaryActivity).apply {

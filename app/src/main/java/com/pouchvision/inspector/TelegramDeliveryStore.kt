@@ -75,6 +75,30 @@ object TelegramDeliveryStore {
      * =========================================================
      */
 
+    fun createDashboardSummaryPending(
+        context: Context,
+        model: String,
+        line: String,
+        intervalHours: Int,
+        testMode: Boolean
+    ): Long {
+
+        return createPending(
+            context = context,
+            model = model,
+            line = line,
+            inspectionType = "DASHBOARD SUMMARY",
+            score = 0.0,
+            judgment =
+                if (testMode) {
+                    "TEST / ${intervalHours}시간"
+                } else {
+                    "AUTO / ${intervalHours}시간"
+                },
+            resultBitmap = null
+        )
+    }
+
     fun createPending(
         context: Context,
         model: String,

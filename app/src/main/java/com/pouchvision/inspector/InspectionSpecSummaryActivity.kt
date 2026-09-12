@@ -3,6 +3,7 @@ package com.pouchvision.inspector
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -156,13 +157,10 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
             throw IllegalStateException("등록된 Model이 없습니다.")
         }
 
-        spinnerModel.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            models
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        spinnerModel.adapter =
+            createVisibleSpinnerAdapter(
+                models
+            )
 
         val current = ProductionContextStore.getCurrent(this)
         val modelIndex = models.indexOf(current.model).let { if (it >= 0) it else 0 }
@@ -181,13 +179,10 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
             listOf("-")
         }
 
-        spinnerLine.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            safeLines
-        ).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
+        spinnerLine.adapter =
+            createVisibleSpinnerAdapter(
+                safeLines
+            )
 
         val preferredIndex = preferredLine
             ?.let { safeLines.indexOf(it) }
@@ -378,6 +373,76 @@ class InspectionSpecSummaryActivity : AppCompatActivity() {
     /* =========================================================
      * Helpers
      * ========================================================= */
+    /* =========================================================
+     * Spinner 글자 가시성
+     * =========================================================
+     *
+     * 일부 Samsung / Dark Mode 조합에서는 Android 기본 Spinner가
+     * 흰색 글자를 사용해 흰색 배경에서 Model / Line 값이 보이지
+     * 않는 경우가 있습니다. 선택값과 드롭다운 글자색을 앱에서
+     * 직접 지정해 항상 읽을 수 있도록 합니다.
+     * ========================================================= */
+    private fun createVisibleSpinnerAdapter(
+        items: List<String>
+    ): ArrayAdapter<String> {
+
+        return object : ArrayAdapter<String>(
+            this,
+            android.R.layout.simple_spinner_item,
+            items
+        ) {
+
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+
+                val view = super.getView(
+                    position,
+                    convertView,
+                    parent
+                )
+
+                (view as? TextView)?.apply {
+                    setTextColor(Color.parseColor("#102A43"))
+                    setBackgroundColor(Color.parseColor("#F8FAFC"))
+                    textSize = 17f
+                    setPadding(dp(14), 0, dp(14), 0)
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+
+                return view
+            }
+
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+
+                val view = super.getDropDownView(
+                    position,
+                    convertView,
+                    parent
+                )
+
+                (view as? TextView)?.apply {
+                    setTextColor(Color.parseColor("#102A43"))
+                    setBackgroundColor(Color.WHITE)
+                    textSize = 17f
+                    setPadding(dp(16), dp(14), dp(16), dp(14))
+                }
+
+                return view
+            }
+        }.apply {
+            setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+            )
+        }
+    }
+
     private fun selectedModel(): String {
         return if (::spinnerModel.isInitialized) {
             spinnerModel.selectedItem?.toString()?.trim().orEmpty()

@@ -1840,24 +1840,25 @@ Tab Score         : -
                     100.0
                 )
 
+        /*
+         * =====================================================
+         * Model / Line별 TAB 판정 기준 적용
+         * =====================================================
+         *
+         * TAB Quality Score는 높을수록 양호합니다.
+         * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
+         */
+        val inspectionSpec =
+            InspectionSpecStore.getCurrent(
+                context = this,
+                inspectionType =
+                    InspectionSpecStore.InspectionType.TAB
+            )
+
         val judgment =
-            when {
-
-                tabScore >=
-                    85.0 ->
-                    "정상 후보"
-
-                tabScore >=
-                    70.0 ->
-                    "주의 후보"
-
-                tabScore >=
-                    50.0 ->
-                    "한계정상 후보"
-
-                else ->
-                    "불량 후보"
-            }
+            inspectionSpec.judge(
+                tabScore
+            )
 
         /*
          * 현재 공용 DefectMarker는 그대로 유지합니다.
@@ -1927,7 +1928,9 @@ NG 후보 영역 : %d개
 
 
         lastDetails +=
-            "\n\n" +
+            "\n\n현재 Model / Line 판정 기준\n" +
+                inspectionSpec.criteriaText() +
+                "\n\n" +
                 photoQualityText
 
         if (!photoQuality.isUsable) {
@@ -2006,6 +2009,9 @@ NG 후보 영역 : %d개
 
 빨간 원/박스 = TAB 주변의 국부 변화 검사 후보
 
+현재 Model / Line 판정 기준
+%s
+
 ※ 빨간 표시는 확정 NG가 아닙니다.
 ※ Barcode, 문자, 반사광, Seal 경계도 후보로 검출될 수 있습니다.
 ※ Position/Tilt/Spacing 값은 현재 Edge 분포 기반 보조지표입니다.
@@ -2020,7 +2026,8 @@ NG 후보 영역 : %d개
                     tabScore,
                     judgment,
                     regionCount,
-                    regionSummary
+                    regionSummary,
+                    inspectionSpec.criteriaText()
                 )
 
             binding.tvTabMetrics.append(

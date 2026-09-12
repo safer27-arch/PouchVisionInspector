@@ -810,6 +810,12 @@ class DashboardActivity :
             selectedLine = selectedLine
         )
 
+        addInspectionComplianceSummary(
+            allRecords = allRecords,
+            selectedModel = selectedModel,
+            selectedLine = selectedLine
+        )
+
         addJudgmentSummary(
             inspectionRecords
         )
@@ -2257,6 +2263,106 @@ class DashboardActivity :
             else ->
                 ""
         }
+    }
+
+    /*
+     * =========================================================
+     * 검사 주기 준수 현황
+     * =========================================================
+     * 기본 관리 기준: 60분마다 최소 1건의 검사 결과 저장.
+     * 현재 선택 Model / Line 기준으로 오늘 경과 시간대를 확인합니다.
+     * 동일 60분 구간에 여러 건을 검사해도 준수 슬롯은 1회로 계산합니다.
+     * =========================================================
+     */
+    private fun addInspectionComplianceSummary(
+        allRecords: List<InspectionHistoryStore.InspectionRecord>,
+        selectedModel: String,
+        selectedLine: String
+    ) {
+        rootContent.addView(sectionTitle("검사 주기 준수 현황"))
+
+        val records =
+            allRecords.filter { record ->
+                !record.inspectionType.equals(TYPE_TOTAL_SESSION, ignoreCase = true) &&
+                    (selectedModel == FILTER_ALL_MODELS ||
+                        record.model.equals(selectedModel, ignoreCase = true)) &&
+                    (selectedLine == FILTER_ALL_LINES ||
+                        record.line.equals(selectedLine, ignoreCase = true))
+            }
+
+        val now = Calendar.getInstance()
+        val start = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        // 현재 진행 중인 시간대까지 계획 슬롯으로 포함합니다.
+        val plannedSlots = now.get(Calendar.HOUR_OF_DAY) + 1
+        val completedHours = mutableSetOf<Int>()
+
+        records.forEach { record ->
+            if (record.id >= start.timeInMillis && record.id <= now.timeInMillis) {
+                val c = Calendar.getInstance().apply { timeInMillis = record.id }
+                completedHours.add(c.get(Calendar.HOUR_OF_DAY))
+            }
+        }
+
+        val actualSlots = completedHours.size
+        val compliance =
+            if (plannedSlots > 0) actualSlots.toDouble() / plannedSlots.toDouble() * 100.0
+            else 0.0
+
+        val missing = (0 until plannedSlots).filter { it !in completedHours }
+
+        val card = createCard()
+
+        val main = TextView(this).apply {
+            text =
+                "관리 기준 : 60분마다 최소 1회\n" +
+                "오늘 계획 : ${plannedSlots}회  |  실시 : ${actualSlots}회\n" +
+                "검사 준수율 : ${String.format(Locale.getDefault(), "%.1f", compliance)}%"
+            textSize = 16f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(
+                when {
+                    compliance >= 90.0 -> Color.parseColor("#2E7D32")
+                    compliance >= 70.0 -> Color.parseColor("#E67E00")
+                    else -> Color.parseColor("#C62828")
+                }
+            )
+            setLineSpacing(0f, 1.18f)
+        }
+        card.addView(main)
+
+        val missingText = TextView(this).apply {
+            text =
+                if (missing.isEmpty()) {
+                    "\n✅ 현재까지 누락 시간대 없음"
+                } else {
+                    val labels = missing.takeLast(8).joinToString(", ") {
+                        String.format(Locale.getDefault(), "%02d:00~%02d:00", it, (it + 1) % 24)
+                    }
+                    val more = if (missing.size > 8) "\n외 ${missing.size - 8}개 시간대" else ""
+                    "\n⚠ 누락 시간대\n$labels$more"
+                }
+            textSize = 14f
+            setTextColor(Color.parseColor("#486581"))
+            setLineSpacing(0f, 1.18f)
+        }
+        card.addView(missingText)
+
+        val guide = TextView(this).apply {
+            text =
+                "\n※ 현재 버전은 00:00부터 현재 시각까지 60분 단위로 계산합니다.\n" +
+                "※ 다음 단계에서 실제 근무시간/교대시간을 설정값으로 연결할 수 있습니다."
+            textSize = 12f
+            setTextColor(Color.parseColor("#829AB1"))
+        }
+        card.addView(guide)
+
+        rootContent.addView(card)
     }
 
     /*

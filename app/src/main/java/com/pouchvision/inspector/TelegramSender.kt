@@ -132,11 +132,15 @@ Telegram 연결 테스트 메시지입니다.
     fun sendDashboardSummary(
         context: Context,
         message: String,
-        callback: ((SendResult) -> Unit)? = null
+        callback: ((SendResult) -> Unit)? = null,
+        allowWhenSummaryOff: Boolean = false
     ) {
         val settings = TelegramSettingsStore.load(context)
 
-        if (!settings.enabled || !settings.dashboardSummaryEnabled) {
+        if (
+            !settings.enabled ||
+            (!settings.dashboardSummaryEnabled && !allowWhenSummaryOff)
+        ) {
             callback?.invoke(
                 SendResult(
                     success = false,

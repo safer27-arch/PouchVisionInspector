@@ -254,6 +254,30 @@
             android:textSize="15sp"
             android:textStyle="bold"/>
 
+        <Button
+            android:id="@+id/btnShiftSummaryTest"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="14dp"
+            android:text="교대조 Summary 지금 테스트"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:textStyle="bold"/>
+
+        <Button
+            android:id="@+id/btnWeeklyReportTest"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="14dp"
+            android:text="Weekly Report 지금 테스트"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:textStyle="bold"/>
+
         <TextView
             android:id="@+id/tvTelegramStatus"
             android:layout_width="match_parent"

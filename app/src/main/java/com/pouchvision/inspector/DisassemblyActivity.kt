@@ -57,6 +57,15 @@ class DisassemblyActivity : AppCompatActivity() {
     private var lastDetails = ""
 
     /*
+     * 현재 분해검사 결과의 Telegram 전송 요청 여부
+     *
+     * - 같은 결과를 여러 번 저장해도 중복 발송 방지
+     * - 새 사진 / ROI / 민감도 변경 / 재검사 시 초기화
+     * - 실제 Telegram 전송은 로컬 이력 저장 성공 후에만 실행
+     */
+    private var telegramAlertQueuedForCurrentResult = false
+
+    /*
      * 민감도
      */
     private val preferenceName =
@@ -280,6 +289,9 @@ class DisassemblyActivity : AppCompatActivity() {
 
         lastResultBitmap =
             null
+
+        telegramAlertQueuedForCurrentResult =
+            false
     }
 
     /*
@@ -1965,15 +1977,6 @@ NG 후보 영역 : %d개
         hasInspectionResult =
             true
 
-        /*
-         * Telegram 자동 알림
-         *
-         * 설정한 전송 기준에 해당하는 판정이면
-         * 결과 이미지 + Model / Line / 검사 항목 / Score를
-         * 자동으로 전송합니다.
-         */
-        sendTelegramAlertIfNeeded()
-
         runOnUiThread {
 
             binding.disassemblyImagePreview.setImageBitmap(
@@ -2051,6 +2054,12 @@ NG 후보 영역 : %d개
     private fun sendTelegramAlertIfNeeded() {
 
         if (
+            telegramAlertQueuedForCurrentResult
+        ) {
+            return
+        }
+
+        if (
             !TelegramSettingsStore.isReady(
                 this
             )
@@ -2066,6 +2075,13 @@ NG 후보 영역 : %d개
         ) {
             return
         }
+
+        /*
+         * 실제 전송 대상임이 확인된 뒤 먼저 잠가
+         * 같은 분해검사 결과의 중복 발송을 방지합니다.
+         */
+        telegramAlertQueuedForCurrentResult =
+            true
 
         TelegramSender.sendInspectionAlert(
             context = this,
@@ -2159,6 +2175,12 @@ NG 후보 영역 : %d개
         if (
             success
         ) {
+
+            /*
+             * 검사 결과 + 사진 저장 성공 후에만
+             * Telegram 정책에 따라 현재 결과를 1회 전송합니다.
+             */
+            sendTelegramAlertIfNeeded()
 
             Toast.makeText(
                 this,

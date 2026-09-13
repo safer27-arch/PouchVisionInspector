@@ -39,6 +39,10 @@ object TelegramSettingsStore {
     private const val KEY_DASHBOARD_LOW_COUNT_WARNING = "dashboard_low_count_warning"
     private const val KEY_DASHBOARD_MIN_COUNT = "dashboard_min_count"
 
+    // 정기검사 누락 Telegram 알림
+    private const val KEY_MISSED_INSPECTION_ENABLED = "missed_inspection_enabled"
+    private const val KEY_MISSED_INSPECTION_INTERVAL_HOURS = "missed_inspection_interval_hours"
+
     private const val KEYSTORE_NAME = "AndroidKeyStore"
     private const val KEY_ALIAS = "PouchVisionTelegramTokenKey"
 
@@ -61,7 +65,9 @@ object TelegramSettingsStore {
         val dashboardZeroWarning: Boolean,
         val dashboardMissingItemWarning: Boolean,
         val dashboardLowCountWarning: Boolean,
-        val dashboardMinCount: Int
+        val dashboardMinCount: Int,
+        val missedInspectionEnabled: Boolean,
+        val missedInspectionIntervalHours: Int
     )
 
     fun load(
@@ -141,6 +147,26 @@ object TelegramSettingsStore {
             prefs.getInt(KEY_DASHBOARD_MIN_COUNT, 4)
                 .coerceAtLeast(1)
 
+        val missedInspectionEnabled =
+            prefs.getBoolean(
+                KEY_MISSED_INSPECTION_ENABLED,
+                true
+            )
+
+        val missedInspectionIntervalHours =
+            prefs.getInt(
+                KEY_MISSED_INSPECTION_INTERVAL_HOURS,
+                2
+            )
+                .takeIf {
+                    it == 1 ||
+                        it == 2 ||
+                        it == 3 ||
+                        it == 4 ||
+                        it == 6
+                }
+                ?: 2
+
         return TelegramSettings(
             enabled = enabled,
             botToken = token,
@@ -152,7 +178,9 @@ object TelegramSettingsStore {
             dashboardZeroWarning = dashboardZeroWarning,
             dashboardMissingItemWarning = dashboardMissingItemWarning,
             dashboardLowCountWarning = dashboardLowCountWarning,
-            dashboardMinCount = dashboardMinCount
+            dashboardMinCount = dashboardMinCount,
+            missedInspectionEnabled = missedInspectionEnabled,
+            missedInspectionIntervalHours = missedInspectionIntervalHours
         )
     }
 
@@ -495,6 +523,33 @@ object TelegramSettingsStore {
             .putBoolean(KEY_DASHBOARD_MISSING_ITEM_WARNING, missingItemWarning)
             .putBoolean(KEY_DASHBOARD_LOW_COUNT_WARNING, lowCountWarning)
             .putInt(KEY_DASHBOARD_MIN_COUNT, minCount.coerceAtLeast(1))
+            .apply()
+    }
+
+    fun setMissedInspectionSettings(
+        context: Context,
+        enabled: Boolean,
+        intervalHours: Int
+    ) {
+        val safeInterval =
+            when (intervalHours) {
+                1, 2, 3, 4, 6 -> intervalHours
+                else -> 2
+            }
+
+        context.getSharedPreferences(
+            PREF_NAME,
+            Context.MODE_PRIVATE
+        )
+            .edit()
+            .putBoolean(
+                KEY_MISSED_INSPECTION_ENABLED,
+                enabled
+            )
+            .putInt(
+                KEY_MISSED_INSPECTION_INTERVAL_HOURS,
+                safeInterval
+            )
             .apply()
     }
 

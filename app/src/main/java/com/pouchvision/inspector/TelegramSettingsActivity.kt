@@ -24,6 +24,7 @@ class TelegramSettingsActivity : AppCompatActivity() {
 
         setupPolicySpinner()
         setupDashboardSpinners()
+        setupMissedInspectionSpinner()
         applyVisibilityStyle()
         loadCurrentSettings()
 
@@ -127,6 +128,24 @@ class TelegramSettingsActivity : AppCompatActivity() {
             )
     }
 
+    private val missedInspectionIntervals =
+        listOf(
+            1,
+            2,
+            3,
+            4,
+            6
+        )
+
+    private fun setupMissedInspectionSpinner() {
+        binding.spinnerMissedInspectionInterval.adapter =
+            createVisibleSpinnerAdapter(
+                missedInspectionIntervals.map {
+                    "${it}시간"
+                }
+            )
+    }
+
     /*
      * =========================================================
      * 화면 가시성 고정
@@ -150,6 +169,7 @@ class TelegramSettingsActivity : AppCompatActivity() {
         binding.switchDashboardZeroWarning.setTextColor(Color.parseColor("#102A43"))
         binding.switchDashboardMissingWarning.setTextColor(Color.parseColor("#102A43"))
         binding.switchDashboardLowCountWarning.setTextColor(Color.parseColor("#102A43"))
+        binding.switchMissedInspectionAlert.setTextColor(Color.parseColor("#102A43"))
 
         setNavyButton(binding.btnSaveTelegramSettings, "#102A43")
         setNavyButton(binding.btnTelegramTest, "#123E63")
@@ -270,6 +290,20 @@ class TelegramSettingsActivity : AppCompatActivity() {
             binding.spinnerAlertPolicy.setSelection(policyIndex)
         }
 
+        binding.switchMissedInspectionAlert.isChecked =
+            settings.missedInspectionEnabled
+
+        val missedIntervalIndex =
+            missedInspectionIntervals.indexOf(
+                settings.missedInspectionIntervalHours
+            )
+
+        if (missedIntervalIndex >= 0) {
+            binding.spinnerMissedInspectionInterval.setSelection(
+                missedIntervalIndex
+            )
+        }
+
         updateStatusText()
     }
 
@@ -352,6 +386,23 @@ class TelegramSettingsActivity : AppCompatActivity() {
         )
 
         DashboardSummaryWorker.applySchedule(
+            this
+        )
+
+        val missedInterval =
+            missedInspectionIntervals.getOrElse(
+                binding.spinnerMissedInspectionInterval.selectedItemPosition
+            ) {
+                2
+            }
+
+        TelegramSettingsStore.setMissedInspectionSettings(
+            context = this,
+            enabled = binding.switchMissedInspectionAlert.isChecked,
+            intervalHours = missedInterval
+        )
+
+        ShiftWeeklyReportWorker.applySchedule(
             this
         )
 
@@ -486,6 +537,12 @@ class TelegramSettingsActivity : AppCompatActivity() {
             if (settings.dashboardSummaryEnabled) {
                 append(" / ${settings.dashboardSummaryIntervalHours}시간")
                 append(" / 최소 ${settings.dashboardMinCount}건")
+            }
+            append("\n검사 누락 알림 : ")
+            if (settings.missedInspectionEnabled) {
+                append("ON / ${settings.missedInspectionIntervalHours}시간 주기")
+            } else {
+                append("OFF")
             }
             append("\n\n※ 테스트 메시지로 Bot / Chat 연결을 확인할 수 있습니다.")
             append("\n※ 실제 NG 자동전송은 다음 단계에서 검사 화면과 연결합니다.")

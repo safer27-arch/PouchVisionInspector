@@ -12,31 +12,50 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- 상단 헤더 -->
+        <!-- 상단 헤더 : 좌측 제목 + 우측 회사 로고 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="110dp"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="24dp"
-            android:paddingEnd="24dp"
+            android:paddingEnd="18dp"
             android:background="#102A43">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Pouch Vision Inspector"
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold"/>
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center_vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Integrated Quality Inspection"
-                android:textColor="#D9E2EC"
-                android:textSize="14sp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Pouch Vision Inspector"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Integrated Quality Inspection"
+                    android:textColor="#D9E2EC"
+                    android:textSize="14sp"/>
+
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/imgCompanyLogo"
+                android:layout_width="150dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="12dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="LG Energy Solution"
+                android:scaleType="fitCenter"
+                android:src="@drawable/lg_energy_solution_logo"/>
 
         </LinearLayout>
 

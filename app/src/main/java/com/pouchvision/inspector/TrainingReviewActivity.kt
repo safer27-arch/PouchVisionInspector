@@ -1984,6 +1984,169 @@ class TrainingReviewActivity : AppCompatActivity() {
                         }"
                     )
                 }
+
+                append(
+                    "\n\n[검사항목별 학습 현황]\n"
+                )
+
+                val dashboardTypes =
+                    listOf(
+                        "BOTTOM CORNER",
+                        "SEAL",
+                        "FORMING",
+                        "TAB",
+                        "DISASSEMBLY"
+                    )
+
+                dashboardTypes.forEach { inspectionType ->
+
+                    val typeRecords =
+                        allRecords.filter {
+                            it.inspectionType.equals(
+                                inspectionType,
+                                ignoreCase = true
+                            )
+                        }
+
+                    val typeTotal =
+                        typeRecords.size
+
+                    val typeLabeled =
+                        typeRecords.count {
+                            it.isLabeled
+                        }
+
+                    val typeMismatch =
+                        typeRecords.count {
+                            it.isMismatch
+                        }
+
+                    val typeMatched =
+                        typeRecords.count {
+                            it.isLabeled &&
+                                !it.isMismatch
+                        }
+
+                    val matchRate =
+                        if (typeLabeled > 0) {
+                            typeMatched * 100.0 /
+                                typeLabeled.toDouble()
+                        } else {
+                            0.0
+                        }
+
+                    val normalCount =
+                        typeRecords.count {
+                            TrainingDataStore
+                                .normalizeLabel(
+                                    it.trueLabel
+                                ) ==
+                                TrainingDataStore
+                                    .LABEL_NORMAL
+                        }
+
+                    val warningCount =
+                        typeRecords.count {
+                            TrainingDataStore
+                                .normalizeLabel(
+                                    it.trueLabel
+                                ) ==
+                                TrainingDataStore
+                                    .LABEL_WARNING
+                        }
+
+                    val limitCount =
+                        typeRecords.count {
+                            TrainingDataStore
+                                .normalizeLabel(
+                                    it.trueLabel
+                                ) ==
+                                TrainingDataStore
+                                    .LABEL_LIMIT
+                        }
+
+                    val ngCount =
+                        typeRecords.count {
+                            TrainingDataStore
+                                .normalizeLabel(
+                                    it.trueLabel
+                                ) ==
+                                TrainingDataStore
+                                    .LABEL_NG
+                        }
+
+                    append(
+                        "\n$inspectionType\n"
+                    )
+
+                    append(
+                        "수집 ${typeTotal} | " +
+                            "GT ${typeLabeled} | " +
+                            "미분류 ${typeTotal - typeLabeled}\n"
+                    )
+
+                    append(
+                        "AI↔GT 일치 ${
+                            String.format(
+                                Locale.getDefault(),
+                                "%.1f",
+                                matchRate
+                            )
+                        }% | 불일치 ${typeMismatch}\n"
+                    )
+
+                    if (
+                        inspectionType.equals(
+                            "BOTTOM CORNER",
+                            ignoreCase = true
+                        )
+                    ) {
+
+                        val gt0 =
+                            typeRecords.count {
+                                it.wrinkleCountGt ==
+                                    TrainingDataStore
+                                        .WRINKLE_COUNT_0
+                            }
+
+                        val gt1 =
+                            typeRecords.count {
+                                it.wrinkleCountGt ==
+                                    TrainingDataStore
+                                        .WRINKLE_COUNT_1
+                            }
+
+                        val gt2 =
+                            typeRecords.count {
+                                it.wrinkleCountGt ==
+                                    TrainingDataStore
+                                        .WRINKLE_COUNT_2
+                            }
+
+                        val gt3 =
+                            typeRecords.count {
+                                it.wrinkleCountGt ==
+                                    TrainingDataStore
+                                        .WRINKLE_COUNT_3_PLUS
+                            }
+
+                        append(
+                            "주름 GT : 0개 $gt0 | " +
+                                "1개 $gt1 | " +
+                                "2개 $gt2 | " +
+                                "3개+ $gt3\n"
+                        )
+
+                    } else {
+
+                        append(
+                            "정상 $normalCount | " +
+                                "주의 $warningCount | " +
+                                "한계정상 $limitCount | " +
+                                "불량 $ngCount\n"
+                        )
+                    }
+                }
             }
     }
 

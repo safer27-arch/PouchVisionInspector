@@ -8,7 +8,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * TAB V2.1 - TAB Damage + PP FLOW 정밀판정
+ * TAB V2.2 - TAB Damage + PP FLOW + Cup 경계 정밀판정
  *
  * 사용자 기준:
  * 1) TAB 자체 데미지는 민감하게 판정
@@ -20,7 +20,7 @@ import kotlin.math.sqrt
  *    - 파우치 Cup과의 거리
  *    를 치명인자로 관리
  *
- * 현재는 정상 사진 10장을 기준으로 한 현장용 1차 규칙입니다.
+ * 현재는 정상 사진 10장을 기준으로 한 현장용 2차 규칙입니다.
  * 실제 NG 샘플이 확보되면 Threshold를 재보정해야 합니다.
  */
 object TabInspectionV2 {
@@ -43,6 +43,8 @@ object TabInspectionV2 {
         val ppFlowMeanWidthPercent: Double,
         val ppFlowThicknessIndex: Double,
         val cupDistancePercent: Double,
+        val cupBoundaryDetected: Boolean,
+        val cupBoundaryConfidence: Double,
 
         val baselineDeviation: Double,
         val qualityScore: Double,
@@ -322,6 +324,10 @@ object TabInspectionV2 {
                 ppFlowThicknessIndex =
                     0.0,
                 cupDistancePercent =
+                    -1.0,
+                cupBoundaryDetected =
+                    false,
+                cupBoundaryConfidence =
                     0.0,
                 baselineDeviation =
                     22.0,
@@ -934,64 +940,102 @@ object TabInspectionV2 {
 
         val rawCupDistancePx =
             if (
-                bestBoundaryX >=
-                0
+                bestBoundaryX >= 0
             ) {
-                if (
-                    flowOnLeft
-                ) {
-                    bestBoundaryX -
-                        maxX
+                if (flowOnLeft) {
+                    bestBoundaryX - maxX
                 } else {
-                    minX -
-                        bestBoundaryX
+                    minX - bestBoundaryX
                 }
             } else {
-                0
+                -1
+            }
+
+        /*
+         * V2.2:
+         * Cup 경계를 못 찾은 경우 0%를 실제 거리처럼 사용하지 않습니다.
+         * - 강한 경계인지
+         * - PP FLOW와 최소 간격이 있는지
+         * - ROI 안에서 비현실적으로 멀지 않은지
+         * 를 확인한 뒤에만 Cup Distance를 유효값으로 인정합니다.
+         */
+        val minValidGapPx =
+            max(
+                2,
+                (w * 0.015).toInt()
+            )
+
+        val maxValidGapPx =
+            max(
+                minValidGapPx + 1,
+                (w * 0.35).toInt()
+            )
+
+        val edgeStrengthRatio =
+            if (edgeThreshold > 0.0) {
+                bestBoundaryScore / edgeThreshold
+            } else {
+                0.0
+            }
+
+        val cupBoundaryDetected =
+            bestBoundaryX >= 0 &&
+                rawCupDistancePx >= minValidGapPx &&
+                rawCupDistancePx <= maxValidGapPx &&
+                edgeStrengthRatio >= 1.05
+
+        val cupBoundaryConfidence =
+            if (cupBoundaryDetected) {
+                (
+                    45.0 +
+                        (edgeStrengthRatio - 1.0) * 35.0 +
+                        min(
+                            20.0,
+                            rawCupDistancePx.toDouble() /
+                                max(1, w).toDouble() *
+                                100.0
+                        )
+                    ).coerceIn(0.0, 100.0)
+            } else {
+                (
+                    max(
+                        0.0,
+                        (edgeStrengthRatio - 0.65) * 45.0
+                    )
+                    ).coerceIn(0.0, 45.0)
             }
 
         val cupDistancePercent =
-            (
-                rawCupDistancePx
-                    .toDouble() /
-                    w.toDouble() *
-                    100.0
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
+            if (cupBoundaryDetected) {
+                (
+                    rawCupDistancePx.toDouble() /
+                        w.toDouble() *
+                        100.0
+                    ).coerceIn(0.0, 100.0)
+            } else {
+                -1.0
+            }
 
         /*
          * 정상 사진 기준에서 너무 가깝거나 너무 멀면 Risk 상승.
-         * 실제 mm 기준은 추후 scale calibration 필요.
+         * Cup 경계가 불확실하면 Risk를 억지 계산하지 않고 0으로 두며,
+         * UI에서 "확인 필요"로 표시합니다.
          */
         val cupDistanceRisk =
-            when {
+            if (!cupBoundaryDetected) {
+                0.0
+            } else {
+                when {
+                    cupDistancePercent < 3.0 ->
+                        (3.0 - cupDistancePercent) * 22.0
 
-                cupDistancePercent <
-                    3.0 ->
-                    (
-                        3.0 -
-                            cupDistancePercent
-                        ) *
-                        22.0
+                    cupDistancePercent > 18.0 ->
+                        (cupDistancePercent - 18.0) * 5.0
 
-                cupDistancePercent >
-                    18.0 ->
-                    (
-                        cupDistancePercent -
-                            18.0
-                        ) *
-                        5.0
-
-                else ->
-                    0.0
+                    else ->
+                        0.0
+                }.coerceIn(0.0, 100.0)
             }
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
 
         /*
          * =====================================================
@@ -1292,7 +1336,11 @@ object TabInspectionV2 {
                     "TAB 또는 PP FLOW 지표가 정상 Master 범위보다 증가했습니다."
 
                 else ->
-                    "현재 정상 TAB Master 범위로 판단됩니다."
+                    if (!cupBoundaryDetected) {
+                        "현재 정상 TAB Master 범위입니다. Cup 경계는 인식 Confidence가 낮아 거리 판정에서 제외했습니다."
+                    } else {
+                        "현재 정상 TAB Master 범위로 판단됩니다."
+                    }
             }
 
         if (
@@ -1334,6 +1382,10 @@ object TabInspectionV2 {
                 ppFlowThicknessIndex,
             cupDistancePercent =
                 cupDistancePercent,
+            cupBoundaryDetected =
+                cupBoundaryDetected,
+            cupBoundaryConfidence =
+                cupBoundaryConfidence,
 
             baselineDeviation =
                 baselineDeviation,
@@ -1584,6 +1636,10 @@ object TabInspectionV2 {
             ppFlowThicknessIndex =
                 0.0,
             cupDistancePercent =
+                -1.0,
+            cupBoundaryDetected =
+                false,
+            cupBoundaryConfidence =
                 0.0,
 
             baselineDeviation =
@@ -1593,7 +1649,7 @@ object TabInspectionV2 {
             judgment =
                 "정상",
             reason =
-                "ROI가 너무 작아 TAB V2.1 분석을 생략했습니다.",
+                "ROI가 너무 작아 TAB V2.2 분석을 생략했습니다.",
             showDefectMarkers =
                 false
         )

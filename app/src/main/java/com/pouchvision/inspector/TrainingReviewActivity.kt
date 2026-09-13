@@ -86,19 +86,18 @@ class TrainingReviewActivity : AppCompatActivity() {
             }
 
             try {
+                contentResolver
+                    .openOutputStream(uri)
+                    ?.use { output ->
 
-                val stream =
-                    contentResolver.openOutputStream(uri)
-                        ?: throw Exception(
-                            "저장 파일을 열 수 없습니다."
+                        TrainingDataStore.exportZip(
+                            this,
+                            output
                         )
-
-                stream.use {
-                    TrainingDataStore.exportZip(
-                        this,
-                        it
+                    }
+                    ?: throw Exception(
+                        "저장 파일을 열 수 없습니다."
                     )
-                }
 
                 Toast.makeText(
                     this,
@@ -110,7 +109,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
                 Toast.makeText(
                     this,
-                    "Export 실패 : ${e.message}",
+                    "Export 실패 : ${e.message ?: "알 수 없는 오류"}",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -144,12 +143,16 @@ class TrainingReviewActivity : AppCompatActivity() {
             insets
         }
 
-        ViewCompat.requestApplyInsets(root)
+        ViewCompat.requestApplyInsets(
+            root
+        )
 
         setupSpinners()
 
         switchTraining.isChecked =
-            TrainingDataStore.isEnabled(this)
+            TrainingDataStore.isEnabled(
+                this
+            )
 
         switchTraining.setOnCheckedChangeListener {
                 _,
@@ -161,16 +164,22 @@ class TrainingReviewActivity : AppCompatActivity() {
             )
 
             if (checked) {
-                syncNow()
+                syncNow(
+                    showToast = true
+                )
             } else {
                 reload()
             }
         }
 
         if (
-            TrainingDataStore.isEnabled(this)
+            TrainingDataStore.isEnabled(
+                this
+            )
         ) {
-            syncNow(false)
+            syncNow(
+                showToast = false
+            )
         } else {
             reload()
         }
@@ -181,9 +190,13 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         if (
             ::root.isInitialized &&
-            TrainingDataStore.isEnabled(this)
+            TrainingDataStore.isEnabled(
+                this
+            )
         ) {
-            syncNow(false)
+            syncNow(
+                showToast = false
+            )
         }
     }
 
@@ -191,6 +204,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         val scroll =
             ScrollView(this).apply {
+
                 isFillViewport = true
 
                 setBackgroundColor(
@@ -212,6 +226,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         val content =
             LinearLayout(this).apply {
+
                 orientation =
                     LinearLayout.VERTICAL
 
@@ -230,6 +245,7 @@ class TrainingReviewActivity : AppCompatActivity() {
          */
         switchTraining =
             Switch(this).apply {
+
                 text =
                     "학습 데이터 수집 ON"
 
@@ -263,7 +279,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
                         text =
                             "검사 결과 사진을 학습용으로 별도 보관합니다.\n" +
-                            "사진을 보고 실제 정답을 직접 지정해주세요."
+                                "사진을 보고 실제 정답을 직접 지정해주세요."
 
                         setPadding(
                             0,
@@ -279,7 +295,9 @@ class TrainingReviewActivity : AppCompatActivity() {
                         "현재 검사이력 가져오기",
                         "#123E63"
                     ) {
-                        syncNow(true)
+                        syncNow(
+                            showToast = true
+                        )
                     }
                 )
             }
@@ -340,7 +358,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         /*
          * =====================================================
-         * 현황
+         * 학습 현황
          * =====================================================
          */
         tvSummary =
@@ -355,7 +373,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         /*
          * =====================================================
-         * 사진 / 라벨 지정
+         * 학습 사진
          * =====================================================
          */
         tvPosition =
@@ -595,7 +613,7 @@ class TrainingReviewActivity : AppCompatActivity() {
     }
 
     private fun syncNow(
-        showToast: Boolean
+        showToast: Boolean = true
     ) {
 
         val added =
@@ -608,7 +626,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         if (showToast) {
 
-            val text =
+            val message =
                 if (added > 0) {
 
                     "학습 데이터 ${added}건 추가"
@@ -620,7 +638,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
             Toast.makeText(
                 this,
-                text,
+                message,
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -766,11 +784,11 @@ class TrainingReviewActivity : AppCompatActivity() {
             buildString {
 
                 append(
-                    "수집 : $total건"
+                    "수집 : ${total}건"
                 )
 
                 append(
-                    "  |  라벨완료 : $labeled건"
+                    "  |  라벨완료 : ${labeled}건"
                 )
 
                 append(
@@ -778,7 +796,7 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
 
                 append(
-                    "  |  AI/정답 불일치 : $mismatch건"
+                    "  |  AI/정답 불일치 : ${mismatch}건"
                 )
 
                 append(
@@ -830,7 +848,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
             tvInfo.text =
                 "검사 결과를 먼저 저장한 뒤\n" +
-                "'현재 검사이력 가져오기'를 눌러주세요."
+                    "'현재 검사이력 가져오기'를 눌러주세요."
 
             tvDetails.text =
                 ""
@@ -1073,6 +1091,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         val row1 =
             LinearLayout(this).apply {
+
                 orientation =
                     LinearLayout.HORIZONTAL
             }
@@ -1083,8 +1102,7 @@ class TrainingReviewActivity : AppCompatActivity() {
                 "#2E7D32"
             ) {
                 setCurrentLabel(
-                    TrainingDataStore
-                        .LABEL_NORMAL
+                    TrainingDataStore.LABEL_NORMAL
                 )
             },
             weightedParams()
@@ -1096,17 +1114,17 @@ class TrainingReviewActivity : AppCompatActivity() {
                 "#C47A00"
             ) {
                 setCurrentLabel(
-                    TrainingDataStore
-                        .LABEL_WARNING
+                    TrainingDataStore.LABEL_WARNING
                 )
             },
             weightedParams(
-                6
+                leftDp = 6
             )
         )
 
         val row2 =
             LinearLayout(this).apply {
+
                 orientation =
                     LinearLayout.HORIZONTAL
             }
@@ -1117,8 +1135,7 @@ class TrainingReviewActivity : AppCompatActivity() {
                 "#B45309"
             ) {
                 setCurrentLabel(
-                    TrainingDataStore
-                        .LABEL_LIMIT
+                    TrainingDataStore.LABEL_LIMIT
                 )
             },
             weightedParams()
@@ -1130,12 +1147,11 @@ class TrainingReviewActivity : AppCompatActivity() {
                 "#B42318"
             ) {
                 setCurrentLabel(
-                    TrainingDataStore
-                        .LABEL_NG
+                    TrainingDataStore.LABEL_NG
                 )
             },
             weightedParams(
-                6
+                leftDp = 6
             )
         )
 
@@ -1163,7 +1179,9 @@ class TrainingReviewActivity : AppCompatActivity() {
                     "← 이전",
                     "#486581"
                 ) {
-                    move(-1)
+                    move(
+                        -1
+                    )
                 },
                 weightedParams()
             )
@@ -1173,10 +1191,12 @@ class TrainingReviewActivity : AppCompatActivity() {
                     "다음 →",
                     "#486581"
                 ) {
-                    move(1)
+                    move(
+                        1
+                    )
                 },
                 weightedParams(
-                    6
+                    leftDp = 6
                 )
             )
         }
@@ -1285,7 +1305,7 @@ class TrainingReviewActivity : AppCompatActivity() {
         child: View
     ): LinearLayout {
 
-        val card =
+        val view =
             LinearLayout(this).apply {
 
                 orientation =
@@ -1339,16 +1359,17 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
             }
 
-        card.layoutParams =
+        view.layoutParams =
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
+
                 bottomMargin =
                     dp(12)
             }
 
-        return card
+        return view
     }
 
     private fun fullButton(
@@ -1390,6 +1411,7 @@ class TrainingReviewActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
+
                 topMargin =
                     dp(8)
             }
@@ -1524,7 +1546,7 @@ class TrainingReviewActivity : AppCompatActivity() {
     }
 
     private fun weightedParams(
-        leftMargin: Int = 0
+        leftDp: Int = 0
     ): LinearLayout.LayoutParams {
 
         return LinearLayout.LayoutParams(
@@ -1535,7 +1557,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
             leftMargin =
                 dp(
-                    leftMargin
+                    leftDp
                 )
 
             topMargin =

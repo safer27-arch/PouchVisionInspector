@@ -1743,8 +1743,7 @@ Seal Score      : -
                 val photoQualityText =
                     String.format(
                         Locale.getDefault(),
-                        "사진 품질 : %s (%.1f / 100)
-밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+                        "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
                         photoQuality.status,
                         photoQuality.qualityScore,
                         photoQuality.averageBrightness,

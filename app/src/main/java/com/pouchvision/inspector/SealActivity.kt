@@ -640,7 +640,7 @@ class SealActivity : AppCompatActivity() {
         binding.tvSealStatus.text =
             "카메라 화면 - Seal 영역을 맞춘 뒤 사진을 촬영해주세요."
 
-        resetRoiPosition()
+        resetDualRoiPositions()
 
         if (
             imageCapture ==
@@ -788,7 +788,7 @@ class SealActivity : AppCompatActivity() {
             )
 
         resetImageMatrix()
-        resetRoiPosition()
+        resetDualRoiPositions()
         resetResultDisplay()
     }
 

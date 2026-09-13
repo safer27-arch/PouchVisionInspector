@@ -8,7 +8,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * TAB V2.3 - TAB Damage + PP FLOW + 반사광 보정 + Cup 경계 정밀판정
+ * TAB V2.4 - TAB Damage + PP FLOW + 반사광 보정 + Cup 구조경계 정밀판정
  *
  * 사용자 기준:
  * 1) TAB 자체 데미지는 민감하게 판정
@@ -20,7 +20,7 @@ import kotlin.math.sqrt
  *    - 파우치 Cup과의 거리
  *    를 치명인자로 관리
  *
- * 현재는 정상 사진 10장을 기준으로 한 현장용 3차 규칙입니다.
+ * 현재는 정상 사진 10장을 기준으로 한 현장용 4차 규칙입니다.
  * 실제 NG 샘플이 확보되면 Threshold를 재보정해야 합니다.
  */
 object TabInspectionV2 {
@@ -847,7 +847,21 @@ object TabInspectionV2 {
                     var count = 0
 
                     for (y in searchY0 until searchY1) {
-                        score += gradient[y * w + x]
+                        val i = y * w + x
+                        val gradScore = gradient[i]
+
+                        val xl = max(0, x - 2)
+                        val xr = min(w - 1, x + 2)
+                        val sideContrast =
+                            abs(
+                                blur[y * w + xr] -
+                                    blur[y * w + xl]
+                            )
+
+                        score +=
+                            gradScore * 0.65 +
+                                sideContrast * 0.35
+
                         count++
                     }
 
@@ -866,7 +880,21 @@ object TabInspectionV2 {
                     var count = 0
 
                     for (y in searchY0 until searchY1) {
-                        score += gradient[y * w + x]
+                        val i = y * w + x
+                        val gradScore = gradient[i]
+
+                        val xl = max(0, x - 2)
+                        val xr = min(w - 1, x + 2)
+                        val sideContrast =
+                            abs(
+                                blur[y * w + xr] -
+                                    blur[y * w + xl]
+                            )
+
+                        score +=
+                            gradScore * 0.65 +
+                                sideContrast * 0.35
+
                         count++
                     }
 
@@ -916,8 +944,8 @@ object TabInspectionV2 {
 
         val boundaryAcceptThreshold =
             max(
-                edgeThreshold * 0.82,
-                meanGradient * 1.15
+                edgeThreshold * 0.68,
+                meanGradient * 1.05
             )
 
         /*
@@ -952,7 +980,7 @@ object TabInspectionV2 {
                         next
                     )
                         .count {
-                            it >= boundaryAcceptThreshold * 0.82
+                            it >= boundaryAcceptThreshold * 0.78
                         }
 
                 if (supportCount >= 2) {
@@ -996,7 +1024,7 @@ object TabInspectionV2 {
             }
 
         /*
-         * V2.3:
+         * V2.4:
          * Cup 경계를 못 찾은 경우 0%를 실제 거리처럼 사용하지 않습니다.
          * - 강한 경계인지
          * - PP FLOW와 최소 간격이 있는지
@@ -1026,16 +1054,16 @@ object TabInspectionV2 {
             bestBoundaryX >= 0 &&
                 rawCupDistancePx >= minValidGapPx &&
                 rawCupDistancePx <= maxValidGapPx &&
-                edgeStrengthRatio >= 0.82
+                edgeStrengthRatio >= 0.68
 
         val cupBoundaryConfidence =
             if (cupBoundaryDetected) {
                 (
-                    55.0 +
+                    58.0 +
                         max(
                             0.0,
-                            edgeStrengthRatio - 0.82
-                        ) * 45.0
+                            edgeStrengthRatio - 0.68
+                        ) * 42.0
                     )
                     .coerceIn(
                         0.0,
@@ -1045,8 +1073,8 @@ object TabInspectionV2 {
                 (
                     max(
                         0.0,
-                        edgeStrengthRatio - 0.45
-                    ) * 70.0
+                        edgeStrengthRatio - 0.35
+                    ) * 80.0
                     )
                     .coerceIn(
                         0.0,
@@ -1697,7 +1725,7 @@ object TabInspectionV2 {
             judgment =
                 "정상",
             reason =
-                "ROI가 너무 작아 TAB V2.3 분석을 생략했습니다.",
+                "ROI가 너무 작아 TAB V2.4 분석을 생략했습니다.",
             showDefectMarkers =
                 false
         )

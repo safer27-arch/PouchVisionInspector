@@ -1624,8 +1624,8 @@ NG 후보 영역 : %d개
                 inspectionSpec.criteriaText() +
                 "\n\n" + photoQualityText +
                 "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다." +
-                "\n※ V2.2는 정상 Master 교차검증 버전이며 단일 Risk만으로 NG 후보를 확정하지 않습니다.
-※ 실제 NG 확보 후 Threshold를 최종 보정합니다."
+                "\n※ V2.2는 정상 Master 교차검증 버전이며 단일 Risk만으로 NG 후보를 확정하지 않습니다." +
+                "\n※ 실제 NG 확보 후 Threshold를 최종 보정합니다."
 
         if (!photoQuality.isUsable) {
             lastDetails += "\n" + photoQuality.message

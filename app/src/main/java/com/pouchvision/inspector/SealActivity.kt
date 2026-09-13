@@ -71,6 +71,13 @@ class SealActivity : AppCompatActivity() {
     private var lastDetails = ""
 
     /*
+     * 현재 SEAL 검사 결과의 Telegram 전송 요청 여부입니다.
+     * 같은 결과의 중복 저장/발송을 막고,
+     * 새 사진·ROI·민감도 변경·재검사 시 초기화합니다.
+     */
+    private var telegramAlertQueuedForCurrentResult = false
+
+    /*
      * =========================================================
      * 민감도
      * =========================================================
@@ -369,6 +376,9 @@ class SealActivity : AppCompatActivity() {
 
         lastResultBitmap =
             null
+
+        telegramAlertQueuedForCurrentResult =
+            false
     }
 
     /*
@@ -1616,12 +1626,13 @@ Seal Score      : -
      * =========================================================
      */
 
+
     private fun analyzeSelectedRoi(
         bitmap: Bitmap
     ) {
 
         binding.tvSealStatus.text =
-            "SEAL ROI 분석 중..."
+            "SEAL V2 ROI 분석 중..."
 
         invalidateInspectionResult()
         restoreOriginalImage()
@@ -1719,8 +1730,10 @@ Seal Score      : -
                     )
 
                 /*
+                 * =================================================
                  * 촬영 이미지 품질 점검
-                 * 검사 Score / 판정에는 영향을 주지 않습니다.
+                 * =================================================
+                 * 검사 판정과 별도의 촬영 보조지표입니다.
                  */
                 val photoQuality =
                     ImageQualityChecker.analyzeBitmap(
@@ -1730,7 +1743,8 @@ Seal Score      : -
                 val photoQualityText =
                     String.format(
                         Locale.getDefault(),
-                        "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+                        "사진 품질 : %s (%.1f / 100)
+밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
                         photoQuality.status,
                         photoQuality.qualityScore,
                         photoQuality.averageBrightness,
@@ -1738,6 +1752,13 @@ Seal Score      : -
                         photoQuality.sharpness
                     )
 
+                /*
+                 * =================================================
+                 * 기존 SEAL 분석
+                 * =================================================
+                 * 기존 Dashboard / History 참고값과
+                 * 현장 비교를 위해 유지합니다.
+                 */
                 val analysisWidth =
                     minOf(
                         320,
@@ -1806,9 +1827,6 @@ Seal Score      : -
                     }
                 }
 
-                /*
-                 * 기존 SEAL 민감도 기반 Threshold
-                 */
                 val edgeThreshold =
                     (
                         75 -
@@ -1854,7 +1872,7 @@ Seal Score      : -
                     for (
                         x in 1 until
                             width -
-                            1
+                        1
                     ) {
 
                         val center =
@@ -1966,9 +1984,6 @@ Seal Score      : -
                     return@Thread
                 }
 
-                /*
-                 * 기존 SEAL 점수 계산
-                 */
                 val edgeDensity =
                     edgeCount
                         .toDouble() /
@@ -1993,7 +2008,7 @@ Seal Score      : -
                         sensitivity /
                         133.3
 
-                val sealUniformity =
+                val legacySealUniformity =
                     (
                         100.0 -
                             (
@@ -2009,7 +2024,7 @@ Seal Score      : -
                             100.0
                         )
 
-                val defectLevel =
+                val legacyDefectLevel =
                     (
                         (
                             edgeDensity *
@@ -2026,10 +2041,10 @@ Seal Score      : -
                             100.0
                         )
 
-                val sealScore =
+                val legacySealScore =
                     (
                         100.0 -
-                            defectLevel
+                            legacyDefectLevel
                         )
                         .coerceIn(
                             0.0,
@@ -2038,11 +2053,37 @@ Seal Score      : -
 
                 /*
                  * =================================================
-                 * Model / Line별 SEAL 판정 기준 적용
+                 * SEAL V2 핵심 분석
                  * =================================================
                  *
-                 * SEAL Quality Score는 높을수록 양호합니다.
-                 * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
+                 * - 실링툴 압착 위치 주름
+                 * - 실제 물리 주름 그룹화
+                 * - 주름 길이 / 강도 / 방향 / Crossing Risk
+                 * - Seal Line Uniformity
+                 * - Width Variation
+                 * - Local Discontinuity
+                 * - PP Flow
+                 * - Transparency / Shadow
+                 * - Cup Intrusion
+                 */
+                val v2 =
+                    SealInspectionV2.analyze(
+                        sourceBitmap = source,
+                        roiLeft = left,
+                        roiTop = top,
+                        roiWidth = roiWidth,
+                        roiHeight = roiHeight,
+                        sensitivity = sensitivity
+                    )
+
+                /*
+                 * =================================================
+                 * Model / Line 기준
+                 * =================================================
+                 *
+                 * 기존 기준은 참고용으로 유지합니다.
+                 * V2 최종 판정은 SealInspectionV2의
+                 * 실링 주름 + 구조적 Risk 판정을 사용합니다.
                  */
                 val inspectionSpec =
                     InspectionSpecStore.getCurrent(
@@ -2052,15 +2093,15 @@ Seal Score      : -
                     )
 
                 val judgment =
-                    inspectionSpec.judge(
-                        sealScore
-                    )
+                    v2.suggestedJudgment
 
                 /*
-                 * NG 후보 영역 표시
+                 * =================================================
+                 * 기존 빨간 후보 표시 유지
+                 * =================================================
                  *
-                 * 현재 공용 DefectMarker를 그대로 사용합니다.
-                 * SEAL 알고리즘 자체는 이번 단계에서 변경하지 않습니다.
+                 * 빨간 후보 수는 실제 Seal Wrinkle 개수와 다를 수 있습니다.
+                 * 현장 적용 초기에는 기존 표시를 보조 시각화로 유지합니다.
                  */
                 val markerResult =
                     DefectMarker.markDefectRegions(
@@ -2070,7 +2111,7 @@ Seal Score      : -
                         roiWidth = roiWidth,
                         roiHeight = roiHeight,
                         sensitivity = sensitivity,
-                        maxRegions = 5
+                        maxRegions = 6
                     )
 
                 val regionSummary =
@@ -2082,13 +2123,18 @@ Seal Score      : -
                     markerResult.regions.size
 
                 /*
-                 * 결과 저장용 수치
+                 * =================================================
+                 * 저장용 수치
+                 * =================================================
+                 *
+                 * Dashboard의 "높을수록 양호" 방향성을 유지하기 위해
+                 * V2 Quality Score를 저장 Score로 사용합니다.
                  */
                 lastSealScore =
-                    sealScore
+                    v2.qualityScore
 
                 lastSealUniformity =
-                    sealUniformity
+                    v2.sealLineUniformity
 
                 lastEdgeDensity =
                     edgeDensity
@@ -2102,56 +2148,130 @@ Seal Score      : -
                 lastJudgment =
                     judgment
 
+                val wrinkleLines =
+                    if (
+                        v2.wrinkles.isEmpty()
+                    ) {
+
+                        "검출된 Seal Wrinkle 없음"
+
+                    } else {
+
+                        v2.wrinkles.joinToString(
+                            separator = "
+"
+                        ) { wrinkle ->
+
+                            String.format(
+                                Locale.getDefault(),
+                                "#%d 길이 %.1f%% | 강도 %.0f | 음영 %.0f | 방향 %.1f° | Crossing %.0f",
+                                wrinkle.index,
+                                wrinkle.lengthPercent,
+                                wrinkle.strength,
+                                wrinkle.shadowRisk,
+                                wrinkle.angleDegree,
+                                wrinkle.sealCrossingRisk
+                            )
+                        }
+                    }
+
                 lastDetails =
                     String.format(
                         Locale.getDefault(),
 
                         """
-Seal Uniformity : %.1f / 100
-Seal Score : %.1f / 100
+SEAL V2
+
+Seal Wrinkle : %d개
+Longest Wrinkle : %.1f%%
+Average Wrinkle Strength : %.1f / 100
+
+Seal Line Uniformity : %.1f / 100
+Width Variation : %.1f%%
+Local Discontinuity Risk : %.1f / 100
+PP Flow Risk : %.1f / 100
+Transparency / Shadow Risk : %.1f / 100
+Cup Intrusion Risk : %.1f / 100
+
+Overall Seal Risk : %.1f / 100
+Quality Score : %.1f / 100
+Final Judgment : %s
+
+Seal Wrinkle 상세
+%s
+
+기존 보조지표
+Legacy Seal Score : %.1f / 100
+Legacy Seal Uniformity : %.1f / 100
 Edge Density : %.1f%%
 Strong Edge : %.1f%%
 Edge Strength : %.1f
-Sensitivity : %d%%
-NG 후보 영역 : %d개
+
+기존 빨간 후보 : %d개
 %s
+
+Sensitivity : %d%%
+V2 Raw Component : %d개
                         """.trimIndent(),
 
-                        sealUniformity,
-                        sealScore,
+                        v2.wrinkleCount,
+                        v2.longestWrinklePercent,
+                        v2.averageWrinkleStrength,
+                        v2.sealLineUniformity,
+                        v2.widthVariationPercent,
+                        v2.localDiscontinuityRisk,
+                        v2.ppFlowRisk,
+                        v2.transparencyShadowRisk,
+                        v2.cupIntrusionRisk,
+                        v2.overallRisk,
+                        v2.qualityScore,
+                        judgment,
+                        wrinkleLines,
+                        legacySealScore,
+                        legacySealUniformity,
                         edgeDensity,
                         strongEdgeDensity,
                         averageStrength,
-                        sensitivity,
                         regionCount,
-                        regionSummary
+                        regionSummary,
+                        sensitivity,
+                        v2.rawComponentCount
                     )
 
                 lastDetails +=
-                    "\n\n현재 Model / Line 판정 기준\n" +
+                    "
+
+현재 Model / Line 기존 판정 기준 (참고용)
+" +
                         inspectionSpec.criteriaText() +
-                        "\n\n" +
-                        photoQualityText
+                        "
+
+" +
+                        photoQualityText +
+                        "
+
+※ Seal Wrinkle은 실링툴 압착 위치의 주름을 우선 감지합니다." +
+                        "
+※ 빨간 후보 영역 수와 실제 Seal Wrinkle 개수는 서로 다를 수 있습니다." +
+                        "
+※ 주름 길이/Seal Width는 현재 mm가 아닌 ROI 대비 상대값입니다." +
+                        "
+※ 현장 Ground Truth 축적 후 V2 판정 기준을 보정합니다."
 
                 if (!photoQuality.isUsable) {
                     lastDetails +=
-                        "\n" +
+                        "
+" +
                             photoQuality.message
                 }
 
                 /*
                  * =================================================
-                 * 핵심 추가:
-                 * 빨간 NG 후보가 표시된 결과 사진을 저장해 둡니다.
-                 * lastBitmap 원본은 변경하지 않습니다.
+                 * 결과 이미지
                  * =================================================
-                 */
-                /*
-                 * 표시 방식만 공통 Renderer로 변경합니다.
-                 *
-                 * - SEAL 판정 / 후보 검출 알고리즘은 그대로 유지
-                 * - "NG 후보 N" 라벨은 ROI 바깥으로 이동
-                 * - 빨간 원 선 굵기는 기존의 약 50%
+                 * 기존 빨간 후보 Renderer를 유지합니다.
+                 * V2 물리 주름 전용 표시 Renderer는 현장 검증 후
+                 * 별도 추가할 수 있습니다.
                  */
                 val displayBitmap =
                     MarkerDisplayRenderer.renderGeneric(
@@ -2169,18 +2289,6 @@ NG 후보 영역 : %d개
                 hasInspectionResult =
                     true
 
-                /*
-                 * Telegram 자동 알림
-                 *
-                 * 설정한 전송 기준에 해당하는 판정이면
-                 * 결과 이미지 + Model / Line / 검사 항목 / Score를
-                 * 자동으로 전송합니다.
-                 */
-                sendTelegramAlertIfNeeded()
-
-                /*
-                 * 화면 결과
-                 */
                 runOnUiThread {
 
                     binding.sealImagePreview
@@ -2196,58 +2304,97 @@ NG 후보 영역 : %d개
                             Locale.getDefault(),
 
                             """
-Seal Uniformity : %.1f / 100
-Edge Density    : %.1f%%
-Strong Edge     : %.1f%%
-Edge Strength   : %.1f
-Seal Score      : %.1f / 100
+SEAL V2
+
+실링 위치 주름 : %d개
+최장 주름 길이 : %.1f%%
+평균 주름 강도 : %.1f / 100
+
+Seal Line Uniformity : %.1f / 100
+Width Variation : %.1f%%
+Local Discontinuity : %.1f / 100
+PP Flow Risk : %.1f / 100
+Shadow Risk : %.1f / 100
+Cup Intrusion Risk : %.1f / 100
+
+Overall Risk : %.1f / 100
+Quality Score : %.1f / 100
 
 판정 : %s
 
 민감도 : %d%%
 
-NG 후보 영역 : %d개
+Seal Wrinkle 상세
 %s
 
-빨간 원/박스 = 국부 변화가 큰 검사 후보 영역
-
-현재 Model / Line 판정 기준
+기존 빨간 후보 : %d개
 %s
 
-※ 빨간 표시는 확정 NG가 아닙니다.
-※ 인쇄문자, 반사광, Pouch 경계선도 후보로 검출될 수 있습니다.
-※ 민감도는 영상 검출 수준이며 실제 품질 Spec과 별도입니다.
-※ 실제 Seal Width(mm)는 Calibration이 필요합니다.
+현재 Model / Line 기존 판정 기준 (참고용)
+%s
+
+※ 핵심 : 실링툴 압착 위치의 실제 주름을 별도 계산합니다.
+※ 빨간 후보 개수 = 실제 Seal Wrinkle 개수가 아닙니다.
+※ 주름 길이와 폭은 현재 ROI 대비 상대값(%%)입니다.
+※ 실제 mm 판정은 향후 Calibration이 필요합니다.
+※ V2는 현장 적용용 1차 버전이며 Ground Truth로 보정합니다.
                             """.trimIndent(),
 
-                            sealUniformity,
-                            edgeDensity,
-                            strongEdgeDensity,
-                            averageStrength,
-                            sealScore,
+                            v2.wrinkleCount,
+                            v2.longestWrinklePercent,
+                            v2.averageWrinkleStrength,
+                            v2.sealLineUniformity,
+                            v2.widthVariationPercent,
+                            v2.localDiscontinuityRisk,
+                            v2.ppFlowRisk,
+                            v2.transparencyShadowRisk,
+                            v2.cupIntrusionRisk,
+                            v2.overallRisk,
+                            v2.qualityScore,
                             judgment,
                             sensitivity,
+                            wrinkleLines,
                             regionCount,
                             regionSummary,
                             inspectionSpec.criteriaText()
                         )
 
                     binding.tvSealMetrics.append(
-                        "\n\n" +
+                        "
+
+" +
                             photoQualityText +
-                            "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
+                            "
+※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
                     )
 
                     binding.tvSealStatus.text =
-                        "SEAL 검사 완료 - $judgment"
+                        "SEAL V2 검사 완료 - $judgment / 실링 주름 ${v2.wrinkleCount}개"
 
                     if (!photoQuality.isUsable) {
                         Toast.makeText(
                             this,
-                            "촬영 상태 재확인 권고\n${photoQuality.message}",
+                            "촬영 상태 재확인 권고
+${photoQuality.message}",
                             Toast.LENGTH_LONG
                         ).show()
                     }
+                }
+
+                if (
+                    smallBitmap !==
+                    roiBitmap &&
+                    !smallBitmap.isRecycled
+                ) {
+
+                    smallBitmap.recycle()
+                }
+
+                if (
+                    !roiBitmap.isRecycled
+                ) {
+
+                    roiBitmap.recycle()
                 }
 
             } catch (e: Exception) {
@@ -2255,12 +2402,13 @@ NG 후보 영역 : %d개
                 runOnUiThread {
 
                     binding.tvSealStatus.text =
-                        "SEAL 분석 오류: ${e.message}"
+                        "SEAL V2 분석 오류: ${e.message}"
                 }
             }
 
         }.start()
     }
+
 
     /*
      * =========================================================
@@ -2270,7 +2418,12 @@ NG 후보 영역 : %d개
 
     private fun sendTelegramAlertIfNeeded() {
 
-        if (
+        
+        if (telegramAlertQueuedForCurrentResult) {
+            return
+        }
+
+if (
             !TelegramSettingsStore.isReady(
                 this
             )
@@ -2286,6 +2439,14 @@ NG 후보 영역 : %d개
         ) {
             return
         }
+
+        /*
+         * 실제 전송 대상임이 확인된 뒤 먼저 잠가
+         * 같은 검사 결과의 중복 발송을 방지합니다.
+         * 네트워크 실패는 기존 재전송 기능이 처리합니다.
+         */
+        telegramAlertQueuedForCurrentResult =
+            true
 
         TelegramSender.sendInspectionAlert(
             context = this,
@@ -2379,6 +2540,12 @@ NG 후보 영역 : %d개
         if (
             success
         ) {
+
+            /*
+             * 검사 결과와 결과 사진이 정상 저장된 경우에만
+             * Telegram 정책에 따라 1회 자동전송합니다.
+             */
+            sendTelegramAlertIfNeeded()
 
             Toast.makeText(
                 this,

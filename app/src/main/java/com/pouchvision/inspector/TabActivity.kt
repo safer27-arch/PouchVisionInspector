@@ -1596,16 +1596,16 @@ Tab Score         : -
             v2.qualityScore
 
         lastPositionError =
-            v2.alignmentRisk
+            v2.tabDamageRisk
 
         lastTiltError =
-            v2.sealUniformityRisk
+            v2.ppFlowStraightnessRisk
 
         lastSpacingError =
-            v2.boundaryRisk
+            v2.cupDistanceRisk
 
         lastLocalDeformation =
-            v2.localDeformationRisk
+            v2.ppFlowSagRisk
 
         lastJudgment =
             v2.judgment
@@ -1615,13 +1615,25 @@ Tab Score         : -
                 Locale.getDefault(),
 
                 """
-TAB V2
+TAB V2.1 - TAB Damage + PP FLOW
 
-TAB Presence Confidence : %.1f / 100
-Alignment Risk : %.1f / 100
+TAB 인식 Confidence : %.1f / 100
+
+[치명인자]
+TAB Damage Risk : %.1f / 100
+PP FLOW Straightness Risk : %.1f / 100
+PP FLOW Width Variation : %.1f / 100
+PP FLOW Sag / 흘러내림 Risk : %.1f / 100
+PP FLOW Thickness Risk : %.1f / 100
+Cup Distance Risk : %.1f / 100
+
+[실측/상대지표]
+PP FLOW 평균 폭 : %.1f %% of ROI
+PP FLOW Thickness Index : %.1f / 100
+Cup Distance : %.1f %% of ROI
+
 Seal Uniformity Risk : %.1f / 100
 Boundary Risk : %.1f / 100
-Local Deformation Risk : %.1f / 100
 Reflection Risk : %.1f / 100
 
 Baseline Deviation : %.1f / 100
@@ -1632,17 +1644,30 @@ Final Judgment : %s
 
 정상 Master 운영 기준
 - 현재 제공된 TAB 정상 사진 10장을 기준군으로 사용
-- TAB 주변 실링부/경계/국부 변형을 우선 검사
-- 파우치 전체의 큰 주름과 반사광은 낮은 가중치
-- 실제 NG 샘플이 없으므로 주의/한계정상/불량 Threshold는 임시 기준
+- TAB 자체 Damage는 다른 항목보다 민감하게 판정
+- PP FLOW 직진성/폭/흘러내림/두께/컵 거리를 치명인자로 관리
+- 두께는 실제 mm가 아니라 색/명암 기반 상대 Index
+- Cup Distance도 현재는 ROI 대비 상대거리이며, 실제 mm는 추후 Scale 보정 필요
+- 실제 NG 샘플이 없으므로 Threshold는 현장용 임시 기준
                 """.trimIndent(),
 
                 v2.tabPresenceConfidence,
-                v2.alignmentRisk,
+
+                v2.tabDamageRisk,
+                v2.ppFlowStraightnessRisk,
+                v2.ppFlowWidthVariation,
+                v2.ppFlowSagRisk,
+                v2.ppFlowThicknessRisk,
+                v2.cupDistanceRisk,
+
+                v2.ppFlowMeanWidthPercent,
+                v2.ppFlowThicknessIndex,
+                v2.cupDistancePercent,
+
                 v2.sealUniformityRisk,
                 v2.boundaryRisk,
-                v2.localDeformationRisk,
                 v2.reflectionRisk,
+
                 v2.baselineDeviation,
                 v2.qualityScore,
                 v2.judgment,
@@ -1713,21 +1738,29 @@ Final Judgment : %s
                 imageMatrixValue
 
             binding.tvTabStatus.text =
-                "TAB V2 분석 완료 - ${v2.judgment}"
+                "TAB V2.1 분석 완료 - ${v2.judgment}"
 
             binding.tvTabMetrics.text =
                 String.format(
                     Locale.getDefault(),
 
                     """
-TAB V2
+TAB V2.1 - 정밀판정
 
 TAB 인식 Confidence : %.1f / 100
-Alignment Risk : %.1f / 100
-Seal Uniformity : %.1f / 100
-Boundary Risk : %.1f / 100
-Local Deformation : %.1f / 100
-Reflection Risk : %.1f / 100
+
+TAB Damage Risk : %.1f / 100
+
+PP FLOW
+직진성 Risk : %.1f / 100
+폭 Variation : %.1f / 100
+흘러내림 Risk : %.1f / 100
+두께 Risk : %.1f / 100
+Cup Distance Risk : %.1f / 100
+
+PP FLOW 평균 폭 : %.1f %% of ROI
+Thickness Index : %.1f / 100
+Cup Distance : %.1f %% of ROI
 
 Baseline Deviation : %.1f / 100
 Quality Score : %.1f / 100
@@ -1736,20 +1769,28 @@ Quality Score : %.1f / 100
 
 %s
 
-※ 정상 판정에서는 빨간 NG 후보를 표시하지 않습니다.
-※ TAB 주변 실링부와 경계 변화를 우선 분석합니다.
-※ 파우치 전체 반사광/큰 주름은 낮은 가중치입니다.
-※ 실제 NG 샘플 확보 후 Threshold를 재보정합니다.
+※ TAB Damage는 민감하게 판정합니다.
+※ PP FLOW 직진성/폭/흘러내림/두께/컵 거리는 치명인자입니다.
+※ 현재 두께/거리 값은 상대값이며 실제 mm 보정 전 단계입니다.
+※ 실제 NG 확보 후 Threshold를 재보정합니다.
                     """.trimIndent(),
 
                     v2.tabPresenceConfidence,
-                    v2.alignmentRisk,
-                    v2.sealUniformityRisk,
-                    v2.boundaryRisk,
-                    v2.localDeformationRisk,
-                    v2.reflectionRisk,
+
+                    v2.tabDamageRisk,
+                    v2.ppFlowStraightnessRisk,
+                    v2.ppFlowWidthVariation,
+                    v2.ppFlowSagRisk,
+                    v2.ppFlowThicknessRisk,
+                    v2.cupDistanceRisk,
+
+                    v2.ppFlowMeanWidthPercent,
+                    v2.ppFlowThicknessIndex,
+                    v2.cupDistancePercent,
+
                     v2.baselineDeviation,
                     v2.qualityScore,
+
                     v2.judgment,
                     v2.reason
                 )

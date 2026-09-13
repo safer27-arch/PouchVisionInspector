@@ -56,6 +56,15 @@ class TabActivity : AppCompatActivity() {
     private var lastDetails = ""
 
     /*
+     * 현재 TAB 검사 결과의 Telegram 전송 요청 여부
+     *
+     * - 같은 결과를 여러 번 저장해도 중복 발송 방지
+     * - 새 사진 / ROI / 민감도 변경 / 재검사 시 초기화
+     * - 네트워크 실패는 기존 TelegramRetryWorker가 재시도
+     */
+    private var telegramAlertQueuedForCurrentResult = false
+
+    /*
      * 민감도
      */
     private val preferenceName =
@@ -295,6 +304,9 @@ class TabActivity : AppCompatActivity() {
 
         lastResultBitmap =
             null
+
+        telegramAlertQueuedForCurrentResult =
+            false
     }
 
     /*
@@ -1542,17 +1554,6 @@ Tab Score         : -
         roiStartY: Int
     ) {
 
-        val analysisWidth =
-            320
-
-        val analysisHeight =
-            220
-
-
-        /*
-         * 촬영 이미지 품질 점검
-         * 검사 Score / 판정에는 영향을 주지 않습니다.
-         */
         val photoQuality =
             ImageQualityChecker.analyzeBitmap(
                 roi
@@ -1561,293 +1562,29 @@ Tab Score         : -
         val photoQualityText =
             String.format(
                 Locale.getDefault(),
-                "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+                "사진 품질 : %s (%.1f / 100)\n밝기 %.1f | 명암 %.1f | 선명도 %.1f",
                 photoQuality.status,
                 photoQuality.qualityScore,
                 photoQuality.averageBrightness,
                 photoQuality.contrast,
                 photoQuality.sharpness
             )
-        val small =
-            Bitmap.createScaledBitmap(
-                roi,
-                analysisWidth,
-                analysisHeight,
-                true
-            )
-
-        val strongThreshold =
-            (
-                115 -
-                    sensitivity *
-                    0.67
-                )
-                .toInt()
-                .coerceIn(
-                    35,
-                    105
-                )
-
-        var totalGradient =
-            0L
-
-        var strongEdgeCount =
-            0L
-
-        var pixelCount =
-            0L
-
-        var leftGradient =
-            0L
-
-        var rightGradient =
-            0L
-
-        var topGradient =
-            0L
-
-        var bottomGradient =
-            0L
-
-        for (
-            y in 1 until
-                small.height -
-                    1
-        ) {
-
-            for (
-                x in 1 until
-                    small.width -
-                        1
-            ) {
-
-                val center =
-                    gray(
-                        small.getPixel(
-                            x,
-                            y
-                        )
-                    )
-
-                val right =
-                    gray(
-                        small.getPixel(
-                            x +
-                                1,
-                            y
-                        )
-                    )
-
-                val bottom =
-                    gray(
-                        small.getPixel(
-                            x,
-                            y +
-                                1
-                        )
-                    )
-
-                val gradient =
-                    abs(
-                        center -
-                            right
-                    ) +
-                        abs(
-                            center -
-                                bottom
-                        )
-
-                totalGradient +=
-                    gradient
-
-                pixelCount++
-
-                if (
-                    gradient >
-                    strongThreshold
-                ) {
-
-                    strongEdgeCount++
-                }
-
-                if (
-                    x <
-                    small.width /
-                        2
-                ) {
-
-                    leftGradient +=
-                        gradient
-
-                } else {
-
-                    rightGradient +=
-                        gradient
-                }
-
-                if (
-                    y <
-                    small.height /
-                        2
-                ) {
-
-                    topGradient +=
-                        gradient
-
-                } else {
-
-                    bottomGradient +=
-                        gradient
-                }
-            }
-        }
-
-        val averageGradient =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                totalGradient
-                    .toDouble() /
-                    pixelCount
-                        .toDouble()
-
-            } else {
-
-                0.0
-            }
-
-        val strongEdgeDensity =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                strongEdgeCount
-                    .toDouble() /
-                    pixelCount
-                        .toDouble() *
-                    100.0
-
-            } else {
-
-                0.0
-            }
-
-        val horizontalTotal =
-            max(
-                1.0,
-                (
-                    leftGradient +
-                        rightGradient
-                    )
-                    .toDouble()
-            )
-
-        val verticalTotal =
-            max(
-                1.0,
-                (
-                    topGradient +
-                        bottomGradient
-                    )
-                    .toDouble()
-            )
-
-        val horizontalBalance =
-            abs(
-                leftGradient -
-                    rightGradient
-            )
-                .toDouble() /
-                horizontalTotal *
-                100.0
-
-        val verticalBalance =
-            abs(
-                topGradient -
-                    bottomGradient
-            )
-                .toDouble() /
-                verticalTotal *
-                100.0
-
-        val sensitivityFactor =
-            0.55 +
-                sensitivity /
-                    133.3
-
-        val positionError =
-            (
-                horizontalBalance *
-                    0.75 +
-                    verticalBalance *
-                    0.25
-                ) *
-                sensitivityFactor
-
-        val tiltError =
-            (
-                verticalBalance *
-                    0.70 +
-                    strongEdgeDensity *
-                    1.2
-                ) *
-                sensitivityFactor
-
-        val spacingError =
-            (
-                horizontalBalance *
-                    0.85 +
-                    strongEdgeDensity *
-                    0.5
-                ) *
-                sensitivityFactor
-
-        val localDeformation =
-            (
-                averageGradient *
-                    0.8 +
-                    strongEdgeDensity *
-                    2.0
-                ) *
-                sensitivityFactor
-
-        val defectLevel =
-            (
-                positionError *
-                    0.30 +
-                    tiltError *
-                    0.25 +
-                    spacingError *
-                    0.25 +
-                    localDeformation *
-                    0.20
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
-
-        val tabScore =
-            (
-                100.0 -
-                    defectLevel
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
 
         /*
          * =====================================================
-         * Model / Line별 TAB 판정 기준 적용
+         * TAB V2
          * =====================================================
          *
-         * TAB Quality Score는 높을수록 양호합니다.
-         * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
+         * TAB 주변의 노란/주황색 실링부를 중심으로
+         * 자동 분석 Window를 잡고,
+         * 위치 / 실링 균일성 / 경계 / 국부 변형을 분석합니다.
          */
+        val v2 =
+            TabInspectionV2.analyze(
+                roi = roi,
+                sensitivity = sensitivity
+            )
+
         val inspectionSpec =
             InspectionSpecStore.getCurrent(
                 context = this,
@@ -1855,128 +1592,116 @@ Tab Score         : -
                     InspectionSpecStore.InspectionType.TAB
             )
 
-        val judgment =
-            inspectionSpec.judge(
-                tabScore
-            )
-
-        /*
-         * 현재 공용 DefectMarker는 그대로 유지합니다.
-         */
-        val markerResult =
-            DefectMarker.markDefectRegions(
-                sourceBitmap = source,
-                roiLeft = roiStartX,
-                roiTop = roiStartY,
-                roiWidth = roi.width,
-                roiHeight = roi.height,
-                sensitivity = sensitivity,
-                maxRegions = 5
-            )
-
-        val regionCount =
-            markerResult.regions.size
-
-        val regionSummary =
-            DefectMarker.buildRegionSummary(
-                markerResult.regions
-            )
-
         lastTabScore =
-            tabScore
+            v2.qualityScore
 
         lastPositionError =
-            positionError
+            v2.alignmentRisk
 
         lastTiltError =
-            tiltError
+            v2.sealUniformityRisk
 
         lastSpacingError =
-            spacingError
+            v2.boundaryRisk
 
         lastLocalDeformation =
-            localDeformation
+            v2.localDeformationRisk
 
         lastJudgment =
-            judgment
+            v2.judgment
 
         lastDetails =
             String.format(
                 Locale.getDefault(),
 
                 """
-Position Error : %.1f
-Tilt Error : %.1f
-Spacing Error : %.1f
-Local Deformation : %.1f
-Tab Score : %.1f / 100
-Sensitivity : %d%%
-NG 후보 영역 : %d개
+TAB V2
+
+TAB Presence Confidence : %.1f / 100
+Alignment Risk : %.1f / 100
+Seal Uniformity Risk : %.1f / 100
+Boundary Risk : %.1f / 100
+Local Deformation Risk : %.1f / 100
+Reflection Risk : %.1f / 100
+
+Baseline Deviation : %.1f / 100
+Quality Score : %.1f / 100
+Final Judgment : %s
 
 %s
+
+정상 Master 운영 기준
+- 현재 제공된 TAB 정상 사진 10장을 기준군으로 사용
+- TAB 주변 실링부/경계/국부 변형을 우선 검사
+- 파우치 전체의 큰 주름과 반사광은 낮은 가중치
+- 실제 NG 샘플이 없으므로 주의/한계정상/불량 Threshold는 임시 기준
                 """.trimIndent(),
 
-                positionError,
-                tiltError,
-                spacingError,
-                localDeformation,
-                tabScore,
-                sensitivity,
-                regionCount,
-                regionSummary
+                v2.tabPresenceConfidence,
+                v2.alignmentRisk,
+                v2.sealUniformityRisk,
+                v2.boundaryRisk,
+                v2.localDeformationRisk,
+                v2.reflectionRisk,
+                v2.baselineDeviation,
+                v2.qualityScore,
+                v2.judgment,
+                v2.reason
             )
 
-
         lastDetails +=
-            "\n\n현재 Model / Line 판정 기준\n" +
+            "\n\n현재 Model / Line 기존 기준 (참고용)\n" +
                 inspectionSpec.criteriaText() +
                 "\n\n" +
-                photoQualityText
+                photoQualityText +
+                "\n\n※ 정상 판정에서는 빨간 NG 후보를 표시하지 않습니다." +
+                "\n※ TAB 주변 실링부를 중심으로 V2 분석합니다."
 
         if (!photoQuality.isUsable) {
+
             lastDetails +=
                 "\n" +
                     photoQuality.message
         }
 
-        /*
-         * 핵심 추가:
-         * 빨간 NG 후보가 표시된 결과 사진을
-         * 이력 저장용으로 보관합니다.
-         *
-         * lastBitmap 원본은 변경하지 않습니다.
-         */
-        /*
-         * 표시 방식만 공통 Renderer로 변경합니다.
-         *
-         * - TAB 판정 / 후보 검출 알고리즘은 그대로 유지
-         * - "NG 후보 N" 라벨은 ROI 바깥으로 이동
-         * - 빨간 원 선 굵기는 기존의 약 50%
-         */
         val displayBitmap =
-            MarkerDisplayRenderer.renderGeneric(
-                sourceBitmap = source,
-                roiLeft = roiStartX,
-                roiTop = roiStartY,
-                roiWidth = roi.width,
-                roiHeight = roi.height,
-                regions = markerResult.regions
-            )
+            if (
+                v2.showDefectMarkers
+            ) {
+
+                val markerResult =
+                    DefectMarker.markDefectRegions(
+                        sourceBitmap = source,
+                        roiLeft = roiStartX,
+                        roiTop = roiStartY,
+                        roiWidth = roi.width,
+                        roiHeight = roi.height,
+                        sensitivity = sensitivity,
+                        maxRegions = 4
+                    )
+
+                MarkerDisplayRenderer.renderGeneric(
+                    sourceBitmap = source,
+                    roiLeft = roiStartX,
+                    roiTop = roiStartY,
+                    roiWidth = roi.width,
+                    roiHeight = roi.height,
+                    regions = markerResult.regions
+                )
+
+            } else {
+
+                source.copy(
+                    Bitmap.Config.ARGB_8888,
+                    true
+                )
+            }
 
         lastResultBitmap =
             displayBitmap
 
         hasInspectionResult =
             true
-
-        /*
-         * Telegram 자동 알림
-         *
-         * 설정한 전송 기준에 해당하는 판정이면
-         * 결과 이미지 + Model / Line / 검사 항목 / Score를
-         * 자동으로 전송합니다.
-         */
-        sendTelegramAlertIfNeeded()
 
         runOnUiThread {
 
@@ -1988,61 +1713,67 @@ NG 후보 영역 : %d개
                 imageMatrixValue
 
             binding.tvTabStatus.text =
-                "TAB ROI 분석 완료 - $judgment"
+                "TAB V2 분석 완료 - ${v2.judgment}"
 
             binding.tvTabMetrics.text =
                 String.format(
                     Locale.getDefault(),
 
                     """
-민감도          : %d%%
-Position Error  : %.1f
-Tilt Error      : %.1f
-Spacing Error   : %.1f
-Local Deform.   : %.1f
-Tab Score       : %.1f / 100
+TAB V2
+
+TAB 인식 Confidence : %.1f / 100
+Alignment Risk : %.1f / 100
+Seal Uniformity : %.1f / 100
+Boundary Risk : %.1f / 100
+Local Deformation : %.1f / 100
+Reflection Risk : %.1f / 100
+
+Baseline Deviation : %.1f / 100
+Quality Score : %.1f / 100
 
 판정 : %s
 
-NG 후보 영역 : %d개
 %s
 
-빨간 원/박스 = TAB 주변의 국부 변화 검사 후보
-
-현재 Model / Line 판정 기준
-%s
-
-※ 빨간 표시는 확정 NG가 아닙니다.
-※ Barcode, 문자, 반사광, Seal 경계도 후보로 검출될 수 있습니다.
-※ Position/Tilt/Spacing 값은 현재 Edge 분포 기반 보조지표입니다.
-※ 실제 Tab 위치·각도·간격(mm) 판정은 Calibration과 기준 형상 설정이 필요합니다.
+※ 정상 판정에서는 빨간 NG 후보를 표시하지 않습니다.
+※ TAB 주변 실링부와 경계 변화를 우선 분석합니다.
+※ 파우치 전체 반사광/큰 주름은 낮은 가중치입니다.
+※ 실제 NG 샘플 확보 후 Threshold를 재보정합니다.
                     """.trimIndent(),
 
-                    sensitivity,
-                    positionError,
-                    tiltError,
-                    spacingError,
-                    localDeformation,
-                    tabScore,
-                    judgment,
-                    regionCount,
-                    regionSummary,
-                    inspectionSpec.criteriaText()
+                    v2.tabPresenceConfidence,
+                    v2.alignmentRisk,
+                    v2.sealUniformityRisk,
+                    v2.boundaryRisk,
+                    v2.localDeformationRisk,
+                    v2.reflectionRisk,
+                    v2.baselineDeviation,
+                    v2.qualityScore,
+                    v2.judgment,
+                    v2.reason
                 )
 
             binding.tvTabMetrics.append(
                 "\n\n" +
                     photoQualityText +
-                    "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
+                    "\n※ 사진 품질은 TAB 판정과 별도의 촬영 상태 보조지표입니다."
             )
 
             if (!photoQuality.isUsable) {
+
                 Toast.makeText(
                     this,
                     "촬영 상태 재확인 권고\n${photoQuality.message}",
                     Toast.LENGTH_LONG
                 ).show()
             }
+        }
+
+        if (
+            !roi.isRecycled
+        ) {
+            roi.recycle()
         }
     }
 
@@ -2053,6 +1784,10 @@ NG 후보 영역 : %d개
      */
 
     private fun sendTelegramAlertIfNeeded() {
+
+        if (telegramAlertQueuedForCurrentResult) {
+            return
+        }
 
         if (
             !TelegramSettingsStore.isReady(
@@ -2070,6 +1805,13 @@ NG 후보 영역 : %d개
         ) {
             return
         }
+
+        /*
+         * 실제 전송 대상임이 확인된 뒤 먼저 잠가
+         * 같은 TAB 검사 결과의 중복 발송을 방지합니다.
+         */
+        telegramAlertQueuedForCurrentResult =
+            true
 
         TelegramSender.sendInspectionAlert(
             context = this,
@@ -2163,6 +1905,12 @@ NG 후보 영역 : %d개
         if (
             success
         ) {
+
+            /*
+             * 검사 결과 + 결과 사진 저장이 성공한 경우에만
+             * 설정된 Telegram 정책에 따라 1회 자동전송합니다.
+             */
+            sendTelegramAlertIfNeeded()
 
             Toast.makeText(
                 this,

@@ -2158,8 +2158,7 @@ Seal Score      : -
                     } else {
 
                         v2.wrinkles.joinToString(
-                            separator = "
-"
+                            separator = "\n"
                         ) { wrinkle ->
 
                             String.format(
@@ -2239,29 +2238,18 @@ V2 Raw Component : %d개
                     )
 
                 lastDetails +=
-                    "
-
-현재 Model / Line 기존 판정 기준 (참고용)
-" +
+                    "\n\n현재 Model / Line 기존 판정 기준 (참고용)\n" +
                         inspectionSpec.criteriaText() +
-                        "
-
-" +
+                        "\n\n" +
                         photoQualityText +
-                        "
-
-※ Seal Wrinkle은 실링툴 압착 위치의 주름을 우선 감지합니다." +
-                        "
-※ 빨간 후보 영역 수와 실제 Seal Wrinkle 개수는 서로 다를 수 있습니다." +
-                        "
-※ 주름 길이/Seal Width는 현재 mm가 아닌 ROI 대비 상대값입니다." +
-                        "
-※ 현장 Ground Truth 축적 후 V2 판정 기준을 보정합니다."
+                        "\n\n※ Seal Wrinkle은 실링툴 압착 위치의 주름을 우선 감지합니다." +
+                        "\n※ 빨간 후보 영역 수와 실제 Seal Wrinkle 개수는 서로 다를 수 있습니다." +
+                        "\n※ 주름 길이/Seal Width는 현재 mm가 아닌 ROI 대비 상대값입니다." +
+                        "\n※ 현장 Ground Truth 축적 후 V2 판정 기준을 보정합니다."
 
                 if (!photoQuality.isUsable) {
                     lastDetails +=
-                        "
-" +
+                        "\n" +
                             photoQuality.message
                 }
 
@@ -2360,12 +2348,9 @@ Seal Wrinkle 상세
                         )
 
                     binding.tvSealMetrics.append(
-                        "
-
-" +
+                        "\n\n" +
                             photoQualityText +
-                            "
-※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
+                            "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
                     )
 
                     binding.tvSealStatus.text =
@@ -2374,8 +2359,7 @@ Seal Wrinkle 상세
                     if (!photoQuality.isUsable) {
                         Toast.makeText(
                             this,
-                            "촬영 상태 재확인 권고
-${photoQuality.message}",
+                            "촬영 상태 재확인 권고\n${photoQuality.message}",
                             Toast.LENGTH_LONG
                         ).show()
                     }

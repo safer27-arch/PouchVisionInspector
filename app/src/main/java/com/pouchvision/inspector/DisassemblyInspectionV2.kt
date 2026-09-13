@@ -8,19 +8,16 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * DISASSEMBLY V2
+ * DISASSEMBLY V2.1
  *
- * 분해 후 실링부는 작업자가 파우치를 잡아 뜯는 과정에서 위치/각도가 흔들릴 수 있으므로
- * 고정 좌표나 절대 직선 위치를 판정 기준으로 사용하지 않습니다.
+ * 정상 분해사진에서 Cell 외곽선, TAB, 알루미늄 반사광을 찢김으로 오인하던
+ * V2 과검출을 줄이기 위한 정상 Master 우선 버전입니다.
  *
- * 핵심:
- * 1) PP/실링 흔적의 연속성
- * 2) 국부 끊김/찢김성 변화
- * 3) 폭/표면 변화의 균일성
- * 4) 강한 국부 Edge 집중
- *
- * 현재는 정상 Master 중심의 1차 현장용 기준입니다.
- * 실제 NG 샘플 확보 후 threshold를 재보정하는 구조입니다.
+ * 원칙
+ * 1) 분해 과정의 위치/각도 이동은 허용
+ * 2) ROI 외곽의 강한 직선 Edge 영향 억제
+ * 3) 전체 밝기보다 PP/Seal 흔적의 국부적인 불연속과 분포 변화에 가중
+ * 4) 실제 NG 샘플 확보 전에는 보수적으로 정상 Master 범위를 우선
  */
 object DisassemblyInspectionV2 {
 
@@ -36,19 +33,14 @@ object DisassemblyInspectionV2 {
         val note: String
     )
 
-    fun analyze(
-        roi: Bitmap,
-        sensitivity: Int
-    ): Result {
-
+    fun analyze(roi: Bitmap, sensitivity: Int): Result {
         val w = 320
         val h = 240
         val small = Bitmap.createScaledBitmap(roi, w, h, true)
-
         val gray = Array(h) { DoubleArray(w) }
+
         var sum = 0.0
         var sum2 = 0.0
-
         for (y in 0 until h) {
             for (x in 0 until w) {
                 val c = small.getPixel(x, y)
@@ -65,148 +57,133 @@ object DisassemblyInspectionV2 {
         val mean = sum / n
         val std = sqrt(max(0.0, sum2 / n - mean * mean))
 
-        // 위치가 흔들려도 견디도록 ROI를 12개 수평 band로 나누어
-        // 각 band의 "변화량"을 비교합니다.
-        val bands = 12
-        val bandScores = DoubleArray(bands)
-        val bandStrong = DoubleArray(bands)
+        // ROI 외곽은 파우치 절단면/Cell 경계가 들어오기 쉬우므로 분석에서 제외합니다.
+        val x0 = (w * 0.08).toInt()
+        val x1 = (w * 0.92).toInt()
+        val y0 = (h * 0.10).toInt()
+        val y1 = (h * 0.90).toInt()
 
-        var totalGrad = 0.0
-        var totalStrong = 0.0
-        var gradCount = 0
+        val rowCount = 12
+        val colCount = 10
+        val rowScore = DoubleArray(rowCount)
+        val rowN = IntArray(rowCount)
+        val colScore = DoubleArray(colCount)
+        val colN = IntArray(colCount)
 
-        val sensitivityFactor = 0.82 + sensitivity.coerceIn(0, 100) / 500.0
-        val strongThreshold = (58.0 - sensitivity * 0.18).coerceIn(36.0, 58.0)
+        var gradSum = 0.0
+        var gradN = 0
+        var strongN = 0
+        val strongThreshold = (72.0 - sensitivity.coerceIn(0, 100) * 0.16)
+            .coerceIn(52.0, 72.0)
 
-        for (y in 1 until h - 1) {
-            val band = min(bands - 1, y * bands / h)
-            for (x in 1 until w - 1) {
+        for (y in max(1, y0) until min(h - 1, y1)) {
+            for (x in max(1, x0) until min(w - 1, x1)) {
                 val gx = abs(gray[y][x + 1] - gray[y][x - 1])
                 val gy = abs(gray[y + 1][x] - gray[y - 1][x])
-                val g = gx + gy
-                totalGrad += g
-                gradCount++
-                bandScores[band] += g
-                if (g >= strongThreshold) {
-                    bandStrong[band] += 1.0
-                    totalStrong += 1.0
-                }
+                // 한 방향의 긴 직선보다 국부적인 2D 변화에 더 반응하도록 제한합니다.
+                val g = min(90.0, gx + gy)
+                gradSum += g
+                gradN++
+                if (g >= strongThreshold) strongN++
+
+                val r = min(rowCount - 1, (y - y0) * rowCount / max(1, y1 - y0))
+                val c = min(colCount - 1, (x - x0) * colCount / max(1, x1 - x0))
+                rowScore[r] += g
+                rowN[r]++
+                colScore[c] += g
+                colN[c]++
             }
         }
 
-        val pixelsPerBand = ((h.toDouble() / bands) * (w - 2)).coerceAtLeast(1.0)
-        for (i in 0 until bands) {
-            bandScores[i] /= pixelsPerBand
-            bandStrong[i] = bandStrong[i] / pixelsPerBand * 100.0
+        for (i in rowScore.indices) if (rowN[i] > 0) rowScore[i] /= rowN[i]
+        for (i in colScore.indices) if (colN[i] > 0) colScore[i] /= colN[i]
+
+        val avgGrad = if (gradN > 0) gradSum / gradN else 0.0
+        val strongDensity = if (gradN > 0) strongN.toDouble() / gradN * 100.0 else 0.0
+
+        val rowMedian = median(rowScore).coerceAtLeast(1.0)
+        val colMedian = median(colScore).coerceAtLeast(1.0)
+        val rowMad = median(rowScore.map { abs(it - rowMedian) }.toDoubleArray()).coerceAtLeast(0.5)
+        val colMad = median(colScore.map { abs(it - colMedian) }.toDoubleArray()).coerceAtLeast(0.5)
+
+        // 인접 band 변화. 최대 한 지점보다 전체적인 안정성을 우선합니다.
+        val rowJumps = mutableListOf<Double>()
+        for (i in 1 until rowScore.size) {
+            rowJumps += abs(rowScore[i] - rowScore[i - 1]) / rowMedian
         }
+        val typicalJump = percentile(rowJumps, 0.70)
+        val highJump = percentile(rowJumps, 0.90)
 
-        val avgGrad = if (gradCount > 0) totalGrad / gradCount else 0.0
-        val strongDensity = if (gradCount > 0) totalStrong / gradCount * 100.0 else 0.0
+        val colCv = sqrt(
+            colScore.map { (it - colMedian) * (it - colMedian) }.average()
+        ) / colMedian
 
-        val sortedBand = bandScores.sorted()
-        val medianBand = sortedBand[sortedBand.size / 2].coerceAtLeast(1.0)
+        // 매우 튀는 band 비율만 국부 단절 후보로 사용합니다.
+        val rowOutlierRatio = rowScore.count {
+            abs(it - rowMedian) > rowMad * 3.2 + 2.0
+        }.toDouble() / rowScore.size
+        val colOutlierRatio = colScore.count {
+            abs(it - colMedian) > colMad * 3.2 + 2.0
+        }.toDouble() / colScore.size
 
-        // 한두 위치의 강한 변화가 전체를 망치지 않도록 robust deviation 사용
-        val bandDeviation = bandScores
-            .map { abs(it - medianBand) / medianBand }
-            .sorted()
-        val robustDeviation = bandDeviation[bandDeviation.size * 3 / 4]
+        // 민감도는 V2보다 영향 범위를 작게 하여 정상사진이 급격히 흔들리지 않게 합니다.
+        val sf = (0.90 + (sensitivity.coerceIn(0, 100) - 60) * 0.0025)
+            .coerceIn(0.80, 1.05)
 
-        // 인접 band 사이 급격한 변화 = PP 흔적 끊김/불연속 후보
-        var jumpSum = 0.0
-        var jumpMax = 0.0
-        for (i in 1 until bands) {
-            val d = abs(bandScores[i] - bandScores[i - 1]) / medianBand
-            jumpSum += d
-            jumpMax = max(jumpMax, d)
-        }
-        val avgJump = jumpSum / (bands - 1)
-
-        // 좌/우 8개 세로 strip의 변화량 차이.
-        // 분해 후 위치가 약간 틀어져도 절대 위치 대신 분포 차이만 봅니다.
-        val strips = 8
-        val stripScores = DoubleArray(strips)
-        val stripCount = IntArray(strips)
-        for (y in 1 until h - 1) {
-            for (x in 1 until w - 1) {
-                val s = min(strips - 1, x * strips / w)
-                val gx = abs(gray[y][x + 1] - gray[y][x - 1])
-                val gy = abs(gray[y + 1][x] - gray[y - 1][x])
-                stripScores[s] += gx + gy
-                stripCount[s]++
-            }
-        }
-        for (i in 0 until strips) {
-            if (stripCount[i] > 0) stripScores[i] /= stripCount[i]
-        }
-        val stripMean = stripScores.average().coerceAtLeast(1.0)
-        val stripCv = sqrt(
-            stripScores.map { (it - stripMean) * (it - stripMean) }.average()
-        ) / stripMean
-
-        // 정상 Master에서 알루미늄 반사 자체를 불량으로 보지 않도록
-        // 전체 밝기/명암은 낮은 가중치로만 사용합니다.
         val continuityRisk = (
-            avgJump * 48.0 +
-                jumpMax * 18.0
-            ).coerceIn(0.0, 100.0) * sensitivityFactor
+            typicalJump * 38.0 +
+                max(0.0, highJump - 0.35) * 22.0
+            ).coerceIn(0.0, 62.0) * sf
 
         val widthVariationRisk = (
-            stripCv * 115.0 +
-                robustDeviation * 28.0
-            ).coerceIn(0.0, 100.0) * sensitivityFactor
+            colCv * 70.0 +
+                colOutlierRatio * 22.0
+            ).coerceIn(0.0, 62.0) * sf
 
         val localTearRisk = (
-            max(0.0, strongDensity - 3.0) * 6.0 +
-                max(0.0, jumpMax - 0.45) * 42.0
-            ).coerceIn(0.0, 100.0) * sensitivityFactor
+            rowOutlierRatio * 48.0 +
+                colOutlierRatio * 30.0 +
+                max(0.0, highJump - 0.55) * 24.0
+            ).coerceIn(0.0, 68.0) * sf
 
+        // 강한 Edge가 조금 존재하는 것은 정상 구조/반사로 간주합니다.
         val strongEdgeRisk = (
-            max(0.0, strongDensity - 2.0) * 5.0 +
-                max(0.0, avgGrad - 15.0) * 1.4
-            ).coerceIn(0.0, 100.0) * sensitivityFactor
+            max(0.0, strongDensity - 9.0) * 2.2 +
+                max(0.0, avgGrad - 24.0) * 0.8
+            ).coerceIn(0.0, 55.0) * sf
 
-        // 분해 후 위치/각도 불안정을 허용하는 정도.
-        // 높은 값일수록 "위치 변화 때문에 판정이 흔들리지 않도록" 설계된 상태.
         val positionTolerance = (
-            100.0 -
-                min(25.0, robustDeviation * 18.0)
-            ).coerceIn(70.0, 100.0)
+            100.0 - min(18.0, (rowMad / rowMedian + colMad / colMedian) * 18.0)
+            ).coerceIn(80.0, 100.0)
 
-        // 촬영/ROI 자체의 정보량. 너무 평평하거나 너무 복잡하면 confidence 저하.
         val confidence = (
             100.0 -
-                max(0.0, 10.0 - std) * 2.0 -
-                max(0.0, strongDensity - 18.0) * 2.2
-            ).coerceIn(45.0, 100.0)
+                max(0.0, 9.0 - std) * 2.0 -
+                max(0.0, strongDensity - 28.0) * 1.5
+            ).coerceIn(55.0, 100.0)
 
-        // 정상 Master 기반 보수적 가중치.
-        // 반사광보다 "연속성/국부 찢김"을 더 중요하게 봅니다.
+        // 정상 Master 우선. 국부 찢김은 중요하지만 실제 NG 확보 전 과도하게 지배하지 않도록 제한합니다.
         val defect = (
             continuityRisk * 0.34 +
-                widthVariationRisk * 0.22 +
+                widthVariationRisk * 0.24 +
                 localTearRisk * 0.30 +
-                strongEdgeRisk * 0.14
+                strongEdgeRisk * 0.12
             ).coerceIn(0.0, 100.0)
 
         val quality = (100.0 - defect).coerceIn(0.0, 100.0)
         val uniformity = (
-            100.0 -
-                widthVariationRisk * 0.55 -
-                strongEdgeRisk * 0.20
+            100.0 - widthVariationRisk * 0.55 - continuityRisk * 0.20
             ).coerceIn(0.0, 100.0)
 
         val note = when {
-            confidence < 60.0 ->
-                "ROI 정보가 불안정합니다. 실링/PP 흔적이 충분히 포함되도록 ROI를 다시 맞춰주세요."
-            localTearRisk >= 65.0 ->
-                "국부 찢김/강한 단절 후보가 큽니다. 실제 실링부를 확대 확인하세요."
-            continuityRisk >= 65.0 ->
-                "PP/실링 흔적의 연속성 변화가 큽니다. 뜯김 방향 영향과 실제 단절을 구분해 확인하세요."
-            widthVariationRisk >= 70.0 ->
-                "폭/표면 분포 변화가 큽니다. 분해 과정의 위치 흔들림인지 실제 실링 편차인지 확인하세요."
+            confidence < 65.0 ->
+                "ROI 정보가 불안정합니다. PP/실링 흔적이 충분히 포함되도록 ROI를 다시 맞춰주세요."
+            localTearRisk >= 60.0 ->
+                "국부 단절/찢김 의심이 있습니다. 실제 실링/PP 흔적을 확대 확인하세요."
+            continuityRisk >= 58.0 ->
+                "PP/실링 흔적의 연속성 변화가 큽니다. 분해 과정의 뜯김 영향과 실제 단절을 구분해 확인하세요."
             else ->
-                "정상 Master 범위 우선 판정입니다. 분해 후 실링 위치 이동은 허용하고 국부 단절/찢김을 중심으로 봅니다."
+                "정상 Master 우선 판정입니다. Cell 외곽선/TAB/알루미늄 반사와 분해 후 위치 이동은 결함 판단에서 억제합니다."
         }
 
         if (small !== roi && !small.isRecycled) small.recycle()
@@ -222,5 +199,19 @@ object DisassemblyInspectionV2 {
             confidence = confidence,
             note = note
         )
+    }
+
+    private fun median(values: DoubleArray): Double {
+        if (values.isEmpty()) return 0.0
+        val s = values.sorted()
+        val m = s.size / 2
+        return if (s.size % 2 == 0) (s[m - 1] + s[m]) / 2.0 else s[m]
+    }
+
+    private fun percentile(values: List<Double>, p: Double): Double {
+        if (values.isEmpty()) return 0.0
+        val s = values.sorted()
+        val idx = ((s.size - 1) * p.coerceIn(0.0, 1.0)).toInt()
+        return s[idx]
     }
 }

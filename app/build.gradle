@@ -14,8 +14,10 @@ android {
 
         // GitHub Actions 실행 번호가 올라갈 때마다 자동 증가합니다.
         def ciBuildNumber = System.getenv("BUILD_NUMBER")
-        versionCode ciBuildNumber != null ? ciBuildNumber.toInteger() : 1
-        versionName "1.0.${ciBuildNumber != null ? ciBuildNumber : 'local'}"
+        // 기존 APK보다 확실히 높은 버전이 되도록 10000을 더합니다.
+        // 예: GitHub Actions #305 -> versionCode 10305
+        versionCode ciBuildNumber != null ? (10000 + ciBuildNumber.toInteger()) : 10001
+        versionName "1.1.${ciBuildNumber != null ? ciBuildNumber : 'local'}"
     }
 
     /*

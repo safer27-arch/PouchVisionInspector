@@ -676,7 +676,7 @@ class DisassemblyActivity : AppCompatActivity() {
 
         binding.tvDisassemblyMetrics.text =
             """
-DISASSEMBLY V2.1
+DISASSEMBLY V2.2
 PP/Seal 연속성 Risk : -
 폭/표면 Variation : -
 국부 찢김 Risk : -
@@ -1542,12 +1542,19 @@ NG 후보 영역 : -
         )
         val judgment = inspectionSpec.judge(result.qualityScore)
 
-        // V2.1: 정상 Master에서는 빨간 후보를 표시하지 않습니다.
-        // 실제 판정이 정상 범위를 벗어나고 국부 찢김 Risk가 충분히 높을 때만
-        // 기존 DefectMarker를 보조 확인용으로 사용합니다.
+        // V2.2: 단일 Risk가 아니라 복수 신호가 함께 높을 때만 빨간 후보를 표시합니다.
+        // 정상 사진의 Cell 경계/반사/접힘 때문에 큰 빨간 원이 생기는 것을 억제합니다.
+        val corroboratedDefect =
+            listOf(
+                result.continuityRisk >= 62.0,
+                result.widthVariationRisk >= 52.0,
+                result.localTearRisk >= 62.0,
+                result.strongEdgeRisk >= 28.0
+            ).count { it } >= 2
+
         val showCandidates =
-            !judgment.equals("정상", ignoreCase = true) &&
-                result.localTearRisk >= 60.0
+            corroboratedDefect &&
+                result.qualityScore < 70.0
 
         val markerResult = if (showCandidates) {
             DefectMarker.markDefectRegions(
@@ -1567,7 +1574,7 @@ NG 후보 영역 : -
         val regionSummary = if (markerResult != null) {
             DefectMarker.buildRegionSummary(markerResult.regions)
         } else {
-            "정상 Master 우선: 빨간 후보 표시 없음"
+            "정상 Master 교차검증: 복수 이상 신호가 없어 빨간 후보 표시 없음"
         }
 
         lastQualityScore = result.qualityScore
@@ -1580,7 +1587,7 @@ NG 후보 영역 : -
         lastDetails = String.format(
             Locale.getDefault(),
             """
-DISASSEMBLY V2.1 - 정밀판정
+DISASSEMBLY V2.2 - 정밀판정
 인식 Confidence : %.1f / 100
 PP/Seal 연속성 Risk : %.1f / 100
 폭/표면 Variation : %.1f / 100
@@ -1617,7 +1624,8 @@ NG 후보 영역 : %d개
                 inspectionSpec.criteriaText() +
                 "\n\n" + photoQualityText +
                 "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다." +
-                "\n※ V2.1은 정상 Master 우선 버전이며 실제 NG 확보 후 Threshold를 최종 보정합니다."
+                "\n※ V2.2는 정상 Master 교차검증 버전이며 단일 Risk만으로 NG 후보를 확정하지 않습니다.
+※ 실제 NG 확보 후 Threshold를 최종 보정합니다."
 
         if (!photoQuality.isUsable) {
             lastDetails += "\n" + photoQuality.message
@@ -1643,7 +1651,7 @@ NG 후보 영역 : %d개
             binding.disassemblyImagePreview.setImageBitmap(displayBitmap)
             binding.disassemblyImagePreview.imageMatrix = imageMatrixValue
             binding.tvDisassemblyStatus.text =
-                "DISASSEMBLY V2.1 분석 완료 - $judgment"
+                "DISASSEMBLY V2.2 분석 완료 - $judgment"
             binding.tvDisassemblyMetrics.text = lastDetails
 
             if (!photoQuality.isUsable) {

@@ -128,6 +128,15 @@ class SealActivity : AppCompatActivity() {
     private var roiLastTouchY =
         0f
 
+
+    private enum class SealRoiSide {
+        LEFT,
+        RIGHT
+    }
+
+    private var selectedSealRoiSide =
+        SealRoiSide.LEFT
+
     /*
      * =========================================================
      * 갤러리
@@ -193,6 +202,8 @@ class SealActivity : AppCompatActivity() {
         setupSensitivity()
         setupImageZoom()
         setupRoiDrag()
+        setupDualRoiControls()
+        resetDualRoiPositions()
 
         /*
          * 사진 촬영
@@ -296,7 +307,7 @@ class SealActivity : AppCompatActivity() {
         binding.btnSealRoiReset
             .setOnClickListener {
 
-                resetRoiPosition()
+                resetDualRoiPositions()
             }
 
         /*
@@ -1202,129 +1213,198 @@ Seal Score      : -
      * =========================================================
      */
 
-    private fun setupRoiDrag() {
+    private fun setupDualRoiControls() {
 
-        binding.sealRoiGuide
-            .setOnTouchListener {
-                    view,
-                    event ->
+        binding.btnSealSelectLeft
+            .setOnClickListener {
+                selectedSealRoiSide =
+                    SealRoiSide.LEFT
 
-                view.parent
-                    ?.requestDisallowInterceptTouchEvent(
-                        true
-                    )
+                updateSelectedRoiUi()
+            }
 
-                when (
-                    event.action
-                ) {
+        binding.btnSealSelectRight
+            .setOnClickListener {
+                selectedSealRoiSide =
+                    SealRoiSide.RIGHT
 
-                    MotionEvent.ACTION_DOWN -> {
+                updateSelectedRoiUi()
+            }
 
-                        roiLastTouchX =
-                            event.rawX
+        updateSelectedRoiUi()
+    }
 
-                        roiLastTouchY =
-                            event.rawY
+    private fun updateSelectedRoiUi() {
 
-                        true
-                    }
+        val leftSelected =
+            selectedSealRoiSide ==
+                SealRoiSide.LEFT
 
-                    MotionEvent.ACTION_MOVE -> {
+        binding.btnSealSelectLeft.alpha =
+            if (leftSelected) 1.0f else 0.55f
 
-                        val dx =
-                            event.rawX -
-                                roiLastTouchX
+        binding.btnSealSelectRight.alpha =
+            if (leftSelected) 0.55f else 1.0f
 
-                        val dy =
-                            event.rawY -
-                                roiLastTouchY
-
-                        val parent =
-                            binding.sealImageArea
-
-                        var newX =
-                            view.x +
-                                dx
-
-                        var newY =
-                            view.y +
-                                dy
-
-                        val maxX =
-                            parent.width -
-                                view.width
-
-                        val maxY =
-                            parent.height -
-                                view.height
-
-                        newX =
-                            newX.coerceIn(
-                                0f,
-                                maxX
-                                    .coerceAtLeast(
-                                        0
-                                    )
-                                    .toFloat()
-                            )
-
-                        newY =
-                            newY.coerceIn(
-                                0f,
-                                maxY
-                                    .coerceAtLeast(
-                                        0
-                                    )
-                                    .toFloat()
-                            )
-
-                        view.x =
-                            newX
-
-                        view.y =
-                            newY
-
-                        roiLastTouchX =
-                            event.rawX
-
-                        roiLastTouchY =
-                            event.rawY
-
-                        invalidateInspectionResult()
-                        restoreOriginalImage()
-
-                        true
-                    }
-
-                    MotionEvent.ACTION_UP,
-                    MotionEvent.ACTION_CANCEL -> {
-
-                        view.parent
-                            ?.requestDisallowInterceptTouchEvent(
-                                false
-                            )
-
-                        true
-                    }
-
-                    else ->
-                        true
-                }
+        binding.tvSealGuide.text =
+            if (leftSelected) {
+                "LEFT ROI 선택됨 - 좌측 실링부에 맞춰주세요"
+            } else {
+                "RIGHT ROI 선택됨 - 우측 실링부에 맞춰주세요"
             }
     }
 
-    /*
-     * =========================================================
-     * ROI 가로
-     * =========================================================
-     */
+    private fun selectedRoiView(): View {
+
+        return if (
+            selectedSealRoiSide ==
+            SealRoiSide.LEFT
+        ) {
+            binding.sealRoiGuide
+        } else {
+            binding.sealRoiGuideRight
+        }
+    }
+
+    private fun setupRoiDrag() {
+
+        setupSingleRoiDrag(
+            binding.sealRoiGuide,
+            SealRoiSide.LEFT
+        )
+
+        setupSingleRoiDrag(
+            binding.sealRoiGuideRight,
+            SealRoiSide.RIGHT
+        )
+    }
+
+    private fun setupSingleRoiDrag(
+        roiView: View,
+        side: SealRoiSide
+    ) {
+
+        roiView.setOnTouchListener {
+                view,
+                event ->
+
+            view.parent
+                ?.requestDisallowInterceptTouchEvent(
+                    true
+                )
+
+            when (
+                event.action
+            ) {
+
+                MotionEvent.ACTION_DOWN -> {
+
+                    selectedSealRoiSide =
+                        side
+
+                    updateSelectedRoiUi()
+
+                    roiLastTouchX =
+                        event.rawX
+
+                    roiLastTouchY =
+                        event.rawY
+
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+
+                    val dx =
+                        event.rawX -
+                            roiLastTouchX
+
+                    val dy =
+                        event.rawY -
+                            roiLastTouchY
+
+                    val parent =
+                        binding.sealImageArea
+
+                    var newX =
+                        view.x +
+                            dx
+
+                    var newY =
+                        view.y +
+                            dy
+
+                    val maxX =
+                        parent.width -
+                            view.width
+
+                    val maxY =
+                        parent.height -
+                            view.height
+
+                    newX =
+                        newX.coerceIn(
+                            0f,
+                            maxX
+                                .coerceAtLeast(
+                                    0
+                                )
+                                .toFloat()
+                        )
+
+                    newY =
+                        newY.coerceIn(
+                            0f,
+                            maxY
+                                .coerceAtLeast(
+                                    0
+                                )
+                                .toFloat()
+                        )
+
+                    view.x =
+                        newX
+
+                    view.y =
+                        newY
+
+                    updateRoiLabels()
+
+                    roiLastTouchX =
+                        event.rawX
+
+                    roiLastTouchY =
+                        event.rawY
+
+                    invalidateInspectionResult()
+                    restoreOriginalImage()
+
+                    true
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+
+                    view.parent
+                        ?.requestDisallowInterceptTouchEvent(
+                            false
+                        )
+
+                    true
+                }
+
+                else ->
+                    true
+            }
+        }
+    }
 
     private fun resizeRoiWidth(
         scale: Float
     ) {
 
         val roi =
-            binding.sealRoiGuide
+            selectedRoiView()
 
         val parent =
             binding.sealImageArea
@@ -1346,12 +1426,12 @@ Seal Score      : -
 
         newWidth =
             newWidth.coerceIn(
-                80,
+                55,
                 max(
-                    80,
+                    55,
                     (
                         parent.width *
-                            0.95f
+                            0.48f
                         )
                         .toInt()
                 )
@@ -1396,21 +1476,17 @@ Seal Score      : -
 
             roi.x =
                 newX
+
+            updateRoiLabels()
         }
     }
-
-    /*
-     * =========================================================
-     * ROI 세로
-     * =========================================================
-     */
 
     private fun resizeRoiHeight(
         scale: Float
     ) {
 
         val roi =
-            binding.sealRoiGuide
+            selectedRoiView()
 
         val parent =
             binding.sealImageArea
@@ -1482,52 +1558,117 @@ Seal Score      : -
 
             roi.y =
                 newY
+
+            updateRoiLabels()
         }
     }
 
-    /*
-     * =========================================================
-     * ROI 중앙
-     * =========================================================
-     */
-
-    private fun resetRoiPosition() {
+    private fun resetDualRoiPositions() {
 
         binding.sealImageArea.post {
-
-            val roi =
-                binding.sealRoiGuide
 
             val parent =
                 binding.sealImageArea
 
-            roi.x =
+            val left =
+                binding.sealRoiGuide
+
+            val right =
+                binding.sealRoiGuideRight
+
+            val centerYLeft =
                 (
-                    parent.width -
-                        roi.width
+                    parent.height -
+                        left.height
                     ) /
                     2f
 
-            roi.y =
+            val centerYRight =
                 (
                     parent.height -
-                        roi.height
+                        right.height
                     ) /
                     2f
+
+            left.x =
+                (
+                    parent.width *
+                        0.20f -
+                        left.width /
+                            2f
+                    )
+                    .coerceIn(
+                        0f,
+                        (
+                            parent.width -
+                                left.width
+                            )
+                            .coerceAtLeast(
+                                0
+                            )
+                            .toFloat()
+                    )
+
+            right.x =
+                (
+                    parent.width *
+                        0.80f -
+                        right.width /
+                            2f
+                    )
+                    .coerceIn(
+                        0f,
+                        (
+                            parent.width -
+                                right.width
+                            )
+                            .coerceAtLeast(
+                                0
+                            )
+                            .toFloat()
+                    )
+
+            left.y =
+                centerYLeft
+
+            right.y =
+                centerYRight
+
+            updateRoiLabels()
 
             invalidateInspectionResult()
             restoreOriginalImage()
         }
     }
 
-    /*
-     * =========================================================
-     * 화면 ROI → 실제 Bitmap 좌표
-     * =========================================================
-     */
+    private fun updateRoiLabels() {
+
+        val left =
+            binding.sealRoiGuide
+
+        val right =
+            binding.sealRoiGuideRight
+
+        binding.tvSealRoiLeftLabel.x =
+            left.x +
+                4f
+
+        binding.tvSealRoiLeftLabel.y =
+            left.y +
+                4f
+
+        binding.tvSealRoiRightLabel.x =
+            right.x +
+                4f
+
+        binding.tvSealRoiRightLabel.y =
+            right.y +
+                4f
+    }
 
     private fun getBitmapRoi(
-        bitmap: Bitmap
+        bitmap: Bitmap,
+        roi: View
     ): RectF? {
 
         if (
@@ -1537,9 +1678,6 @@ Seal Score      : -
 
             return null
         }
-
-        val roi =
-            binding.sealRoiGuide
 
         val imageView =
             binding.sealImagePreview
@@ -1616,6 +1754,213 @@ Seal Score      : -
         return bitmapRect
     }
 
+    private data class SealSideResult(
+        val side: String,
+        val left: Int,
+        val top: Int,
+        val width: Int,
+        val height: Int,
+        val result: SealInspectionV2.Result,
+        val photoQualityText: String
+    )
+
+    private fun analyzeSealSide(
+        source: Bitmap,
+        roiRect: RectF,
+        side: String
+    ): SealSideResult {
+
+        val left =
+            roiRect.left
+                .toInt()
+                .coerceIn(
+                    0,
+                    source.width -
+                        1
+                )
+
+        val top =
+            roiRect.top
+                .toInt()
+                .coerceIn(
+                    0,
+                    source.height -
+                        1
+                )
+
+        val right =
+            roiRect.right
+                .toInt()
+                .coerceIn(
+                    left +
+                        1,
+                    source.width
+                )
+
+        val bottom =
+            roiRect.bottom
+                .toInt()
+                .coerceIn(
+                    top +
+                        1,
+                    source.height
+                )
+
+        val roiWidth =
+            right -
+                left
+
+        val roiHeight =
+            bottom -
+                top
+
+        val roiBitmap =
+            Bitmap.createBitmap(
+                source,
+                left,
+                top,
+                roiWidth,
+                roiHeight
+            )
+
+        val photoQuality =
+            ImageQualityChecker.analyzeBitmap(
+                roiBitmap
+            )
+
+        val photoQualityText =
+            String.format(
+                Locale.getDefault(),
+                "%s 사진 품질 : %s (%.1f / 100)\\n밝기 %.1f | 명암 %.1f | 선명도 %.1f",
+                side,
+                photoQuality.status,
+                photoQuality.qualityScore,
+                photoQuality.averageBrightness,
+                photoQuality.contrast,
+                photoQuality.sharpness
+            )
+
+        val v2 =
+            SealInspectionV2.analyze(
+                sourceBitmap = source,
+                roiLeft = left,
+                roiTop = top,
+                roiWidth = roiWidth,
+                roiHeight = roiHeight,
+                sensitivity = sensitivity
+            )
+
+        if (
+            !roiBitmap.isRecycled
+        ) {
+            roiBitmap.recycle()
+        }
+
+        return SealSideResult(
+            side = side,
+            left = left,
+            top = top,
+            width = roiWidth,
+            height = roiHeight,
+            result = v2,
+            photoQualityText = photoQualityText
+        )
+    }
+
+    private fun worseJudgment(
+        left: String,
+        right: String
+    ): String {
+
+        fun rank(
+            value: String
+        ): Int {
+
+            return when {
+                value.contains("불량") -> 4
+                value.contains("한계") -> 3
+                value.contains("주의") -> 2
+                else -> 1
+            }
+        }
+
+        return if (
+            rank(left) >=
+            rank(right)
+        ) {
+            left
+        } else {
+            right
+        }
+    }
+
+    private fun buildSideText(
+        sideResult: SealSideResult
+    ): String {
+
+        val v =
+            sideResult.result
+
+        val wrinkleDetail =
+            if (
+                v.wrinkles.isEmpty()
+            ) {
+                "검출된 Seal Wrinkle 없음"
+            } else {
+                v.wrinkles.joinToString(
+                    separator = "\\n"
+                ) { wrinkle ->
+                    String.format(
+                        Locale.getDefault(),
+                        "#%d 길이 %.1f%% | 강도 %.0f | 음영 %.0f | Crossing %.0f",
+                        wrinkle.index,
+                        wrinkle.lengthPercent,
+                        wrinkle.strength,
+                        wrinkle.shadowRisk,
+                        wrinkle.sealCrossingRisk
+                    )
+                }
+            }
+
+        return String.format(
+            Locale.getDefault(),
+            """
+%s SEAL
+
+판정 : %s
+Seal Wrinkle : %d개
+최장 주름 : %.1f%%
+평균 주름 강도 : %.1f / 100
+Seal Line Uniformity : %.1f / 100
+Width Variation : %.1f%%
+Local Discontinuity : %.1f / 100
+PP Flow Risk : %.1f / 100
+Shadow Risk : %.1f / 100
+Cup Intrusion Risk : %.1f / 100
+Overall Risk : %.1f / 100
+Quality Score : %.1f / 100
+
+%s
+%s
+            """.trimIndent(),
+            sideResult.side,
+            v.suggestedJudgment,
+            v.wrinkleCount,
+            v.longestWrinklePercent,
+            v.averageWrinkleStrength,
+            v.sealLineUniformity,
+            v.widthVariationPercent,
+            v.localDiscontinuityRisk,
+            v.ppFlowRisk,
+            v.transparencyShadowRisk,
+            v.cupIntrusionRisk,
+            v.overallRisk,
+            v.qualityScore,
+            wrinkleDetail,
+            sideResult.photoQualityText
+        )
+    }
+
     /*
      * =========================================================
      * SEAL 검사
@@ -1632,458 +1977,91 @@ Seal Score      : -
     ) {
 
         binding.tvSealStatus.text =
-            "SEAL V2 ROI 분석 중..."
+            "SEAL 좌/우 동시 분석 중..."
 
         invalidateInspectionResult()
         restoreOriginalImage()
 
-        val bitmapRoi =
+        val leftRoi =
             getBitmapRoi(
-                bitmap
+                bitmap,
+                binding.sealRoiGuide
+            )
+
+        val rightRoi =
+            getBitmapRoi(
+                bitmap,
+                binding.sealRoiGuideRight
             )
 
         if (
-            bitmapRoi ==
+            leftRoi ==
+            null ||
+            rightRoi ==
             null
         ) {
 
             binding.tvSealStatus.text =
-                "ROI 영역을 계산하지 못했습니다."
+                "LEFT / RIGHT ROI 영역을 확인해주세요."
 
             return
         }
 
-        val left =
-            bitmapRoi.left
-                .toInt()
-                .coerceIn(
-                    0,
-                    bitmap.width -
-                        1
-                )
-
-        val top =
-            bitmapRoi.top
-                .toInt()
-                .coerceIn(
-                    0,
-                    bitmap.height -
-                        1
-                )
-
-        val right =
-            bitmapRoi.right
-                .toInt()
-                .coerceIn(
-                    left +
-                        1,
-                    bitmap.width
-                )
-
-        val bottom =
-            bitmapRoi.bottom
-                .toInt()
-                .coerceIn(
-                    top +
-                        1,
-                    bitmap.height
-                )
-
-        val roiWidth =
-            right -
-                left
-
-        val roiHeight =
-            bottom -
-                top
-
-        if (
-            roiWidth <
-            10 ||
-            roiHeight <
-            10
-        ) {
-
-            binding.tvSealStatus.text =
-                "ROI 영역이 너무 작습니다."
-
-            return
-        }
-
-        val source =
-            bitmap
-
-        /*
-         * 분석은 Background Thread
-         */
         Thread {
 
             try {
 
-                val roiBitmap =
-                    Bitmap.createBitmap(
-                        source,
-                        left,
-                        top,
-                        roiWidth,
-                        roiHeight
+                val leftResult =
+                    analyzeSealSide(
+                        source = bitmap,
+                        roiRect = leftRoi,
+                        side = "LEFT"
                     )
 
-                /*
-                 * =================================================
-                 * 촬영 이미지 품질 점검
-                 * =================================================
-                 * 검사 판정과 별도의 촬영 보조지표입니다.
-                 */
-                val photoQuality =
-                    ImageQualityChecker.analyzeBitmap(
-                        roiBitmap
+                val rightResult =
+                    analyzeSealSide(
+                        source = bitmap,
+                        roiRect = rightRoi,
+                        side = "RIGHT"
                     )
 
-                val photoQualityText =
-                    String.format(
-                        Locale.getDefault(),
-                        "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
-                        photoQuality.status,
-                        photoQuality.qualityScore,
-                        photoQuality.averageBrightness,
-                        photoQuality.contrast,
-                        photoQuality.sharpness
+                val finalJudgment =
+                    worseJudgment(
+                        leftResult.result.suggestedJudgment,
+                        rightResult.result.suggestedJudgment
                     )
 
-                /*
-                 * =================================================
-                 * 기존 SEAL 분석
-                 * =================================================
-                 * 기존 Dashboard / History 참고값과
-                 * 현장 비교를 위해 유지합니다.
-                 */
-                val analysisWidth =
+                val worstQuality =
                     minOf(
-                        320,
-                        roiWidth
-                    )
-                        .coerceAtLeast(
-                            20
-                        )
-
-                val analysisHeight =
-                    max(
-                        40,
-                        (
-                            analysisWidth *
-                                roiBitmap.height
-                                    .toFloat() /
-                                roiBitmap.width
-                            )
-                            .toInt()
-                    )
-                        .coerceAtMost(
-                            240
-                        )
-
-                val smallBitmap =
-                    Bitmap.createScaledBitmap(
-                        roiBitmap,
-                        analysisWidth,
-                        analysisHeight,
-                        true
+                        leftResult.result.qualityScore,
+                        rightResult.result.qualityScore
                     )
 
-                val width =
-                    smallBitmap.width
-
-                val height =
-                    smallBitmap.height
-
-                val gray =
-                    IntArray(
-                        width *
-                            height
-                    )
-
-                for (
-                    y in 0 until
-                        height
-                ) {
-
-                    for (
-                        x in 0 until
-                            width
-                    ) {
-
-                        gray[
-                            y *
-                                width +
-                                x
-                        ] =
-                            grayValue(
-                                smallBitmap.getPixel(
-                                    x,
-                                    y
-                                )
-                            )
-                    }
-                }
-
-                val edgeThreshold =
+                val avgUniformity =
                     (
-                        75 -
-                            sensitivity *
-                            0.50
-                        )
-                        .toInt()
-                        .coerceIn(
-                            20,
-                            70
-                        )
+                        leftResult.result.sealLineUniformity +
+                            rightResult.result.sealLineUniformity
+                        ) /
+                        2.0
 
-                val strongThreshold =
-                    (
-                        115 -
-                            sensitivity *
-                            0.67
-                        )
-                        .toInt()
-                        .coerceIn(
-                            35,
-                            105
-                        )
+                lastSealScore =
+                    worstQuality
 
-                var edgeCount =
-                    0L
+                lastSealUniformity =
+                    avgUniformity
 
-                var strongEdgeCount =
-                    0L
-
-                var totalGradient =
+                lastEdgeDensity =
                     0.0
 
-                var sampleCount =
-                    0L
+                lastStrongEdgeDensity =
+                    0.0
 
-                for (
-                    y in 1 until
-                        height -
-                        1
-                ) {
+                lastEdgeStrength =
+                    0.0
 
-                    for (
-                        x in 1 until
-                            width -
-                        1
-                    ) {
+                lastJudgment =
+                    finalJudgment
 
-                        val center =
-                            gray[
-                                y *
-                                    width +
-                                    x
-                            ]
-
-                        val leftValue =
-                            gray[
-                                y *
-                                    width +
-                                    x -
-                                    1
-                            ]
-
-                        val rightValue =
-                            gray[
-                                y *
-                                    width +
-                                    x +
-                                    1
-                            ]
-
-                        val topValue =
-                            gray[
-                                (
-                                    y -
-                                        1
-                                    ) *
-                                    width +
-                                    x
-                            ]
-
-                        val bottomValue =
-                            gray[
-                                (
-                                    y +
-                                        1
-                                    ) *
-                                    width +
-                                    x
-                            ]
-
-                        val gx =
-                            abs(
-                                rightValue -
-                                    leftValue
-                            )
-
-                        val gy =
-                            abs(
-                                bottomValue -
-                                    topValue
-                            )
-
-                        val local =
-                            abs(
-                                center -
-                                    (
-                                        leftValue +
-                                            rightValue +
-                                            topValue +
-                                            bottomValue
-                                        ) /
-                                    4
-                            )
-
-                        val gradient =
-                            gx +
-                                gy +
-                                local
-
-                        totalGradient +=
-                            gradient
-
-                        sampleCount++
-
-                        if (
-                            gradient >=
-                            edgeThreshold
-                        ) {
-
-                            edgeCount++
-                        }
-
-                        if (
-                            gradient >=
-                            strongThreshold
-                        ) {
-
-                            strongEdgeCount++
-                        }
-                    }
-                }
-
-                if (
-                    sampleCount <=
-                    0
-                ) {
-
-                    runOnUiThread {
-
-                        binding.tvSealStatus.text =
-                            "SEAL 분석에 실패했습니다."
-                    }
-
-                    return@Thread
-                }
-
-                val edgeDensity =
-                    edgeCount
-                        .toDouble() /
-                        sampleCount
-                            .toDouble() *
-                        100.0
-
-                val strongEdgeDensity =
-                    strongEdgeCount
-                        .toDouble() /
-                        sampleCount
-                            .toDouble() *
-                        100.0
-
-                val averageStrength =
-                    totalGradient /
-                        sampleCount
-                            .toDouble()
-
-                val sensitivityFactor =
-                    0.55 +
-                        sensitivity /
-                        133.3
-
-                val legacySealUniformity =
-                    (
-                        100.0 -
-                            (
-                                edgeDensity *
-                                    1.6 +
-                                    strongEdgeDensity *
-                                    2.0
-                                ) *
-                            sensitivityFactor
-                        )
-                        .coerceIn(
-                            0.0,
-                            100.0
-                        )
-
-                val legacyDefectLevel =
-                    (
-                        (
-                            edgeDensity *
-                                2.0 +
-                                strongEdgeDensity *
-                                3.0 +
-                                averageStrength *
-                                0.45
-                            ) *
-                            sensitivityFactor
-                        )
-                        .coerceIn(
-                            0.0,
-                            100.0
-                        )
-
-                val legacySealScore =
-                    (
-                        100.0 -
-                            legacyDefectLevel
-                        )
-                        .coerceIn(
-                            0.0,
-                            100.0
-                        )
-
-                /*
-                 * =================================================
-                 * SEAL V2 핵심 분석
-                 * =================================================
-                 *
-                 * - 실링툴 압착 위치 주름
-                 * - 실제 물리 주름 그룹화
-                 * - 주름 길이 / 강도 / 방향 / Crossing Risk
-                 * - Seal Line Uniformity
-                 * - Width Variation
-                 * - Local Discontinuity
-                 * - PP Flow
-                 * - Transparency / Shadow
-                 * - Cup Intrusion
-                 */
-                val v2 =
-                    SealInspectionV2.analyze(
-                        sourceBitmap = source,
-                        roiLeft = left,
-                        roiTop = top,
-                        roiWidth = roiWidth,
-                        roiHeight = roiHeight,
-                        sensitivity = sensitivity
-                    )
-
-                /*
-                 * =================================================
-                 * Model / Line 기준
-                 * =================================================
-                 *
-                 * 기존 기준은 참고용으로 유지합니다.
-                 * V2 최종 판정은 SealInspectionV2의
-                 * 실링 주름 + 구조적 Risk 판정을 사용합니다.
-                 */
                 val inspectionSpec =
                     InspectionSpecStore.getCurrent(
                         context = this,
@@ -2091,187 +2069,97 @@ Seal Score      : -
                             InspectionSpecStore.InspectionType.SEAL
                     )
 
-                val judgment =
-                    v2.suggestedJudgment
+                val leftText =
+                    buildSideText(
+                        leftResult
+                    )
 
-                /*
-                 * =================================================
-                 * 기존 빨간 후보 표시 유지
-                 * =================================================
-                 *
-                 * 빨간 후보 수는 실제 Seal Wrinkle 개수와 다를 수 있습니다.
-                 * 현장 적용 초기에는 기존 표시를 보조 시각화로 유지합니다.
-                 */
-                val markerResult =
+                val rightText =
+                    buildSideText(
+                        rightResult
+                    )
+
+                lastDetails =
+                    """
+SEAL V2 DUAL ROI
+
+$leftText
+
+------------------------------
+
+$rightText
+
+==============================
+종합 판정 : $finalJudgment
+종합 Quality Score : ${String.format(Locale.getDefault(), "%.1f", worstQuality)} / 100
+
+정상 Master Baseline 운영 원칙
+- 현재 확보된 정상 10셀 / 20장(정면+사선)은 정상 변동 참고군으로 사용
+- 실제 NG 이미지가 없으므로 주의/불량 경계는 임시 기준
+- 촬영각도에 따라 이동하는 큰 반사광은 보조지표로만 사용
+- 새로운 주름/크랙성 선, 길이, 강도, 실링선 Crossing을 우선 위험신호로 사용
+- 현장 정상 데이터가 누적되면 기준을 재보정
+
+현재 Model / Line 기존 기준 (참고용)
+${inspectionSpec.criteriaText()}
+                    """.trimIndent()
+
+                val leftMarkerResult =
                     DefectMarker.markDefectRegions(
-                        sourceBitmap = source,
-                        roiLeft = left,
-                        roiTop = top,
-                        roiWidth = roiWidth,
-                        roiHeight = roiHeight,
+                        sourceBitmap = bitmap,
+                        roiLeft = leftResult.left,
+                        roiTop = leftResult.top,
+                        roiWidth = leftResult.width,
+                        roiHeight = leftResult.height,
                         sensitivity = sensitivity,
                         maxRegions = 6
                     )
 
-                val regionSummary =
-                    DefectMarker.buildRegionSummary(
-                        markerResult.regions
+                val rightMarkerResult =
+                    DefectMarker.markDefectRegions(
+                        sourceBitmap = bitmap,
+                        roiLeft = rightResult.left,
+                        roiTop = rightResult.top,
+                        roiWidth = rightResult.width,
+                        roiHeight = rightResult.height,
+                        sensitivity = sensitivity,
+                        maxRegions = 6
                     )
-
-                val regionCount =
-                    markerResult.regions.size
 
                 /*
-                 * =================================================
-                 * 저장용 수치
-                 * =================================================
-                 *
-                 * Dashboard의 "높을수록 양호" 방향성을 유지하기 위해
-                 * V2 Quality Score를 저장 Score로 사용합니다.
+                 * LEFT 표시 후 그 결과 Bitmap 위에 RIGHT 표시를 추가하여
+                 * 좌/우 후보를 한 장에 같이 남깁니다.
                  */
-                lastSealScore =
-                    v2.qualityScore
-
-                lastSealUniformity =
-                    v2.sealLineUniformity
-
-                lastEdgeDensity =
-                    edgeDensity
-
-                lastStrongEdgeDensity =
-                    strongEdgeDensity
-
-                lastEdgeStrength =
-                    averageStrength
-
-                lastJudgment =
-                    judgment
-
-                val wrinkleLines =
-                    if (
-                        v2.wrinkles.isEmpty()
-                    ) {
-
-                        "검출된 Seal Wrinkle 없음"
-
-                    } else {
-
-                        v2.wrinkles.joinToString(
-                            separator = "\n"
-                        ) { wrinkle ->
-
-                            String.format(
-                                Locale.getDefault(),
-                                "#%d 길이 %.1f%% | 강도 %.0f | 음영 %.0f | 방향 %.1f° | Crossing %.0f",
-                                wrinkle.index,
-                                wrinkle.lengthPercent,
-                                wrinkle.strength,
-                                wrinkle.shadowRisk,
-                                wrinkle.angleDegree,
-                                wrinkle.sealCrossingRisk
-                            )
-                        }
-                    }
-
-                lastDetails =
-                    String.format(
-                        Locale.getDefault(),
-
-                        """
-SEAL V2
-
-Seal Wrinkle : %d개
-Longest Wrinkle : %.1f%%
-Average Wrinkle Strength : %.1f / 100
-
-Seal Line Uniformity : %.1f / 100
-Width Variation : %.1f%%
-Local Discontinuity Risk : %.1f / 100
-PP Flow Risk : %.1f / 100
-Transparency / Shadow Risk : %.1f / 100
-Cup Intrusion Risk : %.1f / 100
-
-Overall Seal Risk : %.1f / 100
-Quality Score : %.1f / 100
-Final Judgment : %s
-
-Seal Wrinkle 상세
-%s
-
-기존 보조지표
-Legacy Seal Score : %.1f / 100
-Legacy Seal Uniformity : %.1f / 100
-Edge Density : %.1f%%
-Strong Edge : %.1f%%
-Edge Strength : %.1f
-
-기존 빨간 후보 : %d개
-%s
-
-Sensitivity : %d%%
-V2 Raw Component : %d개
-                        """.trimIndent(),
-
-                        v2.wrinkleCount,
-                        v2.longestWrinklePercent,
-                        v2.averageWrinkleStrength,
-                        v2.sealLineUniformity,
-                        v2.widthVariationPercent,
-                        v2.localDiscontinuityRisk,
-                        v2.ppFlowRisk,
-                        v2.transparencyShadowRisk,
-                        v2.cupIntrusionRisk,
-                        v2.overallRisk,
-                        v2.qualityScore,
-                        judgment,
-                        wrinkleLines,
-                        legacySealScore,
-                        legacySealUniformity,
-                        edgeDensity,
-                        strongEdgeDensity,
-                        averageStrength,
-                        regionCount,
-                        regionSummary,
-                        sensitivity,
-                        v2.rawComponentCount
+                val leftMarked =
+                    MarkerDisplayRenderer.renderGeneric(
+                        sourceBitmap = bitmap,
+                        roiLeft = leftResult.left,
+                        roiTop = leftResult.top,
+                        roiWidth = leftResult.width,
+                        roiHeight = leftResult.height,
+                        regions = leftMarkerResult.regions
                     )
 
-                lastDetails +=
-                    "\n\n현재 Model / Line 기존 판정 기준 (참고용)\n" +
-                        inspectionSpec.criteriaText() +
-                        "\n\n" +
-                        photoQualityText +
-                        "\n\n※ Seal Wrinkle은 실링툴 압착 위치의 주름을 우선 감지합니다." +
-                        "\n※ 빨간 후보 영역 수와 실제 Seal Wrinkle 개수는 서로 다를 수 있습니다." +
-                        "\n※ 주름 길이/Seal Width는 현재 mm가 아닌 ROI 대비 상대값입니다." +
-                        "\n※ 현장 Ground Truth 축적 후 V2 판정 기준을 보정합니다."
+                val finalMarked =
+                    MarkerDisplayRenderer.renderGeneric(
+                        sourceBitmap = leftMarked,
+                        roiLeft = rightResult.left,
+                        roiTop = rightResult.top,
+                        roiWidth = rightResult.width,
+                        roiHeight = rightResult.height,
+                        regions = rightMarkerResult.regions
+                    )
 
-                if (!photoQuality.isUsable) {
-                    lastDetails +=
-                        "\n" +
-                            photoQuality.message
+                if (
+                    leftMarked !==
+                    finalMarked &&
+                    !leftMarked.isRecycled
+                ) {
+                    leftMarked.recycle()
                 }
 
-                /*
-                 * =================================================
-                 * 결과 이미지
-                 * =================================================
-                 * 기존 빨간 후보 Renderer를 유지합니다.
-                 * V2 물리 주름 전용 표시 Renderer는 현장 검증 후
-                 * 별도 추가할 수 있습니다.
-                 */
-                val displayBitmap =
-                    MarkerDisplayRenderer.renderGeneric(
-                        sourceBitmap = source,
-                        roiLeft = left,
-                        roiTop = top,
-                        roiWidth = roiWidth,
-                        roiHeight = roiHeight,
-                        regions = markerResult.regions
-                    )
-
                 lastResultBitmap =
-                    displayBitmap
+                    finalMarked
 
                 hasInspectionResult =
                     true
@@ -2280,112 +2168,50 @@ V2 Raw Component : %d개
 
                     binding.sealImagePreview
                         .setImageBitmap(
-                            displayBitmap
+                            finalMarked
                         )
 
                     binding.sealImagePreview.imageMatrix =
                         imageMatrixValue
 
                     binding.tvSealMetrics.text =
-                        String.format(
-                            Locale.getDefault(),
+                        """
+SEAL V2 - LEFT / RIGHT 동시 검사
 
-                            """
-SEAL V2
+LEFT
+판정 : ${leftResult.result.suggestedJudgment}
+주름 : ${leftResult.result.wrinkleCount}개
+최장 주름 : ${String.format(Locale.getDefault(), "%.1f", leftResult.result.longestWrinklePercent)}%
+Overall Risk : ${String.format(Locale.getDefault(), "%.1f", leftResult.result.overallRisk)}
+Quality : ${String.format(Locale.getDefault(), "%.1f", leftResult.result.qualityScore)}
 
-실링 위치 주름 : %d개
-최장 주름 길이 : %.1f%%
-평균 주름 강도 : %.1f / 100
+RIGHT
+판정 : ${rightResult.result.suggestedJudgment}
+주름 : ${rightResult.result.wrinkleCount}개
+최장 주름 : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.longestWrinklePercent)}%
+Overall Risk : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.overallRisk)}
+Quality : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.qualityScore)}
 
-Seal Line Uniformity : %.1f / 100
-Width Variation : %.1f%%
-Local Discontinuity : %.1f / 100
-PP Flow Risk : %.1f / 100
-Shadow Risk : %.1f / 100
-Cup Intrusion Risk : %.1f / 100
+종합 판정 : $finalJudgment
+종합 Quality Score : ${String.format(Locale.getDefault(), "%.1f", worstQuality)}
 
-Overall Risk : %.1f / 100
-Quality Score : %.1f / 100
-
-판정 : %s
-
-민감도 : %d%%
-
-Seal Wrinkle 상세
-%s
-
-기존 빨간 후보 : %d개
-%s
-
-현재 Model / Line 기존 판정 기준 (참고용)
-%s
-
-※ 핵심 : 실링툴 압착 위치의 실제 주름을 별도 계산합니다.
-※ 빨간 후보 개수 = 실제 Seal Wrinkle 개수가 아닙니다.
-※ 주름 길이와 폭은 현재 ROI 대비 상대값(%%)입니다.
-※ 실제 mm 판정은 향후 Calibration이 필요합니다.
-※ V2는 현장 적용용 1차 버전이며 Ground Truth로 보정합니다.
-                            """.trimIndent(),
-
-                            v2.wrinkleCount,
-                            v2.longestWrinklePercent,
-                            v2.averageWrinkleStrength,
-                            v2.sealLineUniformity,
-                            v2.widthVariationPercent,
-                            v2.localDiscontinuityRisk,
-                            v2.ppFlowRisk,
-                            v2.transparencyShadowRisk,
-                            v2.cupIntrusionRisk,
-                            v2.overallRisk,
-                            v2.qualityScore,
-                            judgment,
-                            sensitivity,
-                            wrinkleLines,
-                            regionCount,
-                            regionSummary,
-                            inspectionSpec.criteriaText()
-                        )
-
-                    binding.tvSealMetrics.append(
-                        "\n\n" +
-                            photoQualityText +
-                            "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
-                    )
+※ 좌/우 중 더 나쁜 판정을 종합 판정으로 사용합니다.
+※ 현재 주의/불량 기준은 정상 10셀/20장 기반의 임시 현장 기준입니다.
+※ 실제 불량 샘플 확보 시 기준을 다시 검증합니다.
+                        """.trimIndent()
 
                     binding.tvSealStatus.text =
-                        "SEAL V2 검사 완료 - $judgment / 실링 주름 ${v2.wrinkleCount}개"
-
-                    if (!photoQuality.isUsable) {
-                        Toast.makeText(
-                            this,
-                            "촬영 상태 재확인 권고\n${photoQuality.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                        "SEAL 완료 - LEFT ${leftResult.result.suggestedJudgment} / RIGHT ${rightResult.result.suggestedJudgment} / 종합 $finalJudgment"
                 }
 
-                if (
-                    smallBitmap !==
-                    roiBitmap &&
-                    !smallBitmap.isRecycled
-                ) {
-
-                    smallBitmap.recycle()
-                }
-
-                if (
-                    !roiBitmap.isRecycled
-                ) {
-
-                    roiBitmap.recycle()
-                }
-
-            } catch (e: Exception) {
+            } catch (
+                e: Exception
+            ) {
 
                 runOnUiThread {
 
                     binding.tvSealStatus.text =
-                        "SEAL V2 분석 오류: ${e.message}"
+                        "SEAL 좌/우 분석 오류: ${e.message}"
                 }
             }
 

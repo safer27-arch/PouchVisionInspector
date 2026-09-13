@@ -659,6 +659,22 @@ class MenuActivity : AppCompatActivity() {
 
         /*
          * =====================================================
+         * 금형 / Punch 예방관리
+         * =====================================================
+         */
+        binding.btnMoldManagement
+            .setOnClickListener {
+
+                startActivity(
+                    Intent(
+                        this,
+                        MoldManagementActivity::class.java
+                    )
+                )
+            }
+
+        /*
+         * =====================================================
          * Telegram 알림 설정
          * =====================================================
          */

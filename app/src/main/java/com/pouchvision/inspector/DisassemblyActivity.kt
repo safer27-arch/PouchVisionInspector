@@ -676,11 +676,12 @@ class DisassemblyActivity : AppCompatActivity() {
 
         binding.tvDisassemblyMetrics.text =
             """
-Surface Uniformity : -
-Edge Density       : -
-Strong Edge        : -
-Local Change       : -
-Quality Score      : -
+DISASSEMBLY V2.1
+PP/Seal 연속성 Risk : -
+폭/표면 Variation : -
+국부 찢김 Risk : -
+Strong Edge Risk : -
+Quality Score : -
 
 판정 : -
 
@@ -1519,50 +1520,36 @@ NG 후보 영역 : -
         roiStartX: Int,
         roiStartY: Int
     ) {
+        val photoQuality = ImageQualityChecker.analyzeBitmap(roi)
+        val photoQualityText = String.format(
+            Locale.getDefault(),
+            "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+            photoQuality.status,
+            photoQuality.qualityScore,
+            photoQuality.averageBrightness,
+            photoQuality.contrast,
+            photoQuality.sharpness
+        )
 
-        /*
-         * DISASSEMBLY V2
-         *
-         * 분해 과정에서 파우치를 잡아 뜯기 때문에 실링부 위치/각도가
-         * 매번 달라질 수 있습니다. 따라서 V2는 절대 위치가 아니라
-         * PP/실링 흔적의 연속성, 국부 단절/찢김, 폭/표면 분포를 중심으로 봅니다.
-         */
-        val photoQuality =
-            ImageQualityChecker.analyzeBitmap(roi)
+        val result = DisassemblyInspectionV2.analyze(
+            roi = roi,
+            sensitivity = sensitivity
+        )
 
-        val photoQualityText =
-            String.format(
-                Locale.getDefault(),
-                "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
-                photoQuality.status,
-                photoQuality.qualityScore,
-                photoQuality.averageBrightness,
-                photoQuality.contrast,
-                photoQuality.sharpness
-            )
+        val inspectionSpec = InspectionSpecStore.getCurrent(
+            context = this,
+            inspectionType = InspectionSpecStore.InspectionType.DISASSEMBLY
+        )
+        val judgment = inspectionSpec.judge(result.qualityScore)
 
-        val v2 =
-            DisassemblyInspectionV2.analyze(
-                roi = roi,
-                sensitivity = sensitivity
-            )
+        // V2.1: 정상 Master에서는 빨간 후보를 표시하지 않습니다.
+        // 실제 판정이 정상 범위를 벗어나고 국부 찢김 Risk가 충분히 높을 때만
+        // 기존 DefectMarker를 보조 확인용으로 사용합니다.
+        val showCandidates =
+            !judgment.equals("정상", ignoreCase = true) &&
+                result.localTearRisk >= 60.0
 
-        val inspectionSpec =
-            InspectionSpecStore.getCurrent(
-                context = this,
-                inspectionType =
-                    InspectionSpecStore.InspectionType.DISASSEMBLY
-            )
-
-        val judgment =
-            inspectionSpec.judge(v2.qualityScore)
-
-        /*
-         * 후보 마커는 기존 공용 검출기를 사용하되,
-         * 정상 판정에서는 알루미늄 반사/분해 흔적을 빨간 NG로 오해하지 않도록
-         * 화면 표시를 억제합니다.
-         */
-        val markerResult =
+        val markerResult = if (showCandidates) {
             DefectMarker.markDefectRegions(
                 sourceBitmap = source,
                 roiLeft = roiStartX,
@@ -1570,64 +1557,33 @@ NG 후보 영역 : -
                 roiWidth = roi.width,
                 roiHeight = roi.height,
                 sensitivity = sensitivity,
-                maxRegions = 5
+                maxRegions = 3
             )
+        } else {
+            null
+        }
 
-        val showDefectMarkers =
-            judgment.contains("불량") ||
-                judgment.contains("NG") ||
-                judgment.contains("한계") ||
-                v2.localTearRisk >= 70.0 ||
-                v2.continuityRisk >= 72.0
+        val regionCount = markerResult?.regions?.size ?: 0
+        val regionSummary = if (markerResult != null) {
+            DefectMarker.buildRegionSummary(markerResult.regions)
+        } else {
+            "정상 Master 우선: 빨간 후보 표시 없음"
+        }
 
-        val displayRegions =
-            if (showDefectMarkers) {
-                markerResult.regions
-            } else {
-                emptyList()
-            }
+        lastQualityScore = result.qualityScore
+        lastSurfaceUniformity = result.surfaceUniformity
+        lastEdgeDensity = result.continuityRisk
+        lastStrongEdgeDensity = result.strongEdgeRisk
+        lastLocalChange = result.localTearRisk
+        lastJudgment = judgment
 
-        val regionCount =
-            displayRegions.size
-
-        val regionSummary =
-            if (regionCount > 0) {
-                DefectMarker.buildRegionSummary(displayRegions)
-            } else {
-                "정상 범위에서는 반사광 후보 표시를 억제합니다."
-            }
-
-        lastQualityScore =
-            v2.qualityScore
-
-        lastSurfaceUniformity =
-            v2.surfaceUniformity
-
-        /*
-         * 기존 History 필드 호환성을 위해 아래 값에는
-         * V2의 핵심 위험도를 매핑합니다.
-         */
-        lastEdgeDensity =
-            v2.continuityRisk
-
-        lastStrongEdgeDensity =
-            v2.localTearRisk
-
-        lastLocalChange =
-            v2.widthVariationRisk
-
-        lastJudgment =
-            judgment
-
-        lastDetails =
-            String.format(
-                Locale.getDefault(),
-                """
-DISASSEMBLY V2 - 분해 실링/PP 정밀판정
-
+        lastDetails = String.format(
+            Locale.getDefault(),
+            """
+DISASSEMBLY V2.1 - 정밀판정
 인식 Confidence : %.1f / 100
 PP/Seal 연속성 Risk : %.1f / 100
-폭/표면 Variation Risk : %.1f / 100
+폭/표면 Variation : %.1f / 100
 국부 찢김 Risk : %.1f / 100
 Strong Edge Risk : %.1f / 100
 위치 흔들림 허용도 : %.1f / 100
@@ -1638,116 +1594,57 @@ Sensitivity : %d%%
 판정 : %s
 
 %s
-
 NG 후보 영역 : %d개
 %s
+            """.trimIndent(),
+            result.confidence,
+            result.continuityRisk,
+            result.widthVariationRisk,
+            result.localTearRisk,
+            result.strongEdgeRisk,
+            result.positionTolerance,
+            result.surfaceUniformity,
+            result.qualityScore,
+            sensitivity,
+            judgment,
+            result.note,
+            regionCount,
+            regionSummary
+        )
 
-현재 Model / Line 판정 기준
-%s
-
-%s
-                """.trimIndent(),
-                v2.confidence,
-                v2.continuityRisk,
-                v2.widthVariationRisk,
-                v2.localTearRisk,
-                v2.strongEdgeRisk,
-                v2.positionTolerance,
-                v2.surfaceUniformity,
-                v2.qualityScore,
-                sensitivity,
-                judgment,
-                v2.note,
-                regionCount,
-                regionSummary,
-                inspectionSpec.criteriaText(),
-                photoQualityText
-            )
+        lastDetails +=
+            "\n\n현재 Model / Line 판정 기준\n" +
+                inspectionSpec.criteriaText() +
+                "\n\n" + photoQualityText +
+                "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다." +
+                "\n※ V2.1은 정상 Master 우선 버전이며 실제 NG 확보 후 Threshold를 최종 보정합니다."
 
         if (!photoQuality.isUsable) {
-            lastDetails +=
-                "\n" +
-                    photoQuality.message
+            lastDetails += "\n" + photoQuality.message
         }
 
-        val displayBitmap =
+        val displayBitmap = if (markerResult != null && markerResult.regions.isNotEmpty()) {
             MarkerDisplayRenderer.renderGeneric(
                 sourceBitmap = source,
                 roiLeft = roiStartX,
                 roiTop = roiStartY,
                 roiWidth = roi.width,
                 roiHeight = roi.height,
-                regions = displayRegions
+                regions = markerResult.regions
             )
+        } else {
+            source.copy(Bitmap.Config.ARGB_8888, true)
+        }
 
-        lastResultBitmap =
-            displayBitmap
-
-        hasInspectionResult =
-            true
+        lastResultBitmap = displayBitmap
+        hasInspectionResult = true
 
         runOnUiThread {
-
-            binding.disassemblyImagePreview.setImageBitmap(
-                displayBitmap
-            )
-
-            binding.disassemblyImagePreview.imageMatrix =
-                imageMatrixValue
-
+            binding.disassemblyImagePreview.setImageBitmap(displayBitmap)
+            binding.disassemblyImagePreview.imageMatrix = imageMatrixValue
             binding.tvDisassemblyStatus.text =
-                "DISASSEMBLY V2 분석 완료 - $judgment"
-
-            binding.tvDisassemblyMetrics.text =
-                String.format(
-                    Locale.getDefault(),
-                    """
-DISASSEMBLY V2 - 정밀판정
-
-인식 Confidence       : %.1f / 100
-PP/Seal 연속성 Risk   : %.1f / 100
-폭/표면 Variation     : %.1f / 100
-국부 찢김 Risk        : %.1f / 100
-Strong Edge Risk      : %.1f / 100
-위치 흔들림 허용도    : %.1f / 100
-Surface Uniformity    : %.1f / 100
-Quality Score         : %.1f / 100
-
-판정 : %s
-
-%s
-
-NG 후보 영역 : %d개
-%s
-
-※ 분해 시 실링부 위치/각도 이동 자체는 불량으로 판정하지 않습니다.
-※ PP/실링 흔적의 연속성, 국부 단절/찢김, 폭/표면 변화가 핵심입니다.
-※ 정상 판정에서는 알루미늄 반사광에 의한 빨간 후보 표시를 억제합니다.
-※ 실제 NG 샘플 확보 후 Threshold를 최종 재보정합니다.
-
-현재 Model / Line 판정 기준
-%s
-                    """.trimIndent(),
-                    v2.confidence,
-                    v2.continuityRisk,
-                    v2.widthVariationRisk,
-                    v2.localTearRisk,
-                    v2.strongEdgeRisk,
-                    v2.positionTolerance,
-                    v2.surfaceUniformity,
-                    v2.qualityScore,
-                    judgment,
-                    v2.note,
-                    regionCount,
-                    regionSummary,
-                    inspectionSpec.criteriaText()
-                )
-
-            binding.tvDisassemblyMetrics.append(
-                "\n\n" +
-                    photoQualityText +
-                    "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
-            )
+                "DISASSEMBLY V2.1 분석 완료 - $judgment"
+            binding.tvDisassemblyMetrics.text = lastDetails
 
             if (!photoQuality.isUsable) {
                 Toast.makeText(

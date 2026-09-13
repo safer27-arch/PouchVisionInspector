@@ -274,22 +274,52 @@ object TrainingDataStore {
     }
 
     private fun copyTrainingImage(
-        context: Context, sourcePath: String, sourceId: Long, inspectionType: String
-    ): String = try {
-        val source = File(sourcePath)
-        if (!source.exists() || !source.isFile) return ""
-        val dir = File(context.filesDir, IMAGE_DIR)
-        if (!dir.exists() && !dir.mkdirs()) return ""
-        val safeType = inspectionType.lowercase(Locale.US)
-            .replace(" ", "_").replace("/", "_").replace("\\", "_")
-        val target = File(dir, "${sourceId}_${safeType}.jpg")
-        if (!target.exists()) {
-            source.inputStream().use { input ->
-                FileOutputStream(target).use { output -> input.copyTo(output) }
+        context: Context,
+        sourcePath: String,
+        sourceId: Long,
+        inspectionType: String
+    ): String {
+
+        return try {
+            val source = File(sourcePath)
+
+            if (!source.exists() || !source.isFile) {
+                return ""
             }
+
+            val dir = File(context.filesDir, IMAGE_DIR)
+
+            if (!dir.exists() && !dir.mkdirs()) {
+                return ""
+            }
+
+            val safeType =
+                inspectionType
+                    .lowercase(Locale.US)
+                    .replace(" ", "_")
+                    .replace("/", "_")
+                    .replace("\\", "_")
+
+            val target =
+                File(
+                    dir,
+                    "${sourceId}_${safeType}.jpg"
+                )
+
+            if (!target.exists()) {
+                source.inputStream().use { input ->
+                    FileOutputStream(target).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+
+            target.absolutePath
+
+        } catch (_: Exception) {
+            ""
         }
-        target.absolutePath
-    } catch (_: Exception) { "" }
+    }
 
     private fun loadMutableJson(context: Context): JSONArray {
         val text = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)

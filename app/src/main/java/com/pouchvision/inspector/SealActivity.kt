@@ -1761,6 +1761,7 @@ Seal Score      : -
         val width: Int,
         val height: Int,
         val result: SealInspectionV2.Result,
+        val baseline: SealBaselineV2.Evaluation,
         val photoQualityText: String
     )
 
@@ -1850,6 +1851,11 @@ Seal Score      : -
                 sensitivity = sensitivity
             )
 
+        val baseline =
+            SealBaselineV2.evaluate(
+                v2
+            )
+
         if (
             !roiBitmap.isRecycled
         ) {
@@ -1863,6 +1869,7 @@ Seal Score      : -
             width = roiWidth,
             height = roiHeight,
             result = v2,
+            baseline = baseline,
             photoQualityText = photoQualityText
         )
     }
@@ -1928,7 +1935,11 @@ Seal Score      : -
 %s SEAL
 
 판정 : %s
-Seal Wrinkle : %d개
+Baseline Deviation : %.1f / 100
+유효 주름/크랙 후보 : %d개
+고위험 크랙 후보 : %d개
+Crack Risk : %.1f / 100
+Seal Wrinkle(raw) : %d개
 최장 주름 : %.1f%%
 평균 주름 강도 : %.1f / 100
 Seal Line Uniformity : %.1f / 100
@@ -1944,7 +1955,11 @@ Quality Score : %.1f / 100
 %s
             """.trimIndent(),
             sideResult.side,
-            v.suggestedJudgment,
+            sideResult.baseline.judgment,
+            sideResult.baseline.baselineDeviation,
+            sideResult.baseline.qualifiedWrinkleCount,
+            sideResult.baseline.severeWrinkleCount,
+            sideResult.baseline.crackRisk,
             v.wrinkleCount,
             v.longestWrinklePercent,
             v.averageWrinkleStrength,
@@ -2026,9 +2041,9 @@ Quality Score : %.1f / 100
                     )
 
                 val finalJudgment =
-                    worseJudgment(
-                        leftResult.result.suggestedJudgment,
-                        rightResult.result.suggestedJudgment
+                    SealBaselineV2.worseJudgment(
+                        leftResult.baseline.judgment,
+                        rightResult.baseline.judgment
                     )
 
                 val worstQuality =
@@ -2095,7 +2110,8 @@ $rightText
 
 정상 Master Baseline 운영 원칙
 - 현재 확보된 정상 10셀 / 20장(정면+사선)은 정상 변동 참고군으로 사용
-- 실제 NG 이미지가 없으므로 주의/불량 경계는 임시 기준
+- 실제 NG 이미지가 없으므로 주의/한계정상/불량 경계는 임시 기준
+- raw NG 후보 개수는 최종 판정에서 제외
 - 촬영각도에 따라 이동하는 큰 반사광은 보조지표로만 사용
 - 새로운 주름/크랙성 선, 길이, 강도, 실링선 Crossing을 우선 위험신호로 사용
 - 현장 정상 데이터가 누적되면 기준을 재보정
@@ -2104,51 +2120,72 @@ $rightText
 ${inspectionSpec.criteriaText()}
                     """.trimIndent()
 
-                val leftMarkerResult =
-                    DefectMarker.markDefectRegions(
-                        sourceBitmap = bitmap,
-                        roiLeft = leftResult.left,
-                        roiTop = leftResult.top,
-                        roiWidth = leftResult.width,
-                        roiHeight = leftResult.height,
-                        sensitivity = sensitivity,
-                        maxRegions = 6
-                    )
-
-                val rightMarkerResult =
-                    DefectMarker.markDefectRegions(
-                        sourceBitmap = bitmap,
-                        roiLeft = rightResult.left,
-                        roiTop = rightResult.top,
-                        roiWidth = rightResult.width,
-                        roiHeight = rightResult.height,
-                        sensitivity = sensitivity,
-                        maxRegions = 6
-                    )
-
                 /*
-                 * LEFT 표시 후 그 결과 Bitmap 위에 RIGHT 표시를 추가하여
-                 * 좌/우 후보를 한 장에 같이 남깁니다.
+                 * 정상 Baseline으로 판정된 쪽은 빨간 NG 후보를 표시하지 않습니다.
+                 * 정상 실링 압흔/반사광이 NG 후보로 보이는 오검출을 줄이기 위함입니다.
                  */
                 val leftMarked =
-                    MarkerDisplayRenderer.renderGeneric(
-                        sourceBitmap = bitmap,
-                        roiLeft = leftResult.left,
-                        roiTop = leftResult.top,
-                        roiWidth = leftResult.width,
-                        roiHeight = leftResult.height,
-                        regions = leftMarkerResult.regions
-                    )
+                    if (
+                        leftResult.baseline.showDefectMarkers
+                    ) {
+
+                        val leftMarkerResult =
+                            DefectMarker.markDefectRegions(
+                                sourceBitmap = bitmap,
+                                roiLeft = leftResult.left,
+                                roiTop = leftResult.top,
+                                roiWidth = leftResult.width,
+                                roiHeight = leftResult.height,
+                                sensitivity = sensitivity,
+                                maxRegions = 4
+                            )
+
+                        MarkerDisplayRenderer.renderGeneric(
+                            sourceBitmap = bitmap,
+                            roiLeft = leftResult.left,
+                            roiTop = leftResult.top,
+                            roiWidth = leftResult.width,
+                            roiHeight = leftResult.height,
+                            regions = leftMarkerResult.regions
+                        )
+
+                    } else {
+
+                        bitmap.copy(
+                            Bitmap.Config.ARGB_8888,
+                            true
+                        )
+                    }
 
                 val finalMarked =
-                    MarkerDisplayRenderer.renderGeneric(
-                        sourceBitmap = leftMarked,
-                        roiLeft = rightResult.left,
-                        roiTop = rightResult.top,
-                        roiWidth = rightResult.width,
-                        roiHeight = rightResult.height,
-                        regions = rightMarkerResult.regions
-                    )
+                    if (
+                        rightResult.baseline.showDefectMarkers
+                    ) {
+
+                        val rightMarkerResult =
+                            DefectMarker.markDefectRegions(
+                                sourceBitmap = bitmap,
+                                roiLeft = rightResult.left,
+                                roiTop = rightResult.top,
+                                roiWidth = rightResult.width,
+                                roiHeight = rightResult.height,
+                                sensitivity = sensitivity,
+                                maxRegions = 4
+                            )
+
+                        MarkerDisplayRenderer.renderGeneric(
+                            sourceBitmap = leftMarked,
+                            roiLeft = rightResult.left,
+                            roiTop = rightResult.top,
+                            roiWidth = rightResult.width,
+                            roiHeight = rightResult.height,
+                            regions = rightMarkerResult.regions
+                        )
+
+                    } else {
+
+                        leftMarked
+                    }
 
                 if (
                     leftMarked !==
@@ -2179,18 +2216,18 @@ ${inspectionSpec.criteriaText()}
 SEAL V2 - LEFT / RIGHT 동시 검사
 
 LEFT
-판정 : ${leftResult.result.suggestedJudgment}
-주름 : ${leftResult.result.wrinkleCount}개
-최장 주름 : ${String.format(Locale.getDefault(), "%.1f", leftResult.result.longestWrinklePercent)}%
-Overall Risk : ${String.format(Locale.getDefault(), "%.1f", leftResult.result.overallRisk)}
-Quality : ${String.format(Locale.getDefault(), "%.1f", leftResult.result.qualityScore)}
+판정 : ${leftResult.baseline.judgment}
+Baseline Deviation : ${String.format(Locale.getDefault(), "%.1f", leftResult.baseline.baselineDeviation)}
+유효 주름/크랙 후보 : ${leftResult.baseline.qualifiedWrinkleCount}개
+고위험 크랙 후보 : ${leftResult.baseline.severeWrinkleCount}개
+${leftResult.baseline.reason}
 
 RIGHT
-판정 : ${rightResult.result.suggestedJudgment}
-주름 : ${rightResult.result.wrinkleCount}개
-최장 주름 : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.longestWrinklePercent)}%
-Overall Risk : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.overallRisk)}
-Quality : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.qualityScore)}
+판정 : ${rightResult.baseline.judgment}
+Baseline Deviation : ${String.format(Locale.getDefault(), "%.1f", rightResult.baseline.baselineDeviation)}
+유효 주름/크랙 후보 : ${rightResult.baseline.qualifiedWrinkleCount}개
+고위험 크랙 후보 : ${rightResult.baseline.severeWrinkleCount}개
+${rightResult.baseline.reason}
 
 종합 판정 : $finalJudgment
 종합 Quality Score : ${String.format(Locale.getDefault(), "%.1f", worstQuality)}
@@ -2201,7 +2238,7 @@ Quality : ${String.format(Locale.getDefault(), "%.1f", rightResult.result.qualit
                         """.trimIndent()
 
                     binding.tvSealStatus.text =
-                        "SEAL 완료 - LEFT ${leftResult.result.suggestedJudgment} / RIGHT ${rightResult.result.suggestedJudgment} / 종합 $finalJudgment"
+                        "SEAL 완료 - LEFT ${leftResult.baseline.judgment} / RIGHT ${rightResult.baseline.judgment} / 종합 $finalJudgment"
                 }
 
             } catch (

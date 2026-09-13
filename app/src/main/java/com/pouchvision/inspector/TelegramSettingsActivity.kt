@@ -49,6 +49,34 @@ class TelegramSettingsActivity : AppCompatActivity() {
             ).show()
         }
 
+        binding.btnShiftSummaryTest.setOnClickListener {
+            saveSettings()
+
+            ShiftWeeklyReportWorker.sendShiftTestNow(
+                this
+            )
+
+            Toast.makeText(
+                this,
+                "교대조 Summary 테스트 전송을 요청했습니다. 최근 12시간을 집계합니다.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
+        binding.btnWeeklyReportTest.setOnClickListener {
+            saveSettings()
+
+            ShiftWeeklyReportWorker.sendWeeklyTestNow(
+                this
+            )
+
+            Toast.makeText(
+                this,
+                "Weekly Report 테스트 전송을 요청했습니다. 최근 1주 및 4주 추세를 집계합니다.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
         binding.btnTelegramBack.setOnClickListener {
             finish()
         }
@@ -126,6 +154,8 @@ class TelegramSettingsActivity : AppCompatActivity() {
         setNavyButton(binding.btnSaveTelegramSettings, "#102A43")
         setNavyButton(binding.btnTelegramTest, "#123E63")
         setNavyButton(binding.btnDashboardSummaryTest, "#0F6B50")
+        setNavyButton(binding.btnShiftSummaryTest, "#8A5A00")
+        setNavyButton(binding.btnWeeklyReportTest, "#6B3FA0")
         setNavyButton(binding.btnTelegramBack, "#486581")
     }
 

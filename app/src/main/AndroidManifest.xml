@@ -3,7 +3,7 @@
     <!-- 카메라 사용 -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Telegram / 네트워크 -->
+    <!-- Telegram Bot API / 네트워크 기능 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature
@@ -48,9 +48,13 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
-        <!-- 이번 업데이트 신규 화면 -->
         <activity
             android:name=".MoldManagementActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".TrainingReviewActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

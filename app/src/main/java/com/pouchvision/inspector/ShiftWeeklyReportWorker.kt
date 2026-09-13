@@ -151,7 +151,114 @@ class ShiftWeeklyReportWorker(
             }
         }
 
+        /*
+         * 60분 검사 누락 자동 알림
+         *
+         * - 현재 진행 중인 1시간 구간은 검사하지 않습니다.
+         * - 직전에 완전히 종료된 1시간 구간만 확인합니다.
+         * - 해당 Model / Line에 개별 검사 결과가 1건도 없으면 Telegram 전송.
+         * - 같은 시간대는 한 번만 전송합니다.
+         * - 07:00 / 19:00 교대 경계에서도 직전 1시간을 정상 확인합니다.
+         */
+        if (!checkMissedInspectionAlert(now)) {
+            retryNeeded = true
+        }
+
         return if (retryNeeded) Result.retry() else Result.success()
+    }
+
+    private fun checkMissedInspectionAlert(
+        now: Calendar
+    ): Boolean {
+
+        val slotEnd =
+            (now.clone() as Calendar).apply {
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        val slotStart =
+            (slotEnd.clone() as Calendar).apply {
+                add(
+                    Calendar.HOUR_OF_DAY,
+                    -1
+                )
+            }
+
+        val production =
+            ProductionContextStore.getCurrent(
+                applicationContext
+            )
+
+        val records =
+            loadRecords(
+                slotStart.timeInMillis,
+                slotEnd.timeInMillis,
+                production.model,
+                production.line
+            )
+
+        // 직전 완료 시간대에 검사 결과가 있으면 누락이 아닙니다.
+        if (records.isNotEmpty()) {
+            return true
+        }
+
+        val alertKey =
+            "MISSED_" +
+                production.model +
+                "_" +
+                production.line +
+                "_" +
+                keyFormat.format(
+                    slotStart.time
+                )
+
+        // 같은 Model / Line / 시간대는 중복 알림 금지
+        if (wasSent(alertKey)) {
+            return true
+        }
+
+        val message =
+            buildString {
+                append("⚠ Pouch 정기검사 미실시 알림")
+                append("\nModel : ${production.model}")
+                append("\nLine : ${production.line}")
+                append(
+                    "\n누락 시간대 : " +
+                        slotLabel(
+                            slotStart,
+                            0
+                        )
+                )
+                append("\n검사 기준 : 60분마다 최소 1회")
+                append("\n상태 : 해당 시간대 검사 이력 0건")
+                append("\n\n📌 다음 검사 주기 내 검사를 실시해주세요.")
+            }
+
+        val success =
+            sendReport(
+                reportType =
+                    "MISSED INSPECTION",
+                judgment =
+                    "60분 검사 미실시",
+                model =
+                    production.model,
+                line =
+                    production.line,
+                message =
+                    message,
+                images =
+                    emptyList()
+            )
+
+        if (success) {
+            markSent(
+                alertKey
+            )
+        }
+
+        return success
     }
 
     private fun sendShiftReport(

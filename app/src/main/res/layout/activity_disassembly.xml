@@ -31,7 +31,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Disassembly Inspection"
+                android:text="Disassembly V2 Inspection"
                 android:textColor="#D9E2EC"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -80,7 +80,7 @@
                 android:paddingTop="6dp"
                 android:paddingEnd="10dp"
                 android:paddingBottom="6dp"
-                android:text="확인할 분해 영역에 ROI를 맞춰주세요"
+                android:text="분해 후 실링/PP 흔적이 포함되도록 ROI를 맞춰주세요"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp" />
         </FrameLayout>
@@ -364,7 +364,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="• 전극 / 분리막 표면의 국부 변화&#10;• 주름 및 찢김 의심 영역&#10;• 비정상 Edge / 손상 흔적&#10;• 표면 균일도 변화"
+                android:text="• PP/실링 흔적의 연속성&#10;• 국부 단절 / 찢김 의심 영역&#10;• 폭/표면 변화의 균일성&#10;• 분해 후 위치/각도 흔들림은 허용"
                 android:textColor="#486581"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -379,7 +379,7 @@
             android:layout_marginBottom="10dp"
             android:background="#FFFFFF"
             android:padding="14dp"
-            android:text="Surface Uniformity : -&#10;Edge Density : -&#10;Strong Edge : -&#10;Local Change : -&#10;Quality Score : -&#10;&#10;판정 : -"
+            android:text="DISASSEMBLY V2&#10;PP/Seal 연속성 Risk : -&#10;폭/표면 Variation : -&#10;국부 찢김 Risk : -&#10;위치 흔들림 허용도 : -&#10;Quality Score : -&#10;&#10;판정 : -"
             android:textColor="#102A43"
             android:textSize="14sp" />
 

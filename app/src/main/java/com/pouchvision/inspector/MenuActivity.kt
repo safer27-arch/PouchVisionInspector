@@ -34,6 +34,17 @@ class MenuActivity : AppCompatActivity() {
         setupProductionContext()
 
         /*
+         * 교대조 / 주간 Telegram 자동 리포트 예약
+         *
+         * 07:00 : 야간조 12시간 Summary
+         * 19:00 : 주간조 12시간 Summary
+         * 월요일 07:00 : Weekly Report + 최근 4주 추세
+         */
+        ShiftWeeklyReportWorker.applySchedule(
+            this
+        )
+
+        /*
          * 기존 메뉴 버튼 연결
          */
         setupButtons()

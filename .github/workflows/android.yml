@@ -25,25 +25,35 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Restore stable Android debug signing key
+      - name: Restore stable APK signing key
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
-            echo "ERROR: GitHub Secret DEBUG_KEYSTORE_BASE64 is not configured."
+            echo "ERROR: DEBUG_KEYSTORE_BASE64 GitHub Secret is missing."
             exit 1
           fi
-          mkdir -p "$HOME/.android"
-          echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
 
-      - name: Build Debug APK
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/app/pouchvision.keystore"
+          chmod 600 "$GITHUB_WORKSPACE/app/pouchvision.keystore"
+
+          echo "Stable signing certificate:"
+          keytool -list -v             -keystore "$GITHUB_WORKSPACE/app/pouchvision.keystore"             -storepass android             -alias androiddebugkey             | grep "SHA256:"
+
+      - name: Build signed Release APK
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: gradle assembleDebug
+          POUCH_KEYSTORE_PATH: ${{ github.workspace }}/app/pouchvision.keystore
+        run: gradle assembleRelease
+
+      - name: Verify APK signature
+        run: |
+          APK="$GITHUB_WORKSPACE/app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --print-certs "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PouchVisionInspector-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: PouchVisionInspector-release-apk
+          path: app/build/outputs/apk/release/app-release.apk

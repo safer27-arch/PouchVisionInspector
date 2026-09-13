@@ -46,14 +46,23 @@ jobs:
           POUCH_KEYSTORE_PATH: ${{ github.workspace }}/app/pouchvision.keystore
         run: gradle assembleRelease
 
-      - name: Verify APK signature
+      - name: Verify APK signature and version
         run: |
           APK="$GITHUB_WORKSPACE/app/build/outputs/apk/release/app-release.apk"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
-          "$APKSIGNER" verify --print-certs "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
+
+          echo "=== APK CERTIFICATE ===" | tee "$GITHUB_WORKSPACE/app/build/outputs/apk/release/build-info.txt"
+          "$APKSIGNER" verify --print-certs "$APK" | tee -a "$GITHUB_WORKSPACE/app/build/outputs/apk/release/build-info.txt"
+
+          echo "" | tee -a "$GITHUB_WORKSPACE/app/build/outputs/apk/release/build-info.txt"
+          echo "=== APK VERSION ===" | tee -a "$GITHUB_WORKSPACE/app/build/outputs/apk/release/build-info.txt"
+          "$AAPT" dump badging "$APK" | grep "^package:" | tee -a "$GITHUB_WORKSPACE/app/build/outputs/apk/release/build-info.txt"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PouchVisionInspector-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/build-info.txt

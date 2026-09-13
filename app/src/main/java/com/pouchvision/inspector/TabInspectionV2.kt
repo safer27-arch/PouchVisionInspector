@@ -8,26 +8,42 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * TAB V2 - 정상 TAB 사진 10장 기반 현장용 1차 분석기
+ * TAB V2.1 - TAB Damage + PP FLOW 정밀판정
  *
- * 검사 목적
- * - TAB 중심 위치/정렬
- * - TAB 주변 실링부 균일성
- * - TAB 주변 국부 주름/눌림
- * - TAB-셀 경계의 비정상 변화
- * - 파우치 전체 반사광/큰 주름은 낮은 가중치
+ * 사용자 기준:
+ * 1) TAB 자체 데미지는 민감하게 판정
+ * 2) 파우치 실링툴에 의한 PP FLOW의
+ *    - 직진성
+ *    - 흘러내림 / Sag
+ *    - 폭
+ *    - 두께(색/명암 기반 상대 추정)
+ *    - 파우치 Cup과의 거리
+ *    를 치명인자로 관리
  *
- * 실제 NG 샘플이 없으므로 현재 판정 Threshold는 보수적인 임시 기준입니다.
+ * 현재는 정상 사진 10장을 기준으로 한 현장용 1차 규칙입니다.
+ * 실제 NG 샘플이 확보되면 Threshold를 재보정해야 합니다.
  */
 object TabInspectionV2 {
 
     data class Result(
         val tabPresenceConfidence: Double,
-        val alignmentRisk: Double,
+
+        val tabDamageRisk: Double,
+
+        val ppFlowStraightnessRisk: Double,
+        val ppFlowWidthVariation: Double,
+        val ppFlowSagRisk: Double,
+        val ppFlowThicknessRisk: Double,
+        val cupDistanceRisk: Double,
+
         val sealUniformityRisk: Double,
         val boundaryRisk: Double,
-        val localDeformationRisk: Double,
         val reflectionRisk: Double,
+
+        val ppFlowMeanWidthPercent: Double,
+        val ppFlowThicknessIndex: Double,
+        val cupDistancePercent: Double,
+
         val baselineDeviation: Double,
         val qualityScore: Double,
         val judgment: String,
@@ -40,41 +56,23 @@ object TabInspectionV2 {
         sensitivity: Int
     ): Result {
 
-        if (
-            roi.width < 20 ||
-            roi.height < 20
-        ) {
+        if (roi.width < 30 || roi.height < 30) {
             return emptyResult()
         }
 
-        val targetW =
-            min(
-                320,
-                roi.width
-            )
-                .coerceAtLeast(
-                    40
-                )
-
+        val targetW = min(360, roi.width).coerceAtLeast(60)
         val targetH =
             max(
-                40,
+                60,
                 (
                     targetW *
                         roi.height.toDouble() /
                         roi.width.toDouble()
-                    )
-                    .toInt()
-            )
-                .coerceAtMost(
-                    320
-                )
+                    ).toInt()
+            ).coerceAtMost(420)
 
         val small =
-            if (
-                roi.width == targetW &&
-                roi.height == targetH
-            ) {
+            if (roi.width == targetW && roi.height == targetH) {
                 roi
             } else {
                 Bitmap.createScaledBitmap(
@@ -85,17 +83,10 @@ object TabInspectionV2 {
                 )
             }
 
-        val w =
-            small.width
+        val w = small.width
+        val h = small.height
 
-        val h =
-            small.height
-
-        val pixels =
-            IntArray(
-                w *
-                    h
-            )
+        val pixels = IntArray(w * h)
 
         small.getPixels(
             pixels,
@@ -107,351 +98,403 @@ object TabInspectionV2 {
             h
         )
 
-        val gray =
-            DoubleArray(
-                pixels.size
+        val gray = DoubleArray(w * h)
+        val sat = DoubleArray(w * h)
+        val hue = DoubleArray(w * h)
+
+        for (i in pixels.indices) {
+
+            val c = pixels[i]
+
+            val r = Color.red(c).toDouble()
+            val g = Color.green(c).toDouble()
+            val b = Color.blue(c).toDouble()
+
+            gray[i] =
+                0.299 * r +
+                    0.587 * g +
+                    0.114 * b
+
+            val hsv = FloatArray(3)
+            Color.RGBToHSV(
+                r.toInt(),
+                g.toInt(),
+                b.toInt(),
+                hsv
             )
 
-        val saturation =
-            DoubleArray(
-                pixels.size
-            )
-
-        for (
-            i in pixels.indices
-        ) {
-
-            val c =
-                pixels[
-                    i
-                ]
-
-            val r =
-                Color.red(
-                    c
-                )
-                    .toDouble()
-
-            val g =
-                Color.green(
-                    c
-                )
-                    .toDouble()
-
-            val b =
-                Color.blue(
-                    c
-                )
-                    .toDouble()
-
-            gray[
-                i
-            ] =
-                0.299 *
-                    r +
-                    0.587 *
-                    g +
-                    0.114 *
-                    b
-
-            val mx =
-                max(
-                    r,
-                    max(
-                        g,
-                        b
-                    )
-                )
-
-            val mn =
-                min(
-                    r,
-                    min(
-                        g,
-                        b
-                    )
-                )
-
-            saturation[
-                i
-            ] =
-                if (
-                    mx <=
-                    1.0
-                ) {
-                    0.0
-                } else {
-                    (
-                        mx -
-                            mn
-                        ) /
-                        mx *
-                        100.0
-                }
+            hue[i] = hsv[0].toDouble()
+            sat[i] = hsv[1].toDouble() * 100.0
         }
 
-        val blur =
-            boxBlur(
-                gray,
-                w,
-                h,
-                2
-            )
+        val blur = boxBlur(gray, w, h, 2)
+        val localMean = boxBlur(gray, w, h, 9)
 
-        val localMean =
-            boxBlur(
-                gray,
-                w,
-                h,
-                9
-            )
+        val gradient = DoubleArray(w * h)
 
-        val gradient =
-            DoubleArray(
-                w *
-                    h
-            )
+        var globalGradientSum = 0.0
+        var globalContrastSum = 0.0
+        var globalSamples = 0
 
-        var globalGradient =
-            0.0
+        for (y in 1 until h - 1) {
 
-        var globalContrast =
-            0.0
+            for (x in 1 until w - 1) {
 
-        var sampleCount =
-            0
-
-        for (
-            y in 1 until
-                h -
-                1
-        ) {
-
-            for (
-                x in 1 until
-                    w -
-                    1
-            ) {
-
-                val i =
-                    y *
-                        w +
-                        x
+                val i = y * w + x
 
                 val gx =
-                    blur[
-                        i +
-                            1
-                    ] -
-                        blur[
-                            i -
-                                1
-                        ]
+                    blur[i + 1] -
+                        blur[i - 1]
 
                 val gy =
-                    blur[
-                        i +
-                            w
-                    ] -
-                        blur[
-                            i -
-                                w
-                        ]
+                    blur[i + w] -
+                        blur[i - w]
 
                 val g =
                     sqrt(
-                        gx *
-                            gx +
-                            gy *
-                            gy
+                        gx * gx +
+                            gy * gy
                     )
 
-                gradient[
-                    i
-                ] =
-                    g
+                gradient[i] = g
 
-                globalGradient +=
-                    g
+                globalGradientSum += g
 
-                globalContrast +=
+                globalContrastSum +=
                     abs(
-                        gray[
-                            i
-                        ] -
-                            localMean[
-                                i
-                            ]
+                        gray[i] -
+                            localMean[i]
                     )
 
-                sampleCount++
+                globalSamples++
             }
         }
 
         val meanGradient =
-            if (
-                sampleCount >
-                0
-            ) {
-                globalGradient /
-                    sampleCount
+            if (globalSamples > 0) {
+                globalGradientSum /
+                    globalSamples
             } else {
                 0.0
             }
 
-        val meanContrast =
-            if (
-                sampleCount >
-                0
-            ) {
-                globalContrast /
-                    sampleCount
+        val reflectionRisk =
+            if (globalSamples > 0) {
+                (
+                    globalContrastSum /
+                        globalSamples *
+                        2.0
+                    ).coerceIn(
+                    0.0,
+                    100.0
+                )
             } else {
                 0.0
             }
 
         /*
-         * TAB 사진에서는 노란/주황색 TAB sealing film이
-         * 주변 알루미늄/흰색 셀보다 상대적으로 색 Saturation이 높습니다.
+         * =====================================================
+         * 1. PP FLOW 색 영역 탐색
+         * =====================================================
          *
-         * 이 색 영역의 중심을 찾아 TAB 주변을 자동으로 좁혀 봅니다.
+         * 현재 사진에서 PP FLOW는 노랑/주황 계열로 보이므로
+         * Warm color + saturation을 이용합니다.
+         * 너무 어두운/밝은 반사광은 제외합니다.
          */
-        var satX =
-            0.0
+        val warmMask =
+            BooleanArray(
+                w *
+                    h
+            )
 
-        var satY =
-            0.0
+        var warmCount = 0
 
-        var satWeight =
-            0.0
+        for (y in 1 until h - 1) {
 
-        var satCount =
-            0
+            for (x in 1 until w - 1) {
 
-        for (
-            y in 0 until
-                h
-        ) {
+                val i = y * w + x
 
-            for (
-                x in 0 until
-                    w
-            ) {
+                val warmHue =
+                    hue[i] >= 18.0 &&
+                        hue[i] <= 65.0
 
-                val i =
-                    y *
-                        w +
-                        x
+                val enoughSat =
+                    sat[i] >=
+                        25.0
 
-                val s =
-                    saturation[
-                        i
-                    ]
+                val enoughBrightness =
+                    gray[i] >=
+                        45.0 &&
+                        gray[i] <=
+                        245.0
 
-                if (
-                    s >=
-                    28.0
-                ) {
+                val candidate =
+                    warmHue &&
+                        enoughSat &&
+                        enoughBrightness
 
-                    val weight =
-                        (
-                            s -
-                                24.0
-                            )
-                            .coerceAtLeast(
-                                1.0
-                            )
+                warmMask[i] =
+                    candidate
 
-                    satX +=
-                        x *
-                            weight
-
-                    satY +=
-                        y *
-                            weight
-
-                    satWeight +=
-                        weight
-
-                    satCount++
+                if (candidate) {
+                    warmCount++
                 }
             }
         }
 
         val tabPresenceConfidence =
             (
-                satCount
+                warmCount
                     .toDouble() /
-                    (
-                        w *
-                            h
-                        )
+                    (w * h)
                         .toDouble() *
-                    1800.0
+                    2200.0
                 )
                 .coerceIn(
                     0.0,
                     100.0
                 )
 
-        val centerX =
+        /*
+         * warm PP FLOW component의 bbox와 row profile을 구함.
+         */
+        var minX = w
+        var maxX = -1
+        var minY = h
+        var maxY = -1
+
+        for (y in 0 until h) {
+
+            for (x in 0 until w) {
+
+                if (
+                    warmMask[
+                        y *
+                            w +
+                            x
+                    ]
+                ) {
+
+                    minX = min(minX, x)
+                    maxX = max(maxX, x)
+                    minY = min(minY, y)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+
+        if (
+            maxX < minX ||
+            maxY < minY
+        ) {
+
             if (
-                satWeight >
-                0.0
+                small !== roi &&
+                !small.isRecycled
             ) {
-                satX /
-                    satWeight
+                small.recycle()
+            }
+
+            return Result(
+                tabPresenceConfidence =
+                    tabPresenceConfidence,
+                tabDamageRisk =
+                    0.0,
+                ppFlowStraightnessRisk =
+                    0.0,
+                ppFlowWidthVariation =
+                    0.0,
+                ppFlowSagRisk =
+                    0.0,
+                ppFlowThicknessRisk =
+                    0.0,
+                cupDistanceRisk =
+                    0.0,
+                sealUniformityRisk =
+                    0.0,
+                boundaryRisk =
+                    0.0,
+                reflectionRisk =
+                    reflectionRisk,
+                ppFlowMeanWidthPercent =
+                    0.0,
+                ppFlowThicknessIndex =
+                    0.0,
+                cupDistancePercent =
+                    0.0,
+                baselineDeviation =
+                    22.0,
+                qualityScore =
+                    78.0,
+                judgment =
+                    "정상",
+                reason =
+                    "TAB/PP FLOW 색 영역 인식 Confidence가 낮습니다. ROI 위치를 확인해주세요.",
+                showDefectMarkers =
+                    false
+            )
+        }
+
+        val flowHeight =
+            max(
+                1,
+                maxY -
+                    minY +
+                    1
+            )
+
+        val rowCenters =
+            mutableListOf<Double>()
+
+        val rowWidths =
+            mutableListOf<Double>()
+
+        val rowBrightness =
+            mutableListOf<Double>()
+
+        for (y in minY..maxY) {
+
+            var rowMinX =
+                w
+
+            var rowMaxX =
+                -1
+
+            var brightnessSum =
+                0.0
+
+            var rowCount =
+                0
+
+            for (x in minX..maxX) {
+
+                val i =
+                    y *
+                        w +
+                        x
+
+                if (
+                    warmMask[i]
+                ) {
+
+                    rowMinX =
+                        min(
+                            rowMinX,
+                            x
+                        )
+
+                    rowMaxX =
+                        max(
+                            rowMaxX,
+                            x
+                        )
+
+                    brightnessSum +=
+                        gray[i]
+
+                    rowCount++
+                }
+            }
+
+            if (
+                rowCount >
+                0 &&
+                rowMaxX >=
+                rowMinX
+            ) {
+
+                rowCenters.add(
+                    (
+                        rowMinX +
+                            rowMaxX
+                        ) /
+                        2.0
+                )
+
+                rowWidths.add(
+                    (
+                        rowMaxX -
+                            rowMinX +
+                            1
+                        )
+                        .toDouble()
+                )
+
+                rowBrightness.add(
+                    brightnessSum /
+                        rowCount
+                )
+            }
+        }
+
+        val meanWidth =
+            if (
+                rowWidths.isNotEmpty()
+            ) {
+                rowWidths.average()
+            } else {
+                0.0
+            }
+
+        val ppFlowMeanWidthPercent =
+            (
+                meanWidth /
+                    w.toDouble() *
+                    100.0
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
+
+        /*
+         * =====================================================
+         * 2. PP FLOW 직진성
+         * =====================================================
+         *
+         * 각 row의 중심선이 좌우로 얼마나 흔들리는지 계산.
+         */
+        val meanCenter =
+            if (
+                rowCenters.isNotEmpty()
+            ) {
+                rowCenters.average()
             } else {
                 w /
                     2.0
             }
 
-        val centerY =
+        val centerStd =
             if (
-                satWeight >
-                0.0
+                rowCenters.isNotEmpty()
             ) {
-                satY /
-                    satWeight
+
+                sqrt(
+                    rowCenters
+                        .map {
+                            val d =
+                                it -
+                                    meanCenter
+
+                            d *
+                                d
+                        }
+                        .average()
+                )
+
             } else {
-                h /
-                    2.0
+                0.0
             }
 
-        /*
-         * 실제 촬영에서는 TAB이 ROI 중앙에 정확히 올 필요는 없지만
-         * 지나치게 치우치면 ROI가 TAB 주변을 충분히 포함하지 못한 것으로 본다.
-         */
-        val normDx =
-            abs(
-                centerX -
-                    w /
-                        2.0
-            ) /
-                max(
-                    1.0,
-                    w /
-                        2.0
-                )
-
-        val normDy =
-            abs(
-                centerY -
-                    h /
-                        2.0
-            ) /
-                max(
-                    1.0,
-                    h /
-                        2.0
-                )
-
-        val alignmentRisk =
+        val ppFlowStraightnessRisk =
             (
-                normDx *
-                    58.0 +
-                    normDy *
-                    42.0
+                centerStd /
+                    max(
+                        1.0,
+                        meanWidth
+                    ) *
+                    55.0
                 )
                 .coerceIn(
                     0.0,
@@ -459,74 +502,247 @@ object TabInspectionV2 {
                 )
 
         /*
-         * TAB 주변 자동 분석 Window
+         * =====================================================
+         * 3. PP FLOW 폭 변화
+         * =====================================================
          */
-        val halfW =
-            max(
-                8,
+        val widthStd =
+            if (
+                rowWidths.isNotEmpty()
+            ) {
+
+                sqrt(
+                    rowWidths
+                        .map {
+                            val d =
+                                it -
+                                    meanWidth
+
+                            d *
+                                d
+                        }
+                        .average()
+                )
+
+            } else {
+                0.0
+            }
+
+        val ppFlowWidthVariation =
+            (
+                widthStd /
+                    max(
+                        1.0,
+                        meanWidth
+                    ) *
+                    100.0
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
+
+        /*
+         * =====================================================
+         * 4. PP FLOW 흘러내림 / Sag
+         * =====================================================
+         *
+         * flow 상/중/하 구간 중심선의 이동량 + 폭 증가를 같이 봄.
+         */
+        fun segmentMean(
+            values: List<Double>,
+            startRatio: Double,
+            endRatio: Double
+        ): Double {
+
+            if (
+                values.isEmpty()
+            ) {
+                return 0.0
+            }
+
+            val start =
                 (
-                    w *
-                        0.22
+                    values.size *
+                        startRatio
                     )
                     .toInt()
-            )
+                    .coerceIn(
+                        0,
+                        values.size -
+                            1
+                    )
 
-        val halfH =
-            max(
-                8,
+            val end =
                 (
-                    h *
-                        0.30
+                    values.size *
+                        endRatio
                     )
                     .toInt()
+                    .coerceIn(
+                        start +
+                            1,
+                        values.size
+                    )
+
+            return values
+                .subList(
+                    start,
+                    end
+                )
+                .average()
+        }
+
+        val upperCenter =
+            segmentMean(
+                rowCenters,
+                0.05,
+                0.33
             )
 
-        val x0 =
+        val middleCenter =
+            segmentMean(
+                rowCenters,
+                0.34,
+                0.66
+            )
+
+        val lowerCenter =
+            segmentMean(
+                rowCenters,
+                0.67,
+                0.95
+            )
+
+        val upperWidth =
+            segmentMean(
+                rowWidths,
+                0.05,
+                0.33
+            )
+
+        val lowerWidth =
+            segmentMean(
+                rowWidths,
+                0.67,
+                0.95
+            )
+
+        val sagShift =
+            max(
+                abs(
+                    lowerCenter -
+                        middleCenter
+                ),
+                abs(
+                    upperCenter -
+                        middleCenter
+                )
+            )
+
+        val sagWidthExpansion =
+            max(
+                0.0,
+                lowerWidth -
+                    upperWidth
+            )
+
+        val ppFlowSagRisk =
             (
-                centerX.toInt() -
-                    halfW
+                sagShift /
+                    max(
+                        1.0,
+                        meanWidth
+                    ) *
+                    55.0 +
+                    sagWidthExpansion /
+                    max(
+                        1.0,
+                        meanWidth
+                    ) *
+                    45.0
                 )
                 .coerceIn(
-                    1,
-                    w -
-                        2
+                    0.0,
+                    100.0
                 )
 
-        val x1 =
+        /*
+         * =====================================================
+         * 5. PP FLOW 두께 상대지수
+         * =====================================================
+         *
+         * 실제 두께(mm)가 아니라 색/명암 기반 상대 Index.
+         * 동일 조명/카메라 조건에서 추세용으로만 사용.
+         */
+        val meanFlowBrightness =
+            if (
+                rowBrightness.isNotEmpty()
+            ) {
+                rowBrightness.average()
+            } else {
+                0.0
+            }
+
+        val ppFlowThicknessIndex =
             (
-                centerX.toInt() +
-                    halfW
+                (
+                    255.0 -
+                        meanFlowBrightness
+                    ) /
+                    255.0 *
+                    100.0
                 )
                 .coerceIn(
-                    x0 +
-                        1,
-                    w -
-                        1
+                    0.0,
+                    100.0
                 )
 
-        val y0 =
+        val brightnessStd =
+            if (
+                rowBrightness.isNotEmpty()
+            ) {
+
+                sqrt(
+                    rowBrightness
+                        .map {
+                            val d =
+                                it -
+                                    meanFlowBrightness
+
+                            d *
+                                d
+                        }
+                        .average()
+                )
+
+            } else {
+                0.0
+            }
+
+        val ppFlowThicknessRisk =
             (
-                centerY.toInt() -
-                    halfH
+                brightnessStd *
+                    2.0 +
+                    abs(
+                        ppFlowThicknessIndex -
+                            42.0
+                    ) *
+                    0.45
                 )
                 .coerceIn(
-                    1,
-                    h -
-                        2
+                    0.0,
+                    100.0
                 )
 
-        val y1 =
-            (
-                centerY.toInt() +
-                    halfH
-                )
-                .coerceIn(
-                    y0 +
-                        1,
-                    h -
-                        1
-                )
-
+        /*
+         * =====================================================
+         * 6. Cup과 PP FLOW 거리
+         * =====================================================
+         *
+         * PP FLOW bbox에서 ROI 안쪽 방향으로 가장 가까운 강한 수직 경계를 찾는다.
+         * 실제 mm가 아닌 ROI width 대비 상대 거리(%).
+         */
         val edgeThreshold =
             max(
                 12.0,
@@ -538,239 +754,427 @@ object TabInspectionV2 {
                                     0,
                                     100
                                 ) *
-                            0.0035
+                            0.003
                         )
             )
 
-        var strongEdges =
-            0
+        val searchY0 =
+            minY.coerceIn(
+                1,
+                h -
+                    2
+            )
 
-        var windowPixels =
-            0
+        val searchY1 =
+            maxY.coerceIn(
+                searchY0 +
+                    1,
+                h -
+                    1
+            )
 
-        var windowStrength =
+        var bestBoundaryX =
+            -1
+
+        var bestBoundaryScore =
             0.0
 
-        var leftStrength =
-            0.0
+        /*
+         * PP FLOW가 좌측/우측 어느 쪽에 있든,
+         * ROI 중심 방향을 "Cup 안쪽"으로 가정.
+         */
+        val flowOnLeft =
+            meanCenter <
+                w /
+                    2.0
 
-        var rightStrength =
-            0.0
+        val searchStart =
+            if (
+                flowOnLeft
+            ) {
+                maxX +
+                    1
+            } else {
+                minX -
+                    1
+            }
 
-        var leftCount =
-            0
+        val searchEnd =
+            if (
+                flowOnLeft
+            ) {
+                min(
+                    w -
+                        2,
+                    (
+                        w *
+                            0.80
+                        )
+                        .toInt()
+                )
+            } else {
+                max(
+                    1,
+                    (
+                        w *
+                            0.20
+                        )
+                        .toInt()
+                )
+            }
 
-        var rightCount =
-            0
-
-        var topStrength =
-            0.0
-
-        var bottomStrength =
-            0.0
-
-        var topCount =
-            0
-
-        var bottomCount =
-            0
-
-        val localContrastValues =
-            mutableListOf<Double>()
-
-        for (
-            y in y0 until
-                y1
+        if (
+            flowOnLeft
         ) {
 
             for (
-                x in x0 until
-                    x1
+                x in searchStart..
+                    searchEnd
             ) {
 
-                val i =
-                    y *
-                        w +
+                var score =
+                    0.0
+
+                var count =
+                    0
+
+                for (
+                    y in searchY0 until
+                        searchY1
+                ) {
+
+                    val i =
+                        y *
+                            w +
+                            x
+
+                    score +=
+                        gradient[i]
+
+                    count++
+                }
+
+                val avg =
+                    if (
+                        count >
+                        0
+                    ) {
+                        score /
+                            count
+                    } else {
+                        0.0
+                    }
+
+                if (
+                    avg >
+                    bestBoundaryScore
+                ) {
+
+                    bestBoundaryScore =
+                        avg
+
+                    bestBoundaryX =
                         x
+                }
+            }
 
-                val g =
-                    gradient[
-                        i
-                    ]
+        } else {
 
-                windowStrength +=
-                    g
+            for (
+                x in searchStart downTo
+                    searchEnd
+            ) {
 
-                windowPixels++
+                var score =
+                    0.0
 
-                if (
-                    g >=
-                    edgeThreshold
+                var count =
+                    0
+
+                for (
+                    y in searchY0 until
+                        searchY1
                 ) {
-                    strongEdges++
+
+                    val i =
+                        y *
+                            w +
+                            x
+
+                    score +=
+                        gradient[i]
+
+                    count++
                 }
 
-                val lc =
-                    abs(
-                        gray[
-                            i
-                        ] -
-                            localMean[
-                                i
-                            ]
-                    )
-
-                localContrastValues.add(
-                    lc
-                )
+                val avg =
+                    if (
+                        count >
+                        0
+                    ) {
+                        score /
+                            count
+                    } else {
+                        0.0
+                    }
 
                 if (
-                    x <
-                    centerX
+                    avg >
+                    bestBoundaryScore
                 ) {
 
-                    leftStrength +=
-                        g
+                    bestBoundaryScore =
+                        avg
 
-                    leftCount++
-
-                } else {
-
-                    rightStrength +=
-                        g
-
-                    rightCount++
-                }
-
-                if (
-                    y <
-                    centerY
-                ) {
-
-                    topStrength +=
-                        g
-
-                    topCount++
-
-                } else {
-
-                    bottomStrength +=
-                        g
-
-                    bottomCount++
+                    bestBoundaryX =
+                        x
                 }
             }
         }
 
-        val strongEdgeDensity =
+        val rawCupDistancePx =
             if (
-                windowPixels >
+                bestBoundaryX >=
                 0
             ) {
-                strongEdges
+                if (
+                    flowOnLeft
+                ) {
+                    bestBoundaryX -
+                        maxX
+                } else {
+                    minX -
+                        bestBoundaryX
+                }
+            } else {
+                0
+            }
+
+        val cupDistancePercent =
+            (
+                rawCupDistancePx
                     .toDouble() /
-                    windowPixels
+                    w.toDouble() *
+                    100.0
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
+
+        /*
+         * 정상 사진 기준에서 너무 가깝거나 너무 멀면 Risk 상승.
+         * 실제 mm 기준은 추후 scale calibration 필요.
+         */
+        val cupDistanceRisk =
+            when {
+
+                cupDistancePercent <
+                    3.0 ->
+                    (
+                        3.0 -
+                            cupDistancePercent
+                        ) *
+                        22.0
+
+                cupDistancePercent >
+                    18.0 ->
+                    (
+                        cupDistancePercent -
+                            18.0
+                        ) *
+                        5.0
+
+                else ->
+                    0.0
+            }
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
+
+        /*
+         * =====================================================
+         * 7. TAB Damage Risk
+         * =====================================================
+         *
+         * PP FLOW보다 금속 TAB 쪽의 국부 강한 Edge/불연속을 더 민감하게 봄.
+         * Warm bbox 바깥쪽의 금속 TAB 영역을 추정해서 검사.
+         */
+        val tabRegionX0 =
+            if (
+                flowOnLeft
+            ) {
+                max(
+                    1,
+                    minX -
+                        (
+                            meanWidth *
+                                2.2
+                            )
+                            .toInt()
+                )
+            } else {
+                min(
+                    w -
+                        2,
+                    maxX +
+                        1
+                )
+            }
+
+        val tabRegionX1 =
+            if (
+                flowOnLeft
+            ) {
+                max(
+                    tabRegionX0 +
+                        1,
+                    minX -
+                        1
+                )
+            } else {
+                min(
+                    w -
+                        1,
+                    maxX +
+                        (
+                            meanWidth *
+                                2.2
+                            )
+                            .toInt()
+                )
+            }
+
+        var tabStrong =
+            0
+
+        var tabPixels =
+            0
+
+        var tabPeak =
+            0.0
+
+        val tx0 =
+            min(
+                tabRegionX0,
+                tabRegionX1
+            )
+                .coerceIn(
+                    1,
+                    w -
+                        2
+                )
+
+        val tx1 =
+            max(
+                tabRegionX0,
+                tabRegionX1
+            )
+                .coerceIn(
+                    tx0 +
+                        1,
+                    w -
+                        1
+                )
+
+        for (
+            y in searchY0 until
+                searchY1
+        ) {
+
+            for (
+                x in tx0 until
+                    tx1
+            ) {
+
+                val g =
+                    gradient[
+                        y *
+                            w +
+                            x
+                    ]
+
+                tabPeak =
+                    max(
+                        tabPeak,
+                        g
+                    )
+
+                tabPixels++
+
+                if (
+                    g >=
+                    edgeThreshold *
+                        1.25
+                ) {
+                    tabStrong++
+                }
+            }
+        }
+
+        val tabStrongDensity =
+            if (
+                tabPixels >
+                0
+            ) {
+                tabStrong
+                    .toDouble() /
+                    tabPixels
                         .toDouble() *
                     100.0
             } else {
                 0.0
             }
 
-        val avgWindowStrength =
-            if (
-                windowPixels >
-                0
-            ) {
-                windowStrength /
-                    windowPixels
-            } else {
-                0.0
-            }
-
-        val leftAverage =
-            if (
-                leftCount >
-                0
-            ) {
-                leftStrength /
-                    leftCount
-            } else {
-                0.0
-            }
-
-        val rightAverage =
-            if (
-                rightCount >
-                0
-            ) {
-                rightStrength /
-                    rightCount
-            } else {
-                0.0
-            }
-
-        val topAverage =
-            if (
-                topCount >
-                0
-            ) {
-                topStrength /
-                    topCount
-            } else {
-                0.0
-            }
-
-        val bottomAverage =
-            if (
-                bottomCount >
-                0
-            ) {
-                bottomStrength /
-                    bottomCount
-            } else {
-                0.0
-            }
-
-        val sideAsymmetry =
-            abs(
-                leftAverage -
-                    rightAverage
-            )
-
-        val verticalAsymmetry =
-            abs(
-                topAverage -
-                    bottomAverage
-            )
+        /*
+         * TAB Damage는 민감하게:
+         * 상대적으로 작은 강한 Edge 증가도 Risk에 크게 반영.
+         */
+        val tabDamageRisk =
+            (
+                tabStrongDensity *
+                    2.3 +
+                    max(
+                        0.0,
+                        tabPeak -
+                            edgeThreshold *
+                                1.4
+                    ) *
+                    0.65
+                )
+                .coerceIn(
+                    0.0,
+                    100.0
+                )
 
         /*
-         * Seal Uniformity:
-         * 좌우/상하의 구조 강도 편차와 국부 Edge 과다를 함께 본다.
+         * Seal Uniformity / Boundary 보조지표
          */
         val sealUniformityRisk =
             (
-                sideAsymmetry *
-                    2.1 +
-                    verticalAsymmetry *
-                    1.4 +
-                    strongEdgeDensity *
-                    0.70
+                ppFlowStraightnessRisk *
+                    0.35 +
+                    ppFlowWidthVariation *
+                    0.30 +
+                    ppFlowThicknessRisk *
+                    0.20 +
+                    ppFlowSagRisk *
+                    0.15
                 )
                 .coerceIn(
                     0.0,
                     100.0
                 )
 
-        /*
-         * Boundary Risk:
-         * TAB 주변 경계가 너무 불연속/복잡해지는 경우.
-         */
         val boundaryRisk =
             (
-                strongEdgeDensity *
-                    1.8 +
-                    avgWindowStrength *
-                    0.55
+                cupDistanceRisk *
+                    0.50 +
+                    ppFlowSagRisk *
+                    0.25 +
+                    ppFlowStraightnessRisk *
+                    0.25
                 )
                 .coerceIn(
                     0.0,
@@ -778,99 +1182,29 @@ object TabInspectionV2 {
                 )
 
         /*
-         * Local Deformation:
-         * TAB 주변 국부 Contrast 상위 영역을 사용.
-         * 넓은 반사광은 평균화되므로 영향이 줄어든다.
+         * 치명인자 우선 가중치
          */
-        val sortedContrast =
-            localContrastValues
-                .sorted()
-
-        val highContrast =
-            if (
-                sortedContrast.isEmpty()
-            ) {
-                0.0
-            } else {
-
-                val start =
-                    (
-                        sortedContrast.size *
-                            0.90
-                        )
-                        .toInt()
-                        .coerceIn(
-                            0,
-                            sortedContrast.size -
-                                1
-                        )
-
-                sortedContrast
-                    .subList(
-                        start,
-                        sortedContrast.size
-                    )
-                    .average()
-            }
-
-        val localDeformationRisk =
-            (
-                highContrast *
-                    2.1 +
-                    strongEdgeDensity *
-                    0.85
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
-
-        /*
-         * Reflection Risk는 판정에 매우 낮은 비중만 사용한다.
-         */
-        val reflectionRisk =
-            (
-                meanContrast *
-                    2.1
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
-
-        /*
-         * TAB Presence Confidence가 너무 낮으면
-         * 실제 TAB을 ROI 안에 충분히 넣지 못한 가능성이 있으므로
-         * 판정 Risk보다는 재촬영/ROI 확인 신호로 사용한다.
-         */
-        val missingPenalty =
-            if (
-                tabPresenceConfidence <
-                18.0
-            ) {
-                (
-                    18.0 -
-                        tabPresenceConfidence
-                    ) *
-                    1.8
-            } else {
-                0.0
-            }
-
         val baselineDeviation =
             (
-                alignmentRisk *
-                    0.16 +
-                    sealUniformityRisk *
-                    0.28 +
-                    boundaryRisk *
-                    0.22 +
-                    localDeformationRisk *
-                    0.27 +
+                tabDamageRisk *
+                    0.30 +
+                    ppFlowStraightnessRisk *
+                    0.13 +
+                    ppFlowWidthVariation *
+                    0.13 +
+                    ppFlowSagRisk *
+                    0.12 +
+                    ppFlowThicknessRisk *
+                    0.10 +
+                    cupDistanceRisk *
+                    0.14 +
                     reflectionRisk *
                     0.03 +
-                    missingPenalty *
-                    0.04
+                    (
+                        100.0 -
+                            tabPresenceConfidence
+                        ) *
+                    0.05
                 )
                 .coerceIn(
                     0.0,
@@ -888,32 +1222,50 @@ object TabInspectionV2 {
                 )
 
         /*
-         * 실제 NG 사진이 없기 때문에
-         * 불량 판정은 두 개 이상의 위험신호가 동시에 매우 높을 때만 낸다.
+         * 치명인자 override
+         * - TAB Damage는 단독으로도 더 민감하게 판정
+         * - PP FLOW는 여러 항목이 동시에 높을 때 상향 판정
          */
+        val criticalPpFlowCount =
+            listOf(
+                ppFlowStraightnessRisk,
+                ppFlowWidthVariation,
+                ppFlowSagRisk,
+                ppFlowThicknessRisk,
+                cupDistanceRisk
+            )
+                .count {
+                    it >=
+                        72.0
+                }
+
         val judgment =
             when {
 
-                (
-                    sealUniformityRisk >=
-                        88.0 &&
-                        localDeformationRisk >=
-                        86.0
-                    ) ||
-                    (
-                        boundaryRisk >=
-                            92.0 &&
-                            localDeformationRisk >=
-                            82.0
-                        ) ->
+                tabDamageRisk >=
+                    88.0 ->
                     "불량"
 
-                baselineDeviation >=
-                    74.0 ->
+                tabDamageRisk >=
+                    72.0 ->
+                    "한계정상"
+
+                criticalPpFlowCount >=
+                    3 ->
+                    "불량"
+
+                criticalPpFlowCount ==
+                    2 ->
                     "한계정상"
 
                 baselineDeviation >=
-                    56.0 ->
+                    70.0 ->
+                    "한계정상"
+
+                baselineDeviation >=
+                    52.0 ||
+                    tabDamageRisk >=
+                    55.0 ->
                     "주의"
 
                 else ->
@@ -925,19 +1277,19 @@ object TabInspectionV2 {
 
                 tabPresenceConfidence <
                     12.0 ->
-                    "TAB 색/실링부 인식 Confidence가 낮습니다. ROI가 TAB 주변을 충분히 포함하는지 확인 권고."
+                    "TAB/PP FLOW 인식 Confidence가 낮습니다. ROI에 TAB과 주변 Seal을 포함해주세요."
 
-                judgment ==
-                    "불량" ->
-                    "TAB 주변 실링/경계/국부 변형이 정상 기준보다 크게 증가했습니다."
+                tabDamageRisk >=
+                    72.0 ->
+                    "TAB 자체 데미지 Risk가 높습니다. TAB 변형/찍힘/Edge 손상 재확인 권고."
 
-                judgment ==
-                    "한계정상" ->
-                    "정상 TAB 기준보다 형상 변화가 크게 증가했습니다. 재확인 권고."
+                criticalPpFlowCount >=
+                    2 ->
+                    "PP FLOW 직진성/폭/흘러내림/두께/컵 거리 중 복수 치명인자가 정상 기준에서 이탈했습니다."
 
                 judgment ==
                     "주의" ->
-                    "TAB 주변 균일성 또는 국부 변형이 정상 기준보다 증가했습니다."
+                    "TAB 또는 PP FLOW 지표가 정상 Master 범위보다 증가했습니다."
 
                 else ->
                     "현재 정상 TAB Master 범위로 판단됩니다."
@@ -954,16 +1306,35 @@ object TabInspectionV2 {
         return Result(
             tabPresenceConfidence =
                 tabPresenceConfidence,
-            alignmentRisk =
-                alignmentRisk,
+
+            tabDamageRisk =
+                tabDamageRisk,
+
+            ppFlowStraightnessRisk =
+                ppFlowStraightnessRisk,
+            ppFlowWidthVariation =
+                ppFlowWidthVariation,
+            ppFlowSagRisk =
+                ppFlowSagRisk,
+            ppFlowThicknessRisk =
+                ppFlowThicknessRisk,
+            cupDistanceRisk =
+                cupDistanceRisk,
+
             sealUniformityRisk =
                 sealUniformityRisk,
             boundaryRisk =
                 boundaryRisk,
-            localDeformationRisk =
-                localDeformationRisk,
             reflectionRisk =
                 reflectionRisk,
+
+            ppFlowMeanWidthPercent =
+                ppFlowMeanWidthPercent,
+            ppFlowThicknessIndex =
+                ppFlowThicknessIndex,
+            cupDistancePercent =
+                cupDistancePercent,
+
             baselineDeviation =
                 baselineDeviation,
             qualityScore =
@@ -1186,16 +1557,35 @@ object TabInspectionV2 {
         return Result(
             tabPresenceConfidence =
                 0.0,
-            alignmentRisk =
+
+            tabDamageRisk =
                 0.0,
+
+            ppFlowStraightnessRisk =
+                0.0,
+            ppFlowWidthVariation =
+                0.0,
+            ppFlowSagRisk =
+                0.0,
+            ppFlowThicknessRisk =
+                0.0,
+            cupDistanceRisk =
+                0.0,
+
             sealUniformityRisk =
                 0.0,
             boundaryRisk =
                 0.0,
-            localDeformationRisk =
-                0.0,
             reflectionRisk =
                 0.0,
+
+            ppFlowMeanWidthPercent =
+                0.0,
+            ppFlowThicknessIndex =
+                0.0,
+            cupDistancePercent =
+                0.0,
+
             baselineDeviation =
                 0.0,
             qualityScore =
@@ -1203,7 +1593,7 @@ object TabInspectionV2 {
             judgment =
                 "정상",
             reason =
-                "ROI가 너무 작아 TAB V2 분석을 생략했습니다.",
+                "ROI가 너무 작아 TAB V2.1 분석을 생략했습니다.",
             showDefectMarkers =
                 false
         )

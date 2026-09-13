@@ -26,6 +26,77 @@ class ShiftWeeklyReportWorker(
             return Result.success()
         }
 
+        /*
+         * 수동 테스트는 실제 07:00 / 19:00 / 월요일 자동전송 기록과
+         * 완전히 분리합니다. 따라서 테스트를 여러 번 눌러도
+         * 실제 자동 리포트 전송에는 영향을 주지 않습니다.
+         */
+        when (
+            inputData.getString(
+                INPUT_MANUAL_TEST
+            )
+        ) {
+
+            TEST_SHIFT -> {
+
+                val end =
+                    Calendar.getInstance()
+
+                val start =
+                    (
+                        end.clone() as
+                            Calendar
+                        ).apply {
+
+                        add(
+                            Calendar.HOUR_OF_DAY,
+                            -12
+                        )
+                    }
+
+                return if (
+                    sendShiftReport(
+                        shiftName = "TEST 최근 12시간",
+                        start = start,
+                        end = end
+                    )
+                ) {
+                    Result.success()
+                } else {
+                    Result.retry()
+                }
+            }
+
+            TEST_WEEKLY -> {
+
+                val end =
+                    Calendar.getInstance()
+
+                val start =
+                    (
+                        end.clone() as
+                            Calendar
+                        ).apply {
+
+                        add(
+                            Calendar.DAY_OF_YEAR,
+                            -7
+                        )
+                    }
+
+                return if (
+                    sendWeeklyReport(
+                        start = start,
+                        end = end
+                    )
+                ) {
+                    Result.success()
+                } else {
+                    Result.retry()
+                }
+            }
+        }
+
         val now = Calendar.getInstance()
         val hour = now.get(Calendar.HOUR_OF_DAY)
         var retryNeeded = false
@@ -540,6 +611,15 @@ class ShiftWeeklyReportWorker(
         private const val UNIQUE_WORK_NAME = "pouch_shift_weekly_report"
         private const val PREF_NAME = "shift_weekly_report_sent"
 
+        private const val INPUT_MANUAL_TEST =
+            "manual_report_test"
+
+        private const val TEST_SHIFT =
+            "shift"
+
+        private const val TEST_WEEKLY =
+            "weekly"
+
         private val inspectionTypes =
             listOf(
                 "BOTTOM CORNER",
@@ -557,6 +637,70 @@ class ShiftWeeklyReportWorker(
 
         private val keyFormat =
             SimpleDateFormat("yyyyMMddHH", Locale.US)
+
+        fun sendShiftTestNow(
+            context: Context
+        ) {
+
+            val constraints =
+                Constraints.Builder()
+                    .setRequiredNetworkType(
+                        NetworkType.CONNECTED
+                    )
+                    .build()
+
+            val request =
+                androidx.work.OneTimeWorkRequestBuilder<ShiftWeeklyReportWorker>()
+                    .setInputData(
+                        androidx.work.workDataOf(
+                            INPUT_MANUAL_TEST to
+                                TEST_SHIFT
+                        )
+                    )
+                    .setConstraints(
+                        constraints
+                    )
+                    .build()
+
+            WorkManager.getInstance(
+                context.applicationContext
+            )
+                .enqueue(
+                    request
+                )
+        }
+
+        fun sendWeeklyTestNow(
+            context: Context
+        ) {
+
+            val constraints =
+                Constraints.Builder()
+                    .setRequiredNetworkType(
+                        NetworkType.CONNECTED
+                    )
+                    .build()
+
+            val request =
+                androidx.work.OneTimeWorkRequestBuilder<ShiftWeeklyReportWorker>()
+                    .setInputData(
+                        androidx.work.workDataOf(
+                            INPUT_MANUAL_TEST to
+                                TEST_WEEKLY
+                        )
+                    )
+                    .setConstraints(
+                        constraints
+                    )
+                    .build()
+
+            WorkManager.getInstance(
+                context.applicationContext
+            )
+                .enqueue(
+                    request
+                )
+        }
 
         fun applySchedule(context: Context) {
             val constraints =

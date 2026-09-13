@@ -1652,7 +1652,7 @@ Tab Score         : -
                 Locale.getDefault(),
 
                 """
-TAB V2.2 - TAB Damage + PP FLOW + Cup 경계
+TAB V2.4 - TAB Damage + PP FLOW + Cup 구조경계
 
 TAB 인식 Confidence : %.1f / 100
 
@@ -1779,14 +1779,14 @@ Final Judgment : %s
                 imageMatrixValue
 
             binding.tvTabStatus.text =
-                "TAB V2.2 분석 완료 - ${v2.judgment}"
+                "TAB V2.4 분석 완료 - ${v2.judgment}"
 
             binding.tvTabMetrics.text =
                 String.format(
                     Locale.getDefault(),
 
                     """
-TAB V2.2 - 정밀판정
+TAB V2.4 - 정밀판정
 
 TAB 인식 Confidence : %.1f / 100
 

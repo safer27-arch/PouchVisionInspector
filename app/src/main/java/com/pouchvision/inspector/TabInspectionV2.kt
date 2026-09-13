@@ -8,7 +8,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * TAB V2.2 - TAB Damage + PP FLOW + Cup 경계 정밀판정
+ * TAB V2.3 - TAB Damage + PP FLOW + 반사광 보정 + Cup 경계 정밀판정
  *
  * 사용자 기준:
  * 1) TAB 자체 데미지는 민감하게 판정
@@ -20,7 +20,7 @@ import kotlin.math.sqrt
  *    - 파우치 Cup과의 거리
  *    를 치명인자로 관리
  *
- * 현재는 정상 사진 10장을 기준으로 한 현장용 2차 규칙입니다.
+ * 현재는 정상 사진 10장을 기준으로 한 현장용 3차 규칙입니다.
  * 실제 NG 샘플이 확보되면 Threshold를 재보정해야 합니다.
  */
 object TabInspectionV2 {
@@ -704,37 +704,60 @@ object TabInspectionV2 {
                     100.0
                 )
 
-        val brightnessStd =
-            if (
-                rowBrightness.isNotEmpty()
-            ) {
+        /*
+         * V2.3 두께 보정:
+         * 정상 파우치의 강한 반사광 때문에 row 밝기 표준편차가 과도하게 커지는
+         * 문제를 줄이기 위해 중앙 80% 밝기 분포를 사용합니다.
+         * 절대 밝기(촬영각 영향)는 낮은 가중치, 국부 불균일을 주 지표로 사용합니다.
+         */
+        val sortedBrightness =
+            rowBrightness.sorted()
 
+        val trimmedBrightness =
+            if (sortedBrightness.size >= 10) {
+                val cut =
+                    max(
+                        1,
+                        (sortedBrightness.size * 0.10).toInt()
+                    )
+
+                sortedBrightness.subList(
+                    cut,
+                    sortedBrightness.size - cut
+                )
+            } else {
+                sortedBrightness
+            }
+
+        val robustMeanBrightness =
+            if (trimmedBrightness.isNotEmpty()) {
+                trimmedBrightness.average()
+            } else {
+                meanFlowBrightness
+            }
+
+        val robustBrightnessStd =
+            if (trimmedBrightness.isNotEmpty()) {
                 sqrt(
-                    rowBrightness
+                    trimmedBrightness
                         .map {
                             val d =
-                                it -
-                                    meanFlowBrightness
-
-                            d *
-                                d
+                                it - robustMeanBrightness
+                            d * d
                         }
                         .average()
                 )
-
             } else {
                 0.0
             }
 
         val ppFlowThicknessRisk =
             (
-                brightnessStd *
-                    2.0 +
+                robustBrightnessStd * 0.95 +
                     abs(
-                        ppFlowThicknessIndex -
-                            42.0
-                    ) *
-                    0.45
+                        ppFlowThicknessIndex - 42.0
+                    ) * 0.12 +
+                    reflectionRisk * 0.08
                 )
                 .coerceIn(
                     0.0,
@@ -786,155 +809,176 @@ object TabInspectionV2 {
             0.0
 
         /*
-         * PP FLOW가 좌측/우측 어느 쪽에 있든,
-         * ROI 중심 방향을 "Cup 안쪽"으로 가정.
+         * PP FLOW가 좌/우 어느 쪽에 있든 ROI 중심 방향을 Cup 안쪽으로 가정.
+         * V2.3에서는 전체 구간의 "가장 강한 Edge" 하나를 고르지 않고,
+         * PP FLOW에서 가까운 방향으로 이동하면서 지속성이 있는 첫 유효 경계를 찾습니다.
+         * 반사광 한 줄이 Cup 경계로 오인되는 현상을 줄이기 위한 방식입니다.
          */
         val flowOnLeft =
-            meanCenter <
-                w /
-                    2.0
+            meanCenter < w / 2.0
 
         val searchStart =
-            if (
-                flowOnLeft
-            ) {
-                maxX +
-                    1
+            if (flowOnLeft) {
+                maxX + 1
             } else {
-                minX -
-                    1
+                minX - 1
             }
 
         val searchEnd =
-            if (
-                flowOnLeft
-            ) {
+            if (flowOnLeft) {
                 min(
-                    w -
-                        2,
-                    (
-                        w *
-                            0.80
-                        )
-                        .toInt()
+                    w - 2,
+                    (w * 0.88).toInt()
                 )
             } else {
                 max(
                     1,
-                    (
-                        w *
-                            0.20
-                        )
-                        .toInt()
+                    (w * 0.12).toInt()
                 )
             }
 
-        if (
-            flowOnLeft
-        ) {
+        val columnScores =
+            mutableListOf<Pair<Int, Double>>()
 
-            for (
-                x in searchStart..
-                    searchEnd
-            ) {
+        if (flowOnLeft) {
+            if (searchStart <= searchEnd) {
+                for (x in searchStart..searchEnd) {
+                    var score = 0.0
+                    var count = 0
 
-                var score =
-                    0.0
-
-                var count =
-                    0
-
-                for (
-                    y in searchY0 until
-                        searchY1
-                ) {
-
-                    val i =
-                        y *
-                            w +
-                            x
-
-                    score +=
-                        gradient[i]
-
-                    count++
-                }
-
-                val avg =
-                    if (
-                        count >
-                        0
-                    ) {
-                        score /
-                            count
-                    } else {
-                        0.0
+                    for (y in searchY0 until searchY1) {
+                        score += gradient[y * w + x]
+                        count++
                     }
 
-                if (
-                    avg >
-                    bestBoundaryScore
-                ) {
+                    val avg =
+                        if (count > 0) score / count else 0.0
 
-                    bestBoundaryScore =
-                        avg
-
-                    bestBoundaryX =
-                        x
+                    columnScores.add(
+                        x to avg
+                    )
                 }
             }
-
         } else {
+            if (searchStart >= searchEnd) {
+                for (x in searchStart downTo searchEnd) {
+                    var score = 0.0
+                    var count = 0
 
-            for (
-                x in searchStart downTo
-                    searchEnd
-            ) {
+                    for (y in searchY0 until searchY1) {
+                        score += gradient[y * w + x]
+                        count++
+                    }
 
-                var score =
-                    0.0
+                    val avg =
+                        if (count > 0) score / count else 0.0
 
-                var count =
-                    0
+                    columnScores.add(
+                        x to avg
+                    )
+                }
+            }
+        }
 
-                for (
-                    y in searchY0 until
-                        searchY1
-                ) {
+        /*
+         * 3-column smoothing으로 반사광/노이즈 단일선을 억제.
+         */
+        val smoothedScores =
+            columnScores.mapIndexed { index, pair ->
 
-                    val i =
-                        y *
-                            w +
-                            x
+                val from =
+                    max(
+                        0,
+                        index - 1
+                    )
 
-                    score +=
-                        gradient[i]
+                val to =
+                    min(
+                        columnScores.size - 1,
+                        index + 1
+                    )
 
+                var sum = 0.0
+                var count = 0
+
+                for (k in from..to) {
+                    sum += columnScores[k].second
                     count++
                 }
 
-                val avg =
-                    if (
-                        count >
-                        0
-                    ) {
-                        score /
-                            count
+                pair.first to
+                    if (count > 0) {
+                        sum / count
                     } else {
                         0.0
                     }
+            }
 
-                if (
-                    avg >
-                    bestBoundaryScore
-                ) {
+        val boundaryAcceptThreshold =
+            max(
+                edgeThreshold * 0.82,
+                meanGradient * 1.15
+            )
+
+        /*
+         * PP FLOW에서 가까운 순서대로 첫 지속성 경계를 선택.
+         * 후보가 없으면 최고 score를 Confidence 참고용으로만 보관.
+         */
+        for (i in smoothedScores.indices) {
+
+            val score =
+                smoothedScores[i].second
+
+            if (score >= boundaryAcceptThreshold) {
+
+                val prev =
+                    if (i > 0) {
+                        smoothedScores[i - 1].second
+                    } else {
+                        score
+                    }
+
+                val next =
+                    if (i < smoothedScores.size - 1) {
+                        smoothedScores[i + 1].second
+                    } else {
+                        score
+                    }
+
+                val supportCount =
+                    listOf(
+                        prev,
+                        score,
+                        next
+                    )
+                        .count {
+                            it >= boundaryAcceptThreshold * 0.82
+                        }
+
+                if (supportCount >= 2) {
+                    bestBoundaryX =
+                        smoothedScores[i].first
 
                     bestBoundaryScore =
-                        avg
+                        score
 
-                    bestBoundaryX =
-                        x
+                    break
                 }
+            }
+        }
+
+        if (
+            bestBoundaryX < 0 &&
+            smoothedScores.isNotEmpty()
+        ) {
+            val best =
+                smoothedScores.maxByOrNull {
+                    it.second
+                }
+
+            if (best != null) {
+                bestBoundaryScore =
+                    best.second
             }
         }
 
@@ -952,7 +996,7 @@ object TabInspectionV2 {
             }
 
         /*
-         * V2.2:
+         * V2.3:
          * Cup 경계를 못 찾은 경우 0%를 실제 거리처럼 사용하지 않습니다.
          * - 강한 경계인지
          * - PP FLOW와 최소 간격이 있는지
@@ -982,27 +1026,32 @@ object TabInspectionV2 {
             bestBoundaryX >= 0 &&
                 rawCupDistancePx >= minValidGapPx &&
                 rawCupDistancePx <= maxValidGapPx &&
-                edgeStrengthRatio >= 1.05
+                edgeStrengthRatio >= 0.82
 
         val cupBoundaryConfidence =
             if (cupBoundaryDetected) {
                 (
-                    45.0 +
-                        (edgeStrengthRatio - 1.0) * 35.0 +
-                        min(
-                            20.0,
-                            rawCupDistancePx.toDouble() /
-                                max(1, w).toDouble() *
-                                100.0
-                        )
-                    ).coerceIn(0.0, 100.0)
+                    55.0 +
+                        max(
+                            0.0,
+                            edgeStrengthRatio - 0.82
+                        ) * 45.0
+                    )
+                    .coerceIn(
+                        0.0,
+                        100.0
+                    )
             } else {
                 (
                     max(
                         0.0,
-                        (edgeStrengthRatio - 0.65) * 45.0
+                        edgeStrengthRatio - 0.45
+                    ) * 70.0
                     )
-                    ).coerceIn(0.0, 45.0)
+                    .coerceIn(
+                        0.0,
+                        49.0
+                    )
             }
 
         val cupDistancePercent =
@@ -1026,11 +1075,11 @@ object TabInspectionV2 {
                 0.0
             } else {
                 when {
-                    cupDistancePercent < 3.0 ->
-                        (3.0 - cupDistancePercent) * 22.0
+                    cupDistancePercent < 2.5 ->
+                        (2.5 - cupDistancePercent) * 18.0
 
-                    cupDistancePercent > 18.0 ->
-                        (cupDistancePercent - 18.0) * 5.0
+                    cupDistancePercent > 22.0 ->
+                        (cupDistancePercent - 22.0) * 4.0
 
                     else ->
                         0.0
@@ -1275,7 +1324,6 @@ object TabInspectionV2 {
                 ppFlowStraightnessRisk,
                 ppFlowWidthVariation,
                 ppFlowSagRisk,
-                ppFlowThicknessRisk,
                 cupDistanceRisk
             )
                 .count {
@@ -1329,7 +1377,7 @@ object TabInspectionV2 {
 
                 criticalPpFlowCount >=
                     2 ->
-                    "PP FLOW 직진성/폭/흘러내림/두께/컵 거리 중 복수 치명인자가 정상 기준에서 이탈했습니다."
+                    "PP FLOW 직진성/폭/흘러내림/Cup 거리 중 복수 치명인자가 정상 기준에서 이탈했습니다. 두께 Risk는 현재 정상 추세 보조지표로 사용합니다."
 
                 judgment ==
                     "주의" ->
@@ -1649,7 +1697,7 @@ object TabInspectionV2 {
             judgment =
                 "정상",
             reason =
-                "ROI가 너무 작아 TAB V2.2 분석을 생략했습니다.",
+                "ROI가 너무 작아 TAB V2.3 분석을 생략했습니다.",
             showDefectMarkers =
                 false
         )

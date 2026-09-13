@@ -171,18 +171,73 @@ class ShiftWeeklyReportWorker(
         now: Calendar
     ): Boolean {
 
+        val settings =
+            TelegramSettingsStore.load(
+                applicationContext
+            )
+
+        if (!settings.missedInspectionEnabled) {
+            return true
+        }
+
+        val intervalHours =
+            settings.missedInspectionIntervalHours
+                .coerceAtLeast(1)
+
+        val shiftStart =
+            currentShiftStart(
+                now
+            )
+
+        val elapsedMillis =
+            now.timeInMillis -
+                shiftStart.timeInMillis
+
+        val intervalMillis =
+            TimeUnit.HOURS.toMillis(
+                intervalHours.toLong()
+            )
+
+        /*
+         * 아직 첫 검사 주기가 끝나지 않았다면
+         * 누락 여부를 판정하지 않습니다.
+         */
+        if (elapsedMillis < intervalMillis) {
+            return true
+        }
+
+        /*
+         * 교대 시작시간(07:00 / 19:00)을 기준으로
+         * 가장 최근에 완전히 끝난 검사 구간을 계산합니다.
+         *
+         * 예)
+         * 2시간: 07~09, 09~11, 11~13 ...
+         * 3시간: 07~10, 10~13, 13~16 ...
+         */
+        val completedIntervals =
+            (
+                elapsedMillis /
+                    intervalMillis
+                ).toInt()
+
+        if (completedIntervals <= 0) {
+            return true
+        }
+
         val slotEnd =
-            (now.clone() as Calendar).apply {
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+            (shiftStart.clone() as Calendar).apply {
+                add(
+                    Calendar.HOUR_OF_DAY,
+                    completedIntervals *
+                        intervalHours
+                )
             }
 
         val slotStart =
             (slotEnd.clone() as Calendar).apply {
                 add(
                     Calendar.HOUR_OF_DAY,
-                    -1
+                    -intervalHours
                 )
             }
 
@@ -199,7 +254,6 @@ class ShiftWeeklyReportWorker(
                 production.line
             )
 
-        // 직전 완료 시간대에 검사 결과가 있으면 누락이 아닙니다.
         if (records.isNotEmpty()) {
             return true
         }
@@ -210,11 +264,12 @@ class ShiftWeeklyReportWorker(
                 "_" +
                 production.line +
                 "_" +
+                intervalHours +
+                "H_" +
                 keyFormat.format(
                     slotStart.time
                 )
 
-        // 같은 Model / Line / 시간대는 중복 알림 금지
         if (wasSent(alertKey)) {
             return true
         }
@@ -226,13 +281,18 @@ class ShiftWeeklyReportWorker(
                 append("\nLine : ${production.line}")
                 append(
                     "\n누락 시간대 : " +
-                        slotLabel(
-                            slotStart,
-                            0
+                        displayFormat.format(
+                            slotStart.time
+                        ) +
+                        " ~ " +
+                        displayFormat.format(
+                            slotEnd.time
                         )
                 )
-                append("\n검사 기준 : 60분마다 최소 1회")
-                append("\n상태 : 해당 시간대 검사 이력 0건")
+                append(
+                    "\n검사 기준 : ${intervalHours}시간마다 최소 1회"
+                )
+                append("\n상태 : 해당 검사 구간 이력 0건")
                 append("\n\n📌 다음 검사 주기 내 검사를 실시해주세요.")
             }
 
@@ -241,7 +301,7 @@ class ShiftWeeklyReportWorker(
                 reportType =
                     "MISSED INSPECTION",
                 judgment =
-                    "60분 검사 미실시",
+                    "${intervalHours}시간 검사 미실시",
                 model =
                     production.model,
                 line =
@@ -259,6 +319,48 @@ class ShiftWeeklyReportWorker(
         }
 
         return success
+    }
+
+    private fun currentShiftStart(
+        now: Calendar
+    ): Calendar {
+
+        val hour =
+            now.get(
+                Calendar.HOUR_OF_DAY
+            )
+
+        return if (hour >= 7 && hour < 19) {
+
+            (now.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, 7)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        } else if (hour >= 19) {
+
+            (now.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, 19)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        } else {
+
+            (now.clone() as Calendar).apply {
+                add(
+                    Calendar.DAY_OF_YEAR,
+                    -1
+                )
+                set(Calendar.HOUR_OF_DAY, 19)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        }
     }
 
     private fun sendShiftReport(

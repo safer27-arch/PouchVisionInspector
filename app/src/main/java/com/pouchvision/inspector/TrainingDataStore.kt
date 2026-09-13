@@ -305,12 +305,12 @@ object TrainingDataStore {
     fun setWrinkleCountGroundTruth(
         context: Context,
         sourceId: Long,
-        wrinkleCount: Int
+        count: Int
     ): Boolean {
         return setWrinkleCountGroundTruth(
             context = context,
             sourceId = sourceId,
-            wrinkleCount = wrinkleCount,
+            count = count,
             note = ""
         )
     }
@@ -318,11 +318,11 @@ object TrainingDataStore {
     fun setWrinkleCountGroundTruth(
         context: Context,
         sourceId: Long,
-        wrinkleCount: Int,
+        count: Int,
         note: String
     ): Boolean {
         if (
-            wrinkleCount !in listOf(
+            count !in listOf(
                 WRINKLE_COUNT_0,
                 WRINKLE_COUNT_1,
                 WRINKLE_COUNT_2,
@@ -349,8 +349,8 @@ object TrainingDataStore {
                     return false
                 }
 
-                item.put("wrinkleCountGt", wrinkleCount)
-                item.put("trueLabel", labelFromWrinkleCount(wrinkleCount))
+                item.put("wrinkleCountGt", count)
+                item.put("trueLabel", labelFromWrinkleCount(count))
                 item.put("note", note.trim())
                 item.put("labeledAt", nowText)
 
@@ -364,6 +364,33 @@ object TrainingDataStore {
         }
 
         return updated
+    }
+
+    fun setWrinkleCountGroundTruth(
+        context: Context,
+        record: TrainingRecord,
+        count: Int
+    ): Boolean {
+        return setWrinkleCountGroundTruth(
+            context = context,
+            sourceId = record.sourceId,
+            count = count,
+            note = record.note
+        )
+    }
+
+    fun setWrinkleCountGroundTruth(
+        context: Context,
+        record: TrainingRecord,
+        count: Int,
+        note: String
+    ): Boolean {
+        return setWrinkleCountGroundTruth(
+            context = context,
+            sourceId = record.sourceId,
+            count = count,
+            note = note
+        )
     }
 
     fun clearWrinkleCountGroundTruth(

@@ -1520,21 +1520,15 @@ NG 후보 영역 : -
         roiStartY: Int
     ) {
 
-        val analysisWidth =
-            320
-
-        val analysisHeight =
-            240
-
-
         /*
-         * 촬영 이미지 품질 점검
-         * 검사 Score / 판정에는 영향을 주지 않습니다.
+         * DISASSEMBLY V2
+         *
+         * 분해 과정에서 파우치를 잡아 뜯기 때문에 실링부 위치/각도가
+         * 매번 달라질 수 있습니다. 따라서 V2는 절대 위치가 아니라
+         * PP/실링 흔적의 연속성, 국부 단절/찢김, 폭/표면 분포를 중심으로 봅니다.
          */
         val photoQuality =
-            ImageQualityChecker.analyzeBitmap(
-                roi
-            )
+            ImageQualityChecker.analyzeBitmap(roi)
 
         val photoQualityText =
             String.format(
@@ -1546,309 +1540,13 @@ NG 후보 영역 : -
                 photoQuality.contrast,
                 photoQuality.sharpness
             )
-        val small =
-            Bitmap.createScaledBitmap(
-                roi,
-                analysisWidth,
-                analysisHeight,
-                true
+
+        val v2 =
+            DisassemblyInspectionV2.analyze(
+                roi = roi,
+                sensitivity = sensitivity
             )
 
-        val edgeThreshold =
-            (
-                72 -
-                    sensitivity *
-                    0.50
-                )
-                .toInt()
-                .coerceIn(
-                    18,
-                    68
-                )
-
-        val strongThreshold =
-            (
-                115 -
-                    sensitivity *
-                    0.67
-                )
-                .toInt()
-                .coerceIn(
-                    35,
-                    105
-                )
-
-        var edgeCount =
-            0L
-
-        var strongEdgeCount =
-            0L
-
-        var totalGradient =
-            0L
-
-        var pixelCount =
-            0L
-
-        var graySum =
-            0.0
-
-        var graySquareSum =
-            0.0
-
-        for (
-            y in 1 until
-                small.height -
-                    1
-        ) {
-
-            for (
-                x in 1 until
-                    small.width -
-                        1
-            ) {
-
-                val center =
-                    gray(
-                        small.getPixel(
-                            x,
-                            y
-                        )
-                    )
-
-                val right =
-                    gray(
-                        small.getPixel(
-                            x +
-                                1,
-                            y
-                        )
-                    )
-
-                val bottom =
-                    gray(
-                        small.getPixel(
-                            x,
-                            y +
-                                1
-                        )
-                    )
-
-                val gradient =
-                    abs(
-                        center -
-                            right
-                    ) +
-                        abs(
-                            center -
-                                bottom
-                        )
-
-                totalGradient +=
-                    gradient
-
-                pixelCount++
-
-                graySum +=
-                    center.toDouble()
-
-                graySquareSum +=
-                    center.toDouble() *
-                        center.toDouble()
-
-                if (
-                    gradient >
-                    edgeThreshold
-                ) {
-
-                    edgeCount++
-                }
-
-                if (
-                    gradient >
-                    strongThreshold
-                ) {
-
-                    strongEdgeCount++
-                }
-            }
-        }
-
-        val edgeDensity =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                edgeCount
-                    .toDouble() /
-                    pixelCount
-                        .toDouble() *
-                    100.0
-
-            } else {
-
-                0.0
-            }
-
-        val strongEdgeDensity =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                strongEdgeCount
-                    .toDouble() /
-                    pixelCount
-                        .toDouble() *
-                    100.0
-
-            } else {
-
-                0.0
-            }
-
-        val averageGradient =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                totalGradient
-                    .toDouble() /
-                    pixelCount
-                        .toDouble()
-
-            } else {
-
-                0.0
-            }
-
-        /*
-         * ROI 전체의 밝기 분산
-         */
-        val meanGray =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                graySum /
-                    pixelCount
-                        .toDouble()
-
-            } else {
-
-                0.0
-            }
-
-        val variance =
-            if (
-                pixelCount >
-                0
-            ) {
-
-                (
-                    graySquareSum /
-                        pixelCount
-                            .toDouble()
-                    ) -
-                    meanGray *
-                        meanGray
-
-            } else {
-
-                0.0
-            }
-
-        val textureVariation =
-            sqrt(
-                variance
-                    .coerceAtLeast(
-                        0.0
-                    )
-            )
-
-        /*
-         * 민감도 보정
-         */
-        val sensitivityFactor =
-            0.55 +
-                sensitivity /
-                    133.3
-
-        /*
-         * 국부 변화
-         */
-        val localChange =
-            (
-                edgeDensity *
-                    1.4 +
-                    strongEdgeDensity *
-                    3.0 +
-                    averageGradient *
-                    0.50
-                ) *
-                sensitivityFactor
-
-        /*
-         * 표면 균일도
-         */
-        val surfacePenalty =
-            (
-                textureVariation *
-                    0.70 +
-                    strongEdgeDensity *
-                    1.8
-                ) *
-                sensitivityFactor
-
-        val surfaceUniformity =
-            (
-                100.0 -
-                    surfacePenalty
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
-
-        /*
-         * 종합 결함량
-         */
-        val defectLevel =
-            (
-                localChange *
-                    0.60 +
-                    (
-                        100.0 -
-                            surfaceUniformity
-                        ) *
-                    0.40
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
-
-        val qualityScore =
-            (
-                100.0 -
-                    defectLevel
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
-
-        /*
-         * =====================================================
-         * Model / Line별 DISASSEMBLY 판정 기준 적용
-         * =====================================================
-         *
-         * 분해검사 Quality Score는 높을수록 양호합니다.
-         * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
-         */
         val inspectionSpec =
             InspectionSpecStore.getCurrent(
                 context = this,
@@ -1857,13 +1555,12 @@ NG 후보 영역 : -
             )
 
         val judgment =
-            inspectionSpec.judge(
-                qualityScore
-            )
+            inspectionSpec.judge(v2.qualityScore)
 
         /*
-         * 공용 DefectMarker
-         * 기존 검출 방식은 변경하지 않습니다.
+         * 후보 마커는 기존 공용 검출기를 사용하되,
+         * 정상 판정에서는 알루미늄 반사/분해 흔적을 빨간 NG로 오해하지 않도록
+         * 화면 표시를 억제합니다.
          */
         val markerResult =
             DefectMarker.markDefectRegions(
@@ -1876,31 +1573,48 @@ NG 후보 영역 : -
                 maxRegions = 5
             )
 
+        val showDefectMarkers =
+            judgment.contains("불량") ||
+                judgment.contains("NG") ||
+                judgment.contains("한계") ||
+                v2.localTearRisk >= 70.0 ||
+                v2.continuityRisk >= 72.0
+
+        val displayRegions =
+            if (showDefectMarkers) {
+                markerResult.regions
+            } else {
+                emptyList()
+            }
+
         val regionCount =
-            markerResult.regions.size
+            displayRegions.size
 
         val regionSummary =
-            DefectMarker.buildRegionSummary(
-                markerResult.regions
-            )
+            if (regionCount > 0) {
+                DefectMarker.buildRegionSummary(displayRegions)
+            } else {
+                "정상 범위에서는 반사광 후보 표시를 억제합니다."
+            }
 
-        /*
-         * 검사 결과 값
-         */
         lastQualityScore =
-            qualityScore
+            v2.qualityScore
 
         lastSurfaceUniformity =
-            surfaceUniformity
+            v2.surfaceUniformity
 
+        /*
+         * 기존 History 필드 호환성을 위해 아래 값에는
+         * V2의 핵심 위험도를 매핑합니다.
+         */
         lastEdgeDensity =
-            edgeDensity
+            v2.continuityRisk
 
         lastStrongEdgeDensity =
-            strongEdgeDensity
+            v2.localTearRisk
 
         lastLocalChange =
-            localChange
+            v2.widthVariationRisk
 
         lastJudgment =
             judgment
@@ -1908,35 +1622,47 @@ NG 후보 영역 : -
         lastDetails =
             String.format(
                 Locale.getDefault(),
-
                 """
+DISASSEMBLY V2 - 분해 실링/PP 정밀판정
+
+인식 Confidence : %.1f / 100
+PP/Seal 연속성 Risk : %.1f / 100
+폭/표면 Variation Risk : %.1f / 100
+국부 찢김 Risk : %.1f / 100
+Strong Edge Risk : %.1f / 100
+위치 흔들림 허용도 : %.1f / 100
 Surface Uniformity : %.1f / 100
-Edge Density : %.1f%%
-Strong Edge : %.1f%%
-Local Change : %.1f
 Quality Score : %.1f / 100
 Sensitivity : %d%%
+
+판정 : %s
+
+%s
+
 NG 후보 영역 : %d개
+%s
+
+현재 Model / Line 판정 기준
+%s
 
 %s
                 """.trimIndent(),
-
-                surfaceUniformity,
-                edgeDensity,
-                strongEdgeDensity,
-                localChange,
-                qualityScore,
+                v2.confidence,
+                v2.continuityRisk,
+                v2.widthVariationRisk,
+                v2.localTearRisk,
+                v2.strongEdgeRisk,
+                v2.positionTolerance,
+                v2.surfaceUniformity,
+                v2.qualityScore,
                 sensitivity,
+                judgment,
+                v2.note,
                 regionCount,
-                regionSummary
-            )
-
-
-        lastDetails +=
-            "\n\n현재 Model / Line 판정 기준\n" +
-                inspectionSpec.criteriaText() +
-                "\n\n" +
+                regionSummary,
+                inspectionSpec.criteriaText(),
                 photoQualityText
+            )
 
         if (!photoQuality.isUsable) {
             lastDetails +=
@@ -1944,23 +1670,6 @@ NG 후보 영역 : %d개
                     photoQuality.message
         }
 
-        /*
-         * =====================================================
-         * 핵심 추가
-         *
-         * 빨간 NG 후보가 표시된 결과 사진을
-         * 이력 저장용으로 보관합니다.
-         *
-         * lastBitmap 원본은 그대로 유지합니다.
-         * =====================================================
-         */
-        /*
-         * 표시 방식만 공통 Renderer로 변경합니다.
-         *
-         * - 분해검사 판정 / 후보 검출 알고리즘은 그대로 유지
-         * - "NG 후보 N" 라벨은 ROI 바깥으로 이동
-         * - 빨간 원 선 굵기는 기존의 약 50%
-         */
         val displayBitmap =
             MarkerDisplayRenderer.renderGeneric(
                 sourceBitmap = source,
@@ -1968,7 +1677,7 @@ NG 후보 영역 : %d개
                 roiTop = roiStartY,
                 roiWidth = roi.width,
                 roiHeight = roi.height,
-                regions = markerResult.regions
+                regions = displayRegions
             )
 
         lastResultBitmap =
@@ -1987,43 +1696,48 @@ NG 후보 영역 : %d개
                 imageMatrixValue
 
             binding.tvDisassemblyStatus.text =
-                "분해 검사 ROI 분석 완료 - $judgment"
+                "DISASSEMBLY V2 분석 완료 - $judgment"
 
             binding.tvDisassemblyMetrics.text =
                 String.format(
                     Locale.getDefault(),
-
                     """
-민감도             : %d%%
-Surface Uniformity : %.1f / 100
-Edge Density       : %.1f%%
-Strong Edge        : %.1f%%
-Local Change       : %.1f
-Quality Score      : %.1f / 100
+DISASSEMBLY V2 - 정밀판정
+
+인식 Confidence       : %.1f / 100
+PP/Seal 연속성 Risk   : %.1f / 100
+폭/표면 Variation     : %.1f / 100
+국부 찢김 Risk        : %.1f / 100
+Strong Edge Risk      : %.1f / 100
+위치 흔들림 허용도    : %.1f / 100
+Surface Uniformity    : %.1f / 100
+Quality Score         : %.1f / 100
 
 판정 : %s
+
+%s
 
 NG 후보 영역 : %d개
 %s
 
-빨간 원/박스 = 국부 표면 변화가 큰 검사 후보 영역
+※ 분해 시 실링부 위치/각도 이동 자체는 불량으로 판정하지 않습니다.
+※ PP/실링 흔적의 연속성, 국부 단절/찢김, 폭/표면 변화가 핵심입니다.
+※ 정상 판정에서는 알루미늄 반사광에 의한 빨간 후보 표시를 억제합니다.
+※ 실제 NG 샘플 확보 후 Threshold를 최종 재보정합니다.
 
 현재 Model / Line 판정 기준
 %s
-
-※ 빨간 표시는 확정 NG가 아닙니다.
-※ 전극 패턴, 분리막 무늬, 문자, 조명 반사도 후보로 검출될 수 있습니다.
-※ 현재 수치는 영상 변화 기반 보조 지표입니다.
-※ 실제 양산 판정에는 정상 Master Sample과 실제 불량품 검증이 필요합니다.
                     """.trimIndent(),
-
-                    sensitivity,
-                    surfaceUniformity,
-                    edgeDensity,
-                    strongEdgeDensity,
-                    localChange,
-                    qualityScore,
+                    v2.confidence,
+                    v2.continuityRisk,
+                    v2.widthVariationRisk,
+                    v2.localTearRisk,
+                    v2.strongEdgeRisk,
+                    v2.positionTolerance,
+                    v2.surfaceUniformity,
+                    v2.qualityScore,
                     judgment,
+                    v2.note,
                     regionCount,
                     regionSummary,
                     inspectionSpec.criteriaText()

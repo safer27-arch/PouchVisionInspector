@@ -5,6 +5,10 @@ import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import com.pouchvision.inspector.databinding.ActivityMenuBinding
 
 class MenuActivity : AppCompatActivity() {
@@ -25,6 +29,36 @@ class MenuActivity : AppCompatActivity() {
             )
 
         setContentView(
+            binding.root
+        )
+
+        /*
+         * Android 15 / Galaxy 시스템바 겹침 방지
+         *
+         * 상태바(시계, Wi-Fi, 배터리) 아래에서 앱 화면이 시작되고,
+         * 하단 내비게이션 바에도 내용이 가려지지 않도록
+         * 실제 시스템바 높이를 자동 반영합니다.
+         */
+        ViewCompat.setOnApplyWindowInsetsListener(
+            binding.root
+        ) { view, windowInsets ->
+
+            val systemBars =
+                windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                )
+
+            view.updatePadding(
+                left = systemBars.left,
+                top = systemBars.top,
+                right = systemBars.right,
+                bottom = systemBars.bottom
+            )
+
+            windowInsets
+        }
+
+        ViewCompat.requestApplyInsets(
             binding.root
         )
 

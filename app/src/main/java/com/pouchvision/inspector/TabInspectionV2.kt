@@ -8,7 +8,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * TAB V2.4 - TAB Damage + PP FLOW + 반사광 보정 + Cup 구조경계 정밀판정
+ * TAB V2.6 - TAB Damage + PP FLOW + Cup 기준선 보조판정
  *
  * 사용자 기준:
  * 1) TAB 자체 데미지는 민감하게 판정
@@ -20,7 +20,7 @@ import kotlin.math.sqrt
  *    - 파우치 Cup과의 거리
  *    를 치명인자로 관리
  *
- * 현재는 정상 사진 10장을 기준으로 한 현장용 4차 규칙입니다.
+ * 현재는 정상 사진 10장을 기준으로 한 현장용 6차 규칙입니다.
  * 실제 NG 샘플이 확보되면 Threshold를 재보정해야 합니다.
  */
 object TabInspectionV2 {
@@ -942,73 +942,172 @@ object TabInspectionV2 {
                     }
             }
 
+        /*
+         * V2.5 Cup 구조경계:
+         * 한 줄의 강한 반사 Edge가 아니라 여러 높이 구간에서 같은 X 위치에
+         * 반복해서 나타나는 구조 변화만 Cup 후보로 인정합니다.
+         */
         val boundaryAcceptThreshold =
             max(
-                edgeThreshold * 0.68,
-                meanGradient * 1.05
+                edgeThreshold * 0.62,
+                meanGradient * 1.02
             )
 
-        /*
-         * PP FLOW에서 가까운 순서대로 첫 지속성 경계를 선택.
-         * 후보가 없으면 최고 score를 Confidence 참고용으로만 보관.
-         */
-        for (i in smoothedScores.indices) {
+        val bandCount =
+            5
 
-            val score =
-                smoothedScores[i].second
+        val minBandSupport =
+            3
 
-            if (score >= boundaryAcceptThreshold) {
+        var selectedBoundaryX =
+            -1
 
-                val prev =
-                    if (i > 0) {
-                        smoothedScores[i - 1].second
-                    } else {
-                        score
+        var selectedBoundaryScore =
+            0.0
+
+        var selectedBandSupport =
+            0
+
+        if (smoothedScores.isNotEmpty()) {
+
+            for (candidate in smoothedScores) {
+
+                val x =
+                    candidate.first
+
+                var support =
+                    0
+
+                var bandScoreSum =
+                    0.0
+
+                for (band in 0 until bandCount) {
+
+                    val bandY0 =
+                        searchY0 +
+                            (
+                                (searchY1 - searchY0) *
+                                    band /
+                                    bandCount
+                                )
+
+                    val bandY1 =
+                        searchY0 +
+                            (
+                                (searchY1 - searchY0) *
+                                    (band + 1) /
+                                    bandCount
+                                )
+
+                    if (bandY1 <= bandY0) {
+                        continue
                     }
 
-                val next =
-                    if (i < smoothedScores.size - 1) {
-                        smoothedScores[i + 1].second
-                    } else {
-                        score
+                    var localSum =
+                        0.0
+
+                    var localCount =
+                        0
+
+                    for (y in bandY0 until bandY1) {
+
+                        val i =
+                            y * w + x
+
+                        val xl =
+                            max(
+                                0,
+                                x - 2
+                            )
+
+                        val xr =
+                            min(
+                                w - 1,
+                                x + 2
+                            )
+
+                        val sideContrast =
+                            abs(
+                                blur[y * w + xr] -
+                                    blur[y * w + xl]
+                            )
+
+                        localSum +=
+                            gradient[i] * 0.60 +
+                                sideContrast * 0.40
+
+                        localCount++
                     }
 
-                val supportCount =
-                    listOf(
-                        prev,
-                        score,
-                        next
-                    )
-                        .count {
-                            it >= boundaryAcceptThreshold * 0.78
+                    val localAvg =
+                        if (localCount > 0) {
+                            localSum / localCount
+                        } else {
+                            0.0
                         }
 
-                if (supportCount >= 2) {
-                    bestBoundaryX =
-                        smoothedScores[i].first
+                    if (
+                        localAvg >=
+                        boundaryAcceptThreshold * 0.72
+                    ) {
+                        support++
+                        bandScoreSum += localAvg
+                    }
+                }
 
-                    bestBoundaryScore =
-                        score
+                if (support >= minBandSupport) {
 
-                    break
+                    val avgSupportedScore =
+                        bandScoreSum /
+                            support.toDouble()
+
+                    /*
+                     * PP FLOW에서 가까운 구조경계를 우선합니다.
+                     * 동일한 support이면 score가 높은 쪽을 사용합니다.
+                     */
+                    if (
+                        selectedBoundaryX < 0 ||
+                        support > selectedBandSupport ||
+                        (
+                            support == selectedBandSupport &&
+                            avgSupportedScore >
+                                selectedBoundaryScore * 1.08
+                            )
+                    ) {
+                        selectedBoundaryX =
+                            x
+
+                        selectedBoundaryScore =
+                            avgSupportedScore
+
+                        selectedBandSupport =
+                            support
+
+                        /*
+                         * 탐색 순서 자체가 PP FLOW -> Cup 방향이므로
+                         * 4/5 이상 연속 구조가 나오면 가까운 경계를 즉시 채택합니다.
+                         */
+                        if (support >= 4) {
+                            break
+                        }
+                    }
                 }
             }
         }
 
-        if (
-            bestBoundaryX < 0 &&
-            smoothedScores.isNotEmpty()
-        ) {
-            val best =
-                smoothedScores.maxByOrNull {
-                    it.second
-                }
+        bestBoundaryX =
+            selectedBoundaryX
 
-            if (best != null) {
-                bestBoundaryScore =
-                    best.second
+        bestBoundaryScore =
+            if (selectedBoundaryX >= 0) {
+                selectedBoundaryScore
+            } else {
+                smoothedScores
+                    .maxOfOrNull {
+                        it.second
+                    }
+                    ?: 0.0
             }
-        }
 
         val rawCupDistancePx =
             if (
@@ -1024,7 +1123,7 @@ object TabInspectionV2 {
             }
 
         /*
-         * V2.4:
+         * V2.6:
          * Cup 경계를 못 찾은 경우 0%를 실제 거리처럼 사용하지 않습니다.
          * - 강한 경계인지
          * - PP FLOW와 최소 간격이 있는지
@@ -1054,16 +1153,18 @@ object TabInspectionV2 {
             bestBoundaryX >= 0 &&
                 rawCupDistancePx >= minValidGapPx &&
                 rawCupDistancePx <= maxValidGapPx &&
-                edgeStrengthRatio >= 0.68
+                selectedBandSupport >= 4 &&
+                edgeStrengthRatio >= 0.70
 
         val cupBoundaryConfidence =
             if (cupBoundaryDetected) {
                 (
-                    58.0 +
+                    45.0 +
+                        selectedBandSupport * 9.0 +
                         max(
                             0.0,
-                            edgeStrengthRatio - 0.68
-                        ) * 42.0
+                            edgeStrengthRatio - 0.62
+                        ) * 28.0
                     )
                     .coerceIn(
                         0.0,
@@ -1071,10 +1172,11 @@ object TabInspectionV2 {
                     )
             } else {
                 (
-                    max(
-                        0.0,
-                        edgeStrengthRatio - 0.35
-                    ) * 80.0
+                    selectedBandSupport * 8.0 +
+                        max(
+                            0.0,
+                            edgeStrengthRatio - 0.35
+                        ) * 35.0
                     )
                     .coerceIn(
                         0.0,
@@ -1252,17 +1354,19 @@ object TabInspectionV2 {
          * TAB Damage는 민감하게:
          * 상대적으로 작은 강한 Edge 증가도 Risk에 크게 반영.
          */
+        /*
+         * V2.5 TAB Damage:
+         * 단일 peak는 금속 반사광일 가능성이 높으므로 가중치를 낮추고,
+         * 실제 손상에서 더 안정적으로 증가하는 강한 Edge 밀도를 우선합니다.
+         */
         val tabDamageRisk =
             (
-                tabStrongDensity *
-                    2.3 +
+                tabStrongDensity * 2.05 +
                     max(
                         0.0,
                         tabPeak -
-                            edgeThreshold *
-                                1.4
-                    ) *
-                    0.65
+                            edgeThreshold * 1.65
+                    ) * 0.28
                 )
                 .coerceIn(
                     0.0,
@@ -1725,7 +1829,7 @@ object TabInspectionV2 {
             judgment =
                 "정상",
             reason =
-                "ROI가 너무 작아 TAB V2.4 분석을 생략했습니다.",
+                "ROI가 너무 작아 TAB V2.6 분석을 생략했습니다.",
             showDefectMarkers =
                 false
         )

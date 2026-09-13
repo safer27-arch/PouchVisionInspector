@@ -24,6 +24,13 @@ object TrainingDataStore {
     const val LABEL_LIMIT = "한계정상"
     const val LABEL_NG = "불량"
 
+    // Bottom Corner Ground Truth: 실제 물리 주름 개수
+    const val WRINKLE_COUNT_UNKNOWN = -1
+    const val WRINKLE_COUNT_0 = 0
+    const val WRINKLE_COUNT_1 = 1
+    const val WRINKLE_COUNT_2 = 2
+    const val WRINKLE_COUNT_3_PLUS = 3
+
     val LABELS = listOf(
         LABEL_NORMAL,
         LABEL_WARNING,
@@ -44,10 +51,24 @@ object TrainingDataStore {
         val imagePath: String,
         val trueLabel: String,
         val note: String,
-        val labeledAt: String
+        val labeledAt: String,
+        val wrinkleCountGt: Int = WRINKLE_COUNT_UNKNOWN
     ) {
+        val isBottomCorner: Boolean
+            get() = inspectionType.equals("BOTTOM CORNER", ignoreCase = true)
+
+        val hasWrinkleCountGroundTruth: Boolean
+            get() = isBottomCorner && wrinkleCountGt != WRINKLE_COUNT_UNKNOWN
+
+        val wrinkleCountText: String
+            get() = TrainingDataStore.wrinkleCountText(wrinkleCountGt)
+
         val isLabeled: Boolean
-            get() = trueLabel.isNotBlank()
+            get() = if (isBottomCorner) {
+                hasWrinkleCountGroundTruth || trueLabel.isNotBlank()
+            } else {
+                trueLabel.isNotBlank()
+            }
 
         val isMismatch: Boolean
             get() = isLabeled &&
@@ -138,6 +159,7 @@ object TrainingDataStore {
                     put("trueLabel", "")
                     put("note", "")
                     put("labeledAt", "")
+                    put("wrinkleCountGt", WRINKLE_COUNT_UNKNOWN)
                 }
 
                 existing.put(item)
@@ -173,7 +195,11 @@ object TrainingDataStore {
                     imagePath = item.optString("imagePath", ""),
                     trueLabel = item.optString("trueLabel", ""),
                     note = item.optString("note", ""),
-                    labeledAt = item.optString("labeledAt", "")
+                    labeledAt = item.optString("labeledAt", ""),
+                    wrinkleCountGt = item.optInt(
+                        "wrinkleCountGt",
+                        WRINKLE_COUNT_UNKNOWN
+                    )
                 )
             )
         }
@@ -232,6 +258,7 @@ object TrainingDataStore {
                 item.put("trueLabel", "")
                 item.put("note", "")
                 item.put("labeledAt", "")
+                item.put("wrinkleCountGt", WRINKLE_COUNT_UNKNOWN)
                 updated = true
                 break
             }
@@ -242,6 +269,158 @@ object TrainingDataStore {
         }
 
         return updated
+    }
+
+    fun isBottomCorner(inspectionType: String): Boolean {
+        return inspectionType.equals(
+            "BOTTOM CORNER",
+            ignoreCase = true
+        )
+    }
+
+    fun hasWrinkleCountGroundTruth(record: TrainingRecord): Boolean {
+        return record.hasWrinkleCountGroundTruth
+    }
+
+    fun wrinkleCountText(count: Int): String {
+        return when (count) {
+            WRINKLE_COUNT_0 -> "0개"
+            WRINKLE_COUNT_1 -> "1개"
+            WRINKLE_COUNT_2 -> "2개"
+            WRINKLE_COUNT_3_PLUS -> "3개 이상"
+            else -> "미지정"
+        }
+    }
+
+    fun labelFromWrinkleCount(count: Int): String {
+        return when (count) {
+            WRINKLE_COUNT_0,
+            WRINKLE_COUNT_1 -> LABEL_NORMAL
+            WRINKLE_COUNT_2 -> LABEL_LIMIT
+            WRINKLE_COUNT_3_PLUS -> LABEL_NG
+            else -> ""
+        }
+    }
+
+    fun setWrinkleCountGroundTruth(
+        context: Context,
+        sourceId: Long,
+        wrinkleCount: Int
+    ): Boolean {
+        return setWrinkleCountGroundTruth(
+            context = context,
+            sourceId = sourceId,
+            wrinkleCount = wrinkleCount,
+            note = ""
+        )
+    }
+
+    fun setWrinkleCountGroundTruth(
+        context: Context,
+        sourceId: Long,
+        wrinkleCount: Int,
+        note: String
+    ): Boolean {
+        if (
+            wrinkleCount !in listOf(
+                WRINKLE_COUNT_0,
+                WRINKLE_COUNT_1,
+                WRINKLE_COUNT_2,
+                WRINKLE_COUNT_3_PLUS
+            )
+        ) {
+            return false
+        }
+
+        val array = loadMutableJson(context)
+        val nowText = SimpleDateFormat(
+            "yyyy-MM-dd HH:mm:ss",
+            Locale.getDefault()
+        ).format(Date())
+
+        var updated = false
+
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+
+            if (item.optLong("sourceId", 0L) == sourceId) {
+                val type = item.optString("inspectionType", "")
+                if (!isBottomCorner(type)) {
+                    return false
+                }
+
+                item.put("wrinkleCountGt", wrinkleCount)
+                item.put("trueLabel", labelFromWrinkleCount(wrinkleCount))
+                item.put("note", note.trim())
+                item.put("labeledAt", nowText)
+
+                updated = true
+                break
+            }
+        }
+
+        if (updated) {
+            saveJson(context, array)
+        }
+
+        return updated
+    }
+
+    fun clearWrinkleCountGroundTruth(
+        context: Context,
+        sourceId: Long
+    ): Boolean {
+        val array = loadMutableJson(context)
+        var updated = false
+
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+
+            if (item.optLong("sourceId", 0L) == sourceId) {
+                item.put("wrinkleCountGt", WRINKLE_COUNT_UNKNOWN)
+                item.put("trueLabel", "")
+                item.put("note", "")
+                item.put("labeledAt", "")
+                updated = true
+                break
+            }
+        }
+
+        if (updated) {
+            saveJson(context, array)
+        }
+
+        return updated
+    }
+
+    fun countByWrinkleGroundTruth(
+        context: Context,
+        inspectionType: String? = "BOTTOM CORNER"
+    ): Map<Int, Int> {
+        val records =
+            load(context)
+                .filter {
+                    inspectionType == null ||
+                        it.inspectionType.equals(
+                            inspectionType,
+                            ignoreCase = true
+                        )
+                }
+
+        return linkedMapOf(
+            WRINKLE_COUNT_0 to records.count {
+                it.wrinkleCountGt == WRINKLE_COUNT_0
+            },
+            WRINKLE_COUNT_1 to records.count {
+                it.wrinkleCountGt == WRINKLE_COUNT_1
+            },
+            WRINKLE_COUNT_2 to records.count {
+                it.wrinkleCountGt == WRINKLE_COUNT_2
+            },
+            WRINKLE_COUNT_3_PLUS to records.count {
+                it.wrinkleCountGt == WRINKLE_COUNT_3_PLUS
+            }
+        )
     }
 
     fun countByLabel(
@@ -365,6 +544,7 @@ object TrainingDataStore {
                     "Score",
                     "AI_Judgment",
                     "True_Label",
+                    "Wrinkle_Count_GT",
                     "Mismatch",
                     "Sensitivity",
                     "Image_File",
@@ -396,6 +576,7 @@ object TrainingDataStore {
                             ),
                             r.aiJudgment,
                             r.trueLabel,
+                            if (r.isBottomCorner) r.wrinkleCountText else "",
                             if (r.isMismatch) "1" else "0",
                             r.sensitivity.toString(),
                             imageName,

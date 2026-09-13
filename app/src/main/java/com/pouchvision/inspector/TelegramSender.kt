@@ -38,6 +38,11 @@ object TelegramSender {
         val message: String
     )
 
+    data class ReportImageAttachment(
+        val imagePath: String,
+        val caption: String
+    )
+
     /*
      * =========================================================
      * 설정 화면용 테스트 메시지
@@ -173,6 +178,84 @@ Telegram 연결 테스트 메시지입니다.
                 )
 
             callback?.invoke(result)
+        }.start()
+    }
+
+    /*
+     * 교대조 / 주간 리포트: 본문 + 결과 이미지 전송
+     */
+    fun sendReportWithImages(
+        context: Context,
+        message: String,
+        images: List<ReportImageAttachment>,
+        callback: ((SendResult) -> Unit)? = null
+    ) {
+        val settings = TelegramSettingsStore.load(context)
+
+        if (!settings.enabled) {
+            callback?.invoke(
+                SendResult(false, 0, 0, "Telegram 자동 알림이 OFF 상태입니다.")
+            )
+            return
+        }
+
+        if (settings.botToken.isBlank() || settings.chatIds.isEmpty()) {
+            callback?.invoke(
+                SendResult(false, 0, 0, "Telegram Token 또는 Chat ID 설정이 필요합니다.")
+            )
+            return
+        }
+
+        Thread {
+            var totalSuccess = 0
+            var totalFailure = 0
+            val failures = mutableListOf<String>()
+
+            val textResult =
+                sendTextToAll(
+                    botToken = settings.botToken,
+                    chatIds = settings.chatIds,
+                    text = message.take(3900)
+                )
+
+            totalSuccess += textResult.successCount
+            totalFailure += textResult.failureCount
+            if (!textResult.success) failures.add(textResult.message)
+
+            images.forEach { attachment ->
+                val file = File(attachment.imagePath)
+
+                if (attachment.imagePath.isBlank() || !file.exists() || !file.isFile) {
+                    return@forEach
+                }
+
+                val imageResult =
+                    sendPhotoToAll(
+                        botToken = settings.botToken,
+                        chatIds = settings.chatIds,
+                        photoFile = file,
+                        caption = attachment.caption.take(900)
+                    )
+
+                totalSuccess += imageResult.successCount
+                totalFailure += imageResult.failureCount
+                if (!imageResult.success) failures.add(imageResult.message)
+            }
+
+            callback?.invoke(
+                SendResult(
+                    success = totalFailure == 0 && totalSuccess > 0,
+                    successCount = totalSuccess,
+                    failureCount = totalFailure,
+                    message =
+                        if (totalFailure == 0) {
+                            "리포트 Telegram 전송 완료"
+                        } else {
+                            "리포트 일부 전송 실패: " +
+                                failures.distinct().joinToString(" | ")
+                        }
+                )
+            )
         }.start()
     }
 

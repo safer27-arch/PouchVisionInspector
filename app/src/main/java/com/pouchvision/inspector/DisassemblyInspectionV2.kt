@@ -8,10 +8,10 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * DISASSEMBLY V2.1
+ * DISASSEMBLY V2.2
  *
  * 정상 분해사진에서 Cell 외곽선, TAB, 알루미늄 반사광을 찢김으로 오인하던
- * V2 과검출을 줄이기 위한 정상 Master 우선 버전입니다.
+ * V2.1에서 남아 있던 단독 국부 찢김 과검출을 줄이기 위한 정상 Master 교차검증 버전입니다.
  *
  * 원칙
  * 1) 분해 과정의 위치/각도 이동은 허용
@@ -162,26 +162,90 @@ object DisassemblyInspectionV2 {
                 max(0.0, strongDensity - 28.0) * 1.5
             ).coerceIn(55.0, 100.0)
 
-        // 정상 Master 우선. 국부 찢김은 중요하지만 실제 NG 확보 전 과도하게 지배하지 않도록 제한합니다.
+        /*
+         * V2.2 정상 Master 교차검증
+         *
+         * 정상 분해사진에서는 "국부 찢김 Risk" 하나만 높아지는 경우가 있었습니다.
+         * 이는 실제 찢김보다 파우치 접힘/반사/Cell 경계 영향일 가능성이 높습니다.
+         *
+         * 따라서 아래 4개 신호 중 2개 이상이 동시에 높을 때만
+         * 실제 결함 가능성을 강하게 점수에 반영합니다.
+         */
+        val continuityHigh = continuityRisk >= 62.0
+        val widthHigh = widthVariationRisk >= 52.0
+        val tearHigh = localTearRisk >= 62.0
+        val strongHigh = strongEdgeRisk >= 28.0
+
+        val corroborationCount =
+            listOf(
+                continuityHigh,
+                widthHigh,
+                tearHigh,
+                strongHigh
+            ).count { it }
+
+        /*
+         * 정상 Master에서 확인된 변동 범위는 "무결함 기준선"으로 흡수합니다.
+         * - 연속성 Risk 약 50대: 분해 위치/주름 영향으로 허용
+         * - 폭/표면 Variation 약 10~20대: 정상
+         * - 국부 찢김 단독 상승: 강한 감점 금지
+         */
+        val continuityPenalty =
+            max(0.0, continuityRisk - 43.0) * 0.78
+
+        val widthPenalty =
+            max(0.0, widthVariationRisk - 28.0) * 0.72
+
+        val strongPenalty =
+            max(0.0, strongEdgeRisk - 18.0) * 0.70
+
+        val tearPenalty =
+            if (corroborationCount >= 2) {
+                max(0.0, localTearRisk - 28.0) * 0.95
+            } else {
+                // 단독 찢김 신호는 정상 반사/접힘 가능성이 높아 보조 가중치만 적용
+                max(0.0, localTearRisk - 45.0) * 0.16
+            }
+
+        val synergyPenalty =
+            when {
+                corroborationCount >= 4 -> 18.0
+                corroborationCount == 3 -> 11.0
+                corroborationCount == 2 -> 5.0
+                else -> 0.0
+            }
+
         val defect = (
-            continuityRisk * 0.34 +
-                widthVariationRisk * 0.24 +
-                localTearRisk * 0.30 +
-                strongEdgeRisk * 0.12
+            continuityPenalty * 0.48 +
+                widthPenalty * 0.18 +
+                tearPenalty * 0.24 +
+                strongPenalty * 0.10 +
+                synergyPenalty
             ).coerceIn(0.0, 100.0)
 
-        val quality = (100.0 - defect).coerceIn(0.0, 100.0)
+        val quality =
+            (100.0 - defect)
+                .coerceIn(0.0, 100.0)
+
         val uniformity = (
-            100.0 - widthVariationRisk * 0.55 - continuityRisk * 0.20
+            100.0 -
+                max(0.0, widthVariationRisk - 15.0) * 0.40 -
+                max(0.0, continuityRisk - 40.0) * 0.20
             ).coerceIn(0.0, 100.0)
 
         val note = when {
             confidence < 65.0 ->
                 "ROI 정보가 불안정합니다. PP/실링 흔적이 충분히 포함되도록 ROI를 다시 맞춰주세요."
-            localTearRisk >= 60.0 ->
-                "국부 단절/찢김 의심이 있습니다. 실제 실링/PP 흔적을 확대 확인하세요."
-            continuityRisk >= 58.0 ->
-                "PP/실링 흔적의 연속성 변화가 큽니다. 분해 과정의 뜯김 영향과 실제 단절을 구분해 확인하세요."
+
+            corroborationCount >= 2 && tearHigh ->
+                "국부 단절/찢김 신호가 다른 이상 신호와 함께 확인됩니다. 실제 실링/PP 흔적을 확대 확인하세요."
+
+            corroborationCount >= 2 ->
+                "복수 이상 신호가 동시에 확인됩니다. PP/실링 흔적을 확대 확인하세요."
+
+            tearHigh ->
+                "국부 찢김 신호가 단독으로 높지만 정상 Master의 접힘/반사 가능성을 고려해 보조 신호로만 반영했습니다."
+
             else ->
                 "정상 Master 우선 판정입니다. Cell 외곽선/TAB/알루미늄 반사와 분해 후 위치 이동은 결함 판단에서 억제합니다."
         }

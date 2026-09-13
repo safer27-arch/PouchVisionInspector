@@ -1610,12 +1610,49 @@ Tab Score         : -
         lastJudgment =
             v2.judgment
 
+        val cupDistanceRiskText =
+            if (v2.cupBoundaryDetected) {
+                String.format(
+                    Locale.getDefault(),
+                    "%.1f / 100",
+                    v2.cupDistanceRisk
+                )
+            } else {
+                "확인 필요 (판정 제외)"
+            }
+
+        val cupDistanceText =
+            if (v2.cupBoundaryDetected) {
+                String.format(
+                    Locale.getDefault(),
+                    "%.1f %% of ROI",
+                    v2.cupDistancePercent
+                )
+            } else {
+                "확인 필요"
+            }
+
+        val cupBoundaryText =
+            if (v2.cupBoundaryDetected) {
+                String.format(
+                    Locale.getDefault(),
+                    "인식됨 (Confidence %.1f / 100)",
+                    v2.cupBoundaryConfidence
+                )
+            } else {
+                String.format(
+                    Locale.getDefault(),
+                    "인식 불확실 (Confidence %.1f / 100)",
+                    v2.cupBoundaryConfidence
+                )
+            }
+
         lastDetails =
             String.format(
                 Locale.getDefault(),
 
                 """
-TAB V2.1 - TAB Damage + PP FLOW
+TAB V2.2 - TAB Damage + PP FLOW + Cup 경계
 
 TAB 인식 Confidence : %.1f / 100
 
@@ -1625,12 +1662,13 @@ PP FLOW Straightness Risk : %.1f / 100
 PP FLOW Width Variation : %.1f / 100
 PP FLOW Sag / 흘러내림 Risk : %.1f / 100
 PP FLOW Thickness Risk : %.1f / 100
-Cup Distance Risk : %.1f / 100
+Cup Distance Risk : %s
 
 [실측/상대지표]
 PP FLOW 평균 폭 : %.1f %% of ROI
 PP FLOW Thickness Index : %.1f / 100
-Cup Distance : %.1f %% of ROI
+Cup Boundary : %s
+Cup Distance : %s
 
 Seal Uniformity Risk : %.1f / 100
 Boundary Risk : %.1f / 100
@@ -1647,7 +1685,9 @@ Final Judgment : %s
 - TAB 자체 Damage는 다른 항목보다 민감하게 판정
 - PP FLOW 직진성/폭/흘러내림/두께/컵 거리를 치명인자로 관리
 - 두께는 실제 mm가 아니라 색/명암 기반 상대 Index
-- Cup Distance도 현재는 ROI 대비 상대거리이며, 실제 mm는 추후 Scale 보정 필요
+- Cup Distance는 Cup 경계가 확실히 인식된 경우에만 계산
+- Cup 경계 인식이 불확실하면 "확인 필요"로 표시하고 거리 Risk는 최종 판정에서 제외
+- Cup Distance는 현재 ROI 대비 상대거리이며, 실제 mm는 추후 Scale 보정 필요
 - 실제 NG 샘플이 없으므로 Threshold는 현장용 임시 기준
                 """.trimIndent(),
 
@@ -1658,11 +1698,12 @@ Final Judgment : %s
                 v2.ppFlowWidthVariation,
                 v2.ppFlowSagRisk,
                 v2.ppFlowThicknessRisk,
-                v2.cupDistanceRisk,
+                cupDistanceRiskText,
 
                 v2.ppFlowMeanWidthPercent,
                 v2.ppFlowThicknessIndex,
-                v2.cupDistancePercent,
+                cupBoundaryText,
+                cupDistanceText,
 
                 v2.sealUniformityRisk,
                 v2.boundaryRisk,
@@ -1738,14 +1779,14 @@ Final Judgment : %s
                 imageMatrixValue
 
             binding.tvTabStatus.text =
-                "TAB V2.1 분석 완료 - ${v2.judgment}"
+                "TAB V2.2 분석 완료 - ${v2.judgment}"
 
             binding.tvTabMetrics.text =
                 String.format(
                     Locale.getDefault(),
 
                     """
-TAB V2.1 - 정밀판정
+TAB V2.2 - 정밀판정
 
 TAB 인식 Confidence : %.1f / 100
 
@@ -1756,11 +1797,12 @@ PP FLOW
 폭 Variation : %.1f / 100
 흘러내림 Risk : %.1f / 100
 두께 Risk : %.1f / 100
-Cup Distance Risk : %.1f / 100
+Cup Distance Risk : %s
 
 PP FLOW 평균 폭 : %.1f %% of ROI
 Thickness Index : %.1f / 100
-Cup Distance : %.1f %% of ROI
+Cup Boundary : %s
+Cup Distance : %s
 
 Baseline Deviation : %.1f / 100
 Quality Score : %.1f / 100
@@ -1771,7 +1813,7 @@ Quality Score : %.1f / 100
 
 ※ TAB Damage는 민감하게 판정합니다.
 ※ PP FLOW 직진성/폭/흘러내림/두께/컵 거리는 치명인자입니다.
-※ 현재 두께/거리 값은 상대값이며 실제 mm 보정 전 단계입니다.
+※ 두께는 상대값입니다. Cup 경계가 불확실하면 거리는 '확인 필요'로 표시하고 판정에서 제외합니다.
 ※ 실제 NG 확보 후 Threshold를 재보정합니다.
                     """.trimIndent(),
 
@@ -1782,11 +1824,12 @@ Quality Score : %.1f / 100
                     v2.ppFlowWidthVariation,
                     v2.ppFlowSagRisk,
                     v2.ppFlowThicknessRisk,
-                    v2.cupDistanceRisk,
+                    cupDistanceRiskText,
 
                     v2.ppFlowMeanWidthPercent,
                     v2.ppFlowThicknessIndex,
-                    v2.cupDistancePercent,
+                    cupBoundaryText,
+                    cupDistanceText,
 
                     v2.baselineDeviation,
                     v2.qualityScore,

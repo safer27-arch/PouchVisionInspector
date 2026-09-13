@@ -14,22 +14,59 @@ import java.util.zip.ZipOutputStream
 
 object TrainingDataStore {
 
-    private const val PREF_NAME = "pouch_training_data"
-    private const val KEY_ENABLED = "training_enabled"
-    private const val KEY_RECORDS = "training_records_json"
-    private const val IMAGE_DIR = "training_images"
+    private const val PREF_NAME =
+        "pouch_training_data"
 
+    private const val KEY_ENABLED =
+        "training_enabled"
+
+    private const val KEY_RECORDS =
+        "training_records_json"
+
+    private const val IMAGE_DIR =
+        "training_images"
+
+    /*
+     * =========================================================
+     * 공통 정답 라벨
+     * =========================================================
+     */
     const val LABEL_NORMAL = "정상"
     const val LABEL_WARNING = "주의"
     const val LABEL_LIMIT = "한계정상"
     const val LABEL_NG = "불량"
 
-    val LABELS = listOf(
-        LABEL_NORMAL,
-        LABEL_WARNING,
-        LABEL_LIMIT,
-        LABEL_NG
-    )
+    val LABELS =
+        listOf(
+            LABEL_NORMAL,
+            LABEL_WARNING,
+            LABEL_LIMIT,
+            LABEL_NG
+        )
+
+    /*
+     * =========================================================
+     * Bottom Corner 주름 개수 Ground Truth
+     * =========================================================
+     *
+     * -1 : 아직 미지정
+     *  0 : 주름 0개
+     *  1 : 주름 1개
+     *  2 : 주름 2개
+     *  3 : 주름 3개 이상
+     *
+     * 사용자가 확정한 Master 기준
+     *
+     * 0개 -> 정상
+     * 1개 -> 정상
+     * 2개 -> 한계정상
+     * 3개 이상 -> 불량
+     */
+    const val WRINKLE_COUNT_UNSET = -1
+    const val WRINKLE_COUNT_0 = 0
+    const val WRINKLE_COUNT_1 = 1
+    const val WRINKLE_COUNT_2 = 2
+    const val WRINKLE_COUNT_3_PLUS = 3
 
     data class TrainingRecord(
         val sourceId: Long,
@@ -44,34 +81,86 @@ object TrainingDataStore {
         val imagePath: String,
         val trueLabel: String,
         val note: String,
-        val labeledAt: String
+        val labeledAt: String,
+
+        /*
+         * Bottom Corner 전용 정답 주름 개수
+         *
+         * -1 = 미지정
+         * 0  = 0개
+         * 1  = 1개
+         * 2  = 2개
+         * 3  = 3개 이상
+         */
+        val wrinkleCountGt: Int =
+            WRINKLE_COUNT_UNSET
     ) {
+
         val isLabeled: Boolean
-            get() = trueLabel.isNotBlank()
+            get() =
+                trueLabel.isNotBlank()
 
         val isMismatch: Boolean
-            get() = isLabeled &&
-                normalizeLabel(aiJudgment) != normalizeLabel(trueLabel)
+            get() =
+                isLabeled &&
+                    normalizeLabel(
+                        aiJudgment
+                    ) !=
+                    normalizeLabel(
+                        trueLabel
+                    )
+
+        val isBottomCorner: Boolean
+            get() =
+                inspectionType.equals(
+                    "BOTTOM CORNER",
+                    ignoreCase = true
+                )
+
+        val hasWrinkleCountGroundTruth: Boolean
+            get() =
+                isBottomCorner &&
+                    wrinkleCountGt >=
+                    WRINKLE_COUNT_0
+
+        val wrinkleCountText: String
+            get() =
+                wrinkleCountText(
+                    wrinkleCountGt
+                )
     }
 
-    fun isEnabled(context: Context): Boolean {
-        return context.getSharedPreferences(
-            PREF_NAME,
-            Context.MODE_PRIVATE
-        ).getBoolean(
-            KEY_ENABLED,
-            true
-        )
+    /*
+     * =========================================================
+     * 학습 데이터 수집 ON / OFF
+     * =========================================================
+     */
+
+    fun isEnabled(
+        context: Context
+    ): Boolean {
+
+        return context
+            .getSharedPreferences(
+                PREF_NAME,
+                Context.MODE_PRIVATE
+            )
+            .getBoolean(
+                KEY_ENABLED,
+                true
+            )
     }
 
     fun setEnabled(
         context: Context,
         enabled: Boolean
     ) {
-        context.getSharedPreferences(
-            PREF_NAME,
-            Context.MODE_PRIVATE
-        )
+
+        context
+            .getSharedPreferences(
+                PREF_NAME,
+                Context.MODE_PRIVATE
+            )
             .edit()
             .putBoolean(
                 KEY_ENABLED,
@@ -80,21 +169,40 @@ object TrainingDataStore {
             .apply()
     }
 
+    /*
+     * =========================================================
+     * 현재 검사 이력 -> 학습 데이터
+     * =========================================================
+     *
+     * 검사 결과 이미지를 학습용 폴더에 별도 복사합니다.
+     *
+     * 일반 검사 History가 나중에 삭제되어도
+     * Training 데이터는 별도로 유지됩니다.
+     */
+
     fun syncFromInspectionHistory(
         context: Context
     ): Int {
 
-        if (!isEnabled(context)) {
+        if (
+            !isEnabled(
+                context
+            )
+        ) {
             return 0
         }
 
         val existing =
-            loadMutableJson(context)
+            loadMutableJson(
+                context
+            )
 
         val knownIds =
             mutableSetOf<Long>()
 
-        for (i in 0 until existing.length()) {
+        for (
+            i in 0 until existing.length()
+        ) {
 
             existing
                 .optJSONObject(i)
@@ -106,23 +214,32 @@ object TrainingDataStore {
                     it > 0L
                 }
                 ?.let {
-                    knownIds.add(it)
+                    knownIds.add(
+                        it
+                    )
                 }
         }
 
         var added = 0
 
         InspectionHistoryStore
-            .load(context)
+            .load(
+                context
+            )
             .filter {
 
                 !it.inspectionType.equals(
                     "TOTAL SESSION",
                     ignoreCase = true
                 ) &&
+
                     it.imagePath.isNotBlank() &&
+
                     it.id > 0L &&
-                    !knownIds.contains(it.id)
+
+                    !knownIds.contains(
+                        it.id
+                    )
             }
             .sortedBy {
                 it.id
@@ -131,86 +248,109 @@ object TrainingDataStore {
 
                 val copiedImage =
                     copyTrainingImage(
-                        context = context,
-                        sourcePath = source.imagePath,
-                        sourceId = source.id,
-                        inspectionType = source.inspectionType
+                        context =
+                            context,
+
+                        sourcePath =
+                            source.imagePath,
+
+                        sourceId =
+                            source.id,
+
+                        inspectionType =
+                            source.inspectionType
                     )
 
-                if (copiedImage.isBlank()) {
+                if (
+                    copiedImage.isBlank()
+                ) {
                     return@forEach
                 }
 
                 val item =
-                    JSONObject().apply {
+                    JSONObject()
+                        .apply {
 
-                        put(
-                            "sourceId",
-                            source.id
-                        )
+                            put(
+                                "sourceId",
+                                source.id
+                            )
 
-                        put(
-                            "dateTime",
-                            source.dateTime
-                        )
+                            put(
+                                "dateTime",
+                                source.dateTime
+                            )
 
-                        put(
-                            "model",
-                            source.model
-                        )
+                            put(
+                                "model",
+                                source.model
+                            )
 
-                        put(
-                            "line",
-                            source.line
-                        )
+                            put(
+                                "line",
+                                source.line
+                            )
 
-                        put(
-                            "inspectionType",
-                            source.inspectionType
-                        )
+                            put(
+                                "inspectionType",
+                                source.inspectionType
+                            )
 
-                        put(
-                            "score",
-                            source.score
-                        )
+                            put(
+                                "score",
+                                source.score
+                            )
 
-                        put(
-                            "aiJudgment",
-                            source.judgment
-                        )
+                            put(
+                                "aiJudgment",
+                                source.judgment
+                            )
 
-                        put(
-                            "sensitivity",
-                            source.sensitivity
-                        )
+                            put(
+                                "sensitivity",
+                                source.sensitivity
+                            )
 
-                        put(
-                            "details",
-                            source.details
-                        )
+                            put(
+                                "details",
+                                source.details
+                            )
 
-                        put(
-                            "imagePath",
-                            copiedImage
-                        )
+                            put(
+                                "imagePath",
+                                copiedImage
+                            )
 
-                        put(
-                            "trueLabel",
-                            ""
-                        )
+                            put(
+                                "trueLabel",
+                                ""
+                            )
 
-                        put(
-                            "note",
-                            ""
-                        )
+                            put(
+                                "note",
+                                ""
+                            )
 
-                        put(
-                            "labeledAt",
-                            ""
-                        )
-                    }
+                            put(
+                                "labeledAt",
+                                ""
+                            )
 
-                existing.put(item)
+                            /*
+                             * 새 항목
+                             *
+                             * 기존 데이터와 호환되도록
+                             * 기본값은 -1(미지정)입니다.
+                             */
+                            put(
+                                "wrinkleCountGt",
+                                WRINKLE_COUNT_UNSET
+                            )
+                        }
+
+                existing.put(
+                    item
+                )
 
                 knownIds.add(
                     source.id
@@ -219,7 +359,9 @@ object TrainingDataStore {
                 added++
             }
 
-        if (added > 0) {
+        if (
+            added > 0
+        ) {
 
             saveJson(
                 context,
@@ -229,6 +371,12 @@ object TrainingDataStore {
 
         return added
     }
+
+    /*
+     * =========================================================
+     * 학습 데이터 불러오기
+     * =========================================================
+     */
 
     fun load(
         context: Context
@@ -242,7 +390,9 @@ object TrainingDataStore {
         val result =
             mutableListOf<TrainingRecord>()
 
-        for (i in 0 until array.length()) {
+        for (
+            i in 0 until array.length()
+        ) {
 
             val item =
                 array.optJSONObject(i)
@@ -250,6 +400,7 @@ object TrainingDataStore {
 
             result.add(
                 TrainingRecord(
+
                     sourceId =
                         item.optLong(
                             "sourceId",
@@ -326,6 +477,19 @@ object TrainingDataStore {
                         item.optString(
                             "labeledAt",
                             ""
+                        ),
+
+                    /*
+                     * 예전 25개 데이터에는 이 Key가 없습니다.
+                     *
+                     * optInt 기본값 -1을 사용하므로
+                     * 기존 데이터는 그대로 살아 있고
+                     * 주름 개수만 미지정 상태가 됩니다.
+                     */
+                    wrinkleCountGt =
+                        item.optInt(
+                            "wrinkleCountGt",
+                            WRINKLE_COUNT_UNSET
                         )
                 )
             )
@@ -337,6 +501,15 @@ object TrainingDataStore {
             }
     }
 
+    /*
+     * =========================================================
+     * 기존 공통 정답 라벨 지정
+     * =========================================================
+     *
+     * SEAL / FORMING / TAB / DISASSEMBLY 등에서는
+     * 기존 방식 그대로 사용합니다.
+     */
+
     fun setLabel(
         context: Context,
         sourceId: Long,
@@ -344,7 +517,9 @@ object TrainingDataStore {
         note: String
     ): Boolean {
 
-        if (label !in LABELS) {
+        if (
+            label !in LABELS
+        ) {
             return false
         }
 
@@ -354,16 +529,14 @@ object TrainingDataStore {
             )
 
         val nowText =
-            SimpleDateFormat(
-                "yyyy-MM-dd HH:mm:ss",
-                Locale.getDefault()
-            ).format(
-                Date()
-            )
+            currentTimeText()
 
-        var updated = false
+        var updated =
+            false
 
-        for (i in 0 until array.length()) {
+        for (
+            i in 0 until array.length()
+        ) {
 
             val item =
                 array.optJSONObject(i)
@@ -391,12 +564,16 @@ object TrainingDataStore {
                     nowText
                 )
 
-                updated = true
+                updated =
+                    true
+
                 break
             }
         }
 
-        if (updated) {
+        if (
+            updated
+        ) {
 
             saveJson(
                 context,
@@ -406,6 +583,137 @@ object TrainingDataStore {
 
         return updated
     }
+
+    /*
+     * =========================================================
+     * Bottom Corner 주름 개수 Ground Truth 지정
+     * =========================================================
+     *
+     * countCode
+     *
+     * 0 = 주름 0개
+     * 1 = 주름 1개
+     * 2 = 주름 2개
+     * 3 = 주름 3개 이상
+     *
+     * 개수 지정과 동시에 최종 정답도 자동 지정됩니다.
+     *
+     * 0 -> 정상
+     * 1 -> 정상
+     * 2 -> 한계정상
+     * 3+ -> 불량
+     */
+
+    fun setWrinkleCountGroundTruth(
+        context: Context,
+        sourceId: Long,
+        countCode: Int,
+        note: String
+    ): Boolean {
+
+        if (
+            countCode !in
+            WRINKLE_COUNT_0..
+                WRINKLE_COUNT_3_PLUS
+        ) {
+            return false
+        }
+
+        val array =
+            loadMutableJson(
+                context
+            )
+
+        val nowText =
+            currentTimeText()
+
+        var updated =
+            false
+
+        for (
+            i in 0 until array.length()
+        ) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+            if (
+                item.optLong(
+                    "sourceId",
+                    0L
+                ) != sourceId
+            ) {
+                continue
+            }
+
+            val inspectionType =
+                item.optString(
+                    "inspectionType",
+                    ""
+                )
+
+            /*
+             * 이 기능은 Bottom Corner에서만 사용합니다.
+             */
+            if (
+                !inspectionType.equals(
+                    "BOTTOM CORNER",
+                    ignoreCase = true
+                )
+            ) {
+                return false
+            }
+
+            val label =
+                labelFromWrinkleCount(
+                    countCode
+                )
+
+            item.put(
+                "wrinkleCountGt",
+                countCode
+            )
+
+            item.put(
+                "trueLabel",
+                label
+            )
+
+            item.put(
+                "note",
+                note.trim()
+            )
+
+            item.put(
+                "labeledAt",
+                nowText
+            )
+
+            updated =
+                true
+
+            break
+        }
+
+        if (
+            updated
+        ) {
+
+            saveJson(
+                context,
+                array
+            )
+        }
+
+        return updated
+    }
+
+    /*
+     * =========================================================
+     * 정답 라벨 / 주름 개수 지우기
+     * =========================================================
+     */
 
     fun clearLabel(
         context: Context,
@@ -417,9 +725,12 @@ object TrainingDataStore {
                 context
             )
 
-        var updated = false
+        var updated =
+            false
 
-        for (i in 0 until array.length()) {
+        for (
+            i in 0 until array.length()
+        ) {
 
             val item =
                 array.optJSONObject(i)
@@ -438,6 +749,11 @@ object TrainingDataStore {
                 )
 
                 item.put(
+                    "wrinkleCountGt",
+                    WRINKLE_COUNT_UNSET
+                )
+
+                item.put(
                     "note",
                     ""
                 )
@@ -447,12 +763,16 @@ object TrainingDataStore {
                     ""
                 )
 
-                updated = true
+                updated =
+                    true
+
                 break
             }
         }
 
-        if (updated) {
+        if (
+            updated
+        ) {
 
             saveJson(
                 context,
@@ -463,16 +783,25 @@ object TrainingDataStore {
         return updated
     }
 
+    /*
+     * =========================================================
+     * 라벨별 개수
+     * =========================================================
+     */
+
     fun countByLabel(
         context: Context,
         inspectionType: String? = null
     ): Map<String, Int> {
 
         val records =
-            load(context)
+            load(
+                context
+            )
                 .filter {
 
                     inspectionType == null ||
+
                         it.inspectionType.equals(
                             inspectionType,
                             ignoreCase = true
@@ -480,6 +809,7 @@ object TrainingDataStore {
                 }
 
         return linkedMapOf(
+
             LABEL_NORMAL to
                 records.count {
                     it.trueLabel ==
@@ -506,18 +836,77 @@ object TrainingDataStore {
         )
     }
 
+    /*
+     * =========================================================
+     * Bottom Corner Ground Truth 개수별 통계
+     * =========================================================
+     */
+
+    fun countByWrinkleGroundTruth(
+        context: Context
+    ): Map<Int, Int> {
+
+        val records =
+            load(
+                context
+            )
+                .filter {
+
+                    it.isBottomCorner &&
+                        it.hasWrinkleCountGroundTruth
+                }
+
+        return linkedMapOf(
+
+            WRINKLE_COUNT_0 to
+                records.count {
+                    it.wrinkleCountGt ==
+                        WRINKLE_COUNT_0
+                },
+
+            WRINKLE_COUNT_1 to
+                records.count {
+                    it.wrinkleCountGt ==
+                        WRINKLE_COUNT_1
+                },
+
+            WRINKLE_COUNT_2 to
+                records.count {
+                    it.wrinkleCountGt ==
+                        WRINKLE_COUNT_2
+                },
+
+            WRINKLE_COUNT_3_PLUS to
+                records.count {
+                    it.wrinkleCountGt ==
+                        WRINKLE_COUNT_3_PLUS
+                }
+        )
+    }
+
+    /*
+     * =========================================================
+     * ZIP Export
+     * =========================================================
+     */
+
     fun exportZip(
         context: Context,
         outputStream: java.io.OutputStream
     ) {
 
         val records =
-            load(context)
+            load(
+                context
+            )
 
         ZipOutputStream(
             outputStream
         ).use { zip ->
 
+            /*
+             * labels.csv
+             */
             val csvText =
                 buildCsv(
                     records
@@ -537,21 +926,54 @@ object TrainingDataStore {
 
             zip.closeEntry()
 
+            /*
+             * README
+             */
             val guide =
                 """
                 PouchVisionInspector Training Dataset
 
                 labels.csv
-                - AI_Judgment : 현재 앱 판정
-                - True_Label  : 작업자가 확정한 정답
-                - Mismatch    : AI 판정과 정답이 다른 경우 1
-                - Image_File  : images 폴더의 학습 이미지
 
-                권장 라벨
+                - AI_Judgment       : 현재 앱 판정
+                - True_Label        : 작업자가 확정한 최종 정답
+                - Mismatch          : AI 판정과 정답이 다른 경우 1
+                - Wrinkle_Count_GT  : Bottom Corner 실제 주름 개수 정답
+                                      -1 = 미지정
+                                       0 = 0개
+                                       1 = 1개
+                                       2 = 2개
+                                       3 = 3개 이상
+                - Image_File        : images 폴더의 학습 이미지
+
+                Bottom Corner Master 기준
+
+                주름 0개     = 정상
+                주름 1개     = 정상
+                주름 2개     = 한계정상
+                주름 3개 이상 = 불량
+
+                AI 보조 분석 예정 인자
+
+                - 주름 개수
+                - 최장 주름 길이
+                - 전체 주름 길이
+                - 음영 / 대비
+                - 주름 강도
+                - 주름 위치
+                - 주름 연속성
+
+                공통 권장 라벨
+
                 정상 / 주의 / 한계정상 / 불량
 
                 주의:
-                라벨이 비어 있는 데이터는 아직 정답 확정 전입니다.
+
+                True_Label이 비어 있으면
+                아직 작업자 정답이 확정되지 않은 데이터입니다.
+
+                Bottom Corner에서 Wrinkle_Count_GT = -1이면
+                실제 주름 개수 Ground Truth가 아직 입력되지 않은 데이터입니다.
                 """.trimIndent()
 
             zip.putNextEntry(
@@ -568,6 +990,9 @@ object TrainingDataStore {
 
             zip.closeEntry()
 
+            /*
+             * 이미지 저장
+             */
             records.forEach { record ->
 
                 val file =
@@ -609,10 +1034,8 @@ object TrainingDataStore {
 
                 val entryName =
                     "images/" +
-                        safeType +
-                        "/" +
-                        labelFolder +
-                        "/" +
+                        "$safeType/" +
+                        "$labelFolder/" +
                         file.name
 
                 zip.putNextEntry(
@@ -630,7 +1053,9 @@ object TrainingDataStore {
                             8192
                         )
 
-                    while (true) {
+                    while (
+                        true
+                    ) {
 
                         val read =
                             input.read(
@@ -656,6 +1081,12 @@ object TrainingDataStore {
         }
     }
 
+    /*
+     * =========================================================
+     * CSV 생성
+     * =========================================================
+     */
+
     private fun buildCsv(
         records: List<TrainingRecord>
     ): String {
@@ -673,6 +1104,12 @@ object TrainingDataStore {
                     "AI_Judgment",
                     "True_Label",
                     "Mismatch",
+
+                    /*
+                     * 새 항목
+                     */
+                    "Wrinkle_Count_GT",
+
                     "Sensitivity",
                     "Image_File",
                     "Note",
@@ -681,7 +1118,9 @@ object TrainingDataStore {
                     .joinToString(
                         ","
                     ) {
-                        csv(it)
+                        csv(
+                            it
+                        )
                     }
             )
 
@@ -702,6 +1141,7 @@ object TrainingDataStore {
 
                     append(
                         listOf(
+
                             r.sourceId
                                 .toString(),
 
@@ -731,6 +1171,13 @@ object TrainingDataStore {
                                 "0"
                             },
 
+                            /*
+                             * Bottom Corner가 아니거나
+                             * 아직 개수 미지정이면 -1
+                             */
+                            r.wrinkleCountGt
+                                .toString(),
+
                             r.sensitivity
                                 .toString(),
 
@@ -743,7 +1190,9 @@ object TrainingDataStore {
                             .joinToString(
                                 ","
                             ) {
-                                csv(it)
+                                csv(
+                                    it
+                                )
                             }
                     )
 
@@ -753,6 +1202,12 @@ object TrainingDataStore {
                 }
         }
     }
+
+    /*
+     * =========================================================
+     * 학습 이미지 복사
+     * =========================================================
+     */
 
     private fun copyTrainingImage(
         context: Context,
@@ -834,12 +1289,18 @@ object TrainingDataStore {
             target.absolutePath
 
         } catch (
-            e: Exception
+            _: Exception
         ) {
 
             ""
         }
     }
+
+    /*
+     * =========================================================
+     * JSON 불러오기
+     * =========================================================
+     */
 
     private fun loadMutableJson(
         context: Context
@@ -864,12 +1325,18 @@ object TrainingDataStore {
             )
 
         } catch (
-            e: Exception
+            _: Exception
         ) {
 
             JSONArray()
         }
     }
+
+    /*
+     * =========================================================
+     * JSON 저장
+     * =========================================================
+     */
 
     private fun saveJson(
         context: Context,
@@ -889,11 +1356,18 @@ object TrainingDataStore {
             .commit()
     }
 
+    /*
+     * =========================================================
+     * CSV 안전 처리
+     * =========================================================
+     */
+
     private fun csv(
         value: String
     ): String {
 
         return "\"" +
+
             value
                 .replace(
                     "\"",
@@ -907,8 +1381,15 @@ object TrainingDataStore {
                     "\n",
                     " "
                 ) +
+
             "\""
     }
+
+    /*
+     * =========================================================
+     * 판정 문자열 정규화
+     * =========================================================
+     */
 
     fun normalizeLabel(
         value: String
@@ -942,5 +1423,83 @@ object TrainingDataStore {
             else ->
                 v
         }
+    }
+
+    /*
+     * =========================================================
+     * 주름 개수 -> Master 판정
+     * =========================================================
+     */
+
+    fun labelFromWrinkleCount(
+        countCode: Int
+    ): String {
+
+        return when (
+            countCode
+        ) {
+
+            WRINKLE_COUNT_0 ->
+                LABEL_NORMAL
+
+            WRINKLE_COUNT_1 ->
+                LABEL_NORMAL
+
+            WRINKLE_COUNT_2 ->
+                LABEL_LIMIT
+
+            WRINKLE_COUNT_3_PLUS ->
+                LABEL_NG
+
+            else ->
+                ""
+        }
+    }
+
+    /*
+     * =========================================================
+     * 주름 개수 표시 문자열
+     * =========================================================
+     */
+
+    fun wrinkleCountText(
+        countCode: Int
+    ): String {
+
+        return when (
+            countCode
+        ) {
+
+            WRINKLE_COUNT_0 ->
+                "0개"
+
+            WRINKLE_COUNT_1 ->
+                "1개"
+
+            WRINKLE_COUNT_2 ->
+                "2개"
+
+            WRINKLE_COUNT_3_PLUS ->
+                "3개 이상"
+
+            else ->
+                "미지정"
+        }
+    }
+
+    /*
+     * =========================================================
+     * 현재 시간
+     * =========================================================
+     */
+
+    private fun currentTimeText(): String {
+
+        return SimpleDateFormat(
+            "yyyy-MM-dd HH:mm:ss",
+            Locale.getDefault()
+        ).format(
+            Date()
+        )
     }
 }

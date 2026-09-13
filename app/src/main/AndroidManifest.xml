@@ -3,7 +3,7 @@
     <!-- 카메라 사용 -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Telegram Bot API / 네트워크 기능 -->
+    <!-- Telegram / 네트워크 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature
@@ -20,10 +20,12 @@
             android:name=".MenuActivity"
             android:exported="true"
             android:screenOrientation="portrait">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
         </activity>
 
         <activity
@@ -43,6 +45,12 @@
 
         <activity
             android:name=".DashboardActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- 이번 업데이트 신규 화면 -->
+        <activity
+            android:name=".MoldManagementActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

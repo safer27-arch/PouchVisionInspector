@@ -305,12 +305,12 @@ object TrainingDataStore {
     fun setWrinkleCountGroundTruth(
         context: Context,
         sourceId: Long,
-        count: Int
+        countCode: Int
     ): Boolean {
         return setWrinkleCountGroundTruth(
             context = context,
             sourceId = sourceId,
-            count = count,
+            countCode = countCode,
             note = ""
         )
     }
@@ -318,11 +318,11 @@ object TrainingDataStore {
     fun setWrinkleCountGroundTruth(
         context: Context,
         sourceId: Long,
-        count: Int,
+        countCode: Int,
         note: String
     ): Boolean {
         if (
-            count !in listOf(
+            countCode !in listOf(
                 WRINKLE_COUNT_0,
                 WRINKLE_COUNT_1,
                 WRINKLE_COUNT_2,
@@ -349,8 +349,8 @@ object TrainingDataStore {
                     return false
                 }
 
-                item.put("wrinkleCountGt", count)
-                item.put("trueLabel", labelFromWrinkleCount(count))
+                item.put("wrinkleCountGt", countCode)
+                item.put("trueLabel", labelFromWrinkleCount(countCode))
                 item.put("note", note.trim())
                 item.put("labeledAt", nowText)
 
@@ -369,12 +369,12 @@ object TrainingDataStore {
     fun setWrinkleCountGroundTruth(
         context: Context,
         record: TrainingRecord,
-        count: Int
+        countCode: Int
     ): Boolean {
         return setWrinkleCountGroundTruth(
             context = context,
             sourceId = record.sourceId,
-            count = count,
+            countCode = countCode,
             note = record.note
         )
     }
@@ -382,13 +382,13 @@ object TrainingDataStore {
     fun setWrinkleCountGroundTruth(
         context: Context,
         record: TrainingRecord,
-        count: Int,
+        countCode: Int,
         note: String
     ): Boolean {
         return setWrinkleCountGroundTruth(
             context = context,
             sourceId = record.sourceId,
-            count = count,
+            countCode = countCode,
             note = note
         )
     }

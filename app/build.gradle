@@ -11,8 +11,12 @@ android {
         applicationId "com.pouchvision.inspector"
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+
+        // GitHub Actions 실행 번호를 versionCode로 사용합니다.
+        // 로컬 빌드 시에는 1을 사용합니다.
+        def ciBuildNumber = System.getenv("BUILD_NUMBER")
+        versionCode ciBuildNumber != null ? ciBuildNumber.toInteger() : 1
+        versionName "1.0.${ciBuildNumber != null ? ciBuildNumber : 'local'}"
     }
 
     buildFeatures {
@@ -40,6 +44,5 @@ dependencies {
     implementation 'androidx.camera:camera-view:1.4.1'
 
     // Telegram 네트워크 장애 자동 재전송
-    // 네트워크가 다시 연결될 때 백그라운드 작업을 실행합니다.
     implementation 'androidx.work:work-runtime:2.11.2'
 }

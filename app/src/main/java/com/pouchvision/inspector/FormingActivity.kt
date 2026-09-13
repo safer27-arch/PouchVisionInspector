@@ -55,6 +55,12 @@ class FormingActivity : AppCompatActivity() {
     private var lastDetails = ""
 
     /*
+     * 현재 FORMING 검사 결과의 Telegram 전송 요청 여부
+     * 같은 결과 중복 발송 방지용입니다.
+     */
+    private var telegramAlertQueuedForCurrentResult = false
+
+    /*
      * 민감도
      */
     private val preferenceName = "pouch_vision_settings"
@@ -233,6 +239,7 @@ class FormingActivity : AppCompatActivity() {
 
         hasInspectionResult = false
         lastResultBitmap = null
+        telegramAlertQueuedForCurrentResult = false
     }
 
     /*
@@ -574,11 +581,15 @@ class FormingActivity : AppCompatActivity() {
 
         binding.tvFormingMetrics.text =
             """
-Wrinkle       : -
-Deformation   : -
-Symmetry      : -
-Shape Error   : -
-Forming Score : -
+FORMING V2
+면 자동판별 : -
+Shape Stability : -
+Corner Risk : -
+Wall Risk : -
+Center Boundary : -
+Local Fold : -
+Baseline Deviation : -
+Quality Score : -
 
 판정 : -
             """.trimIndent()
@@ -1368,13 +1379,9 @@ Forming Score : -
         roiStartY: Int
     ) {
 
-        val analysisWidth = 320
-        val analysisHeight = 240
-
-
         /*
-         * 촬영 이미지 품질 점검
-         * 검사 Score / 판정에는 영향을 주지 않습니다.
+         * 촬영 이미지 품질 점검.
+         * 사진 품질은 판정과 별도의 보조지표로만 사용합니다.
          */
         val photoQuality =
             ImageQualityChecker.analyzeBitmap(
@@ -1384,271 +1391,31 @@ Forming Score : -
         val photoQualityText =
             String.format(
                 Locale.getDefault(),
-                "사진 품질 : %s (%.1f / 100)\n밝기 %.1f  |  명암 %.1f  |  선명도 %.1f",
+                "사진 품질 : %s (%.1f / 100)\n밝기 %.1f | 명암 %.1f | 선명도 %.1f",
                 photoQuality.status,
                 photoQuality.qualityScore,
                 photoQuality.averageBrightness,
                 photoQuality.contrast,
                 photoQuality.sharpness
             )
-        val small =
-            Bitmap.createScaledBitmap(
-                roi,
-                analysisWidth,
-                analysisHeight,
-                true
-            )
-
-        val edgeThreshold =
-            (
-                70 -
-                    sensitivity *
-                    0.50
-                )
-                .toInt()
-                .coerceIn(
-                    18,
-                    65
-                )
-
-        val strongThreshold =
-            (
-                115 -
-                    sensitivity *
-                    0.67
-                )
-                .toInt()
-                .coerceIn(
-                    35,
-                    105
-                )
-
-        var edgeCount = 0L
-        var strongEdgeCount = 0L
-        var totalStrength = 0L
-        var pixelCount = 0L
-
-        var leftGraySum = 0L
-        var rightGraySum = 0L
-        var leftCount = 0L
-        var rightCount = 0L
-
-        for (
-            y in 1 until
-                small.height - 1
-        ) {
-
-            for (
-                x in 1 until
-                    small.width - 1
-            ) {
-
-                val center =
-                    gray(
-                        small.getPixel(
-                            x,
-                            y
-                        )
-                    )
-
-                val rightPixel =
-                    gray(
-                        small.getPixel(
-                            x + 1,
-                            y
-                        )
-                    )
-
-                val bottomPixel =
-                    gray(
-                        small.getPixel(
-                            x,
-                            y + 1
-                        )
-                    )
-
-                val gradient =
-                    abs(
-                        center -
-                            rightPixel
-                    ) +
-                        abs(
-                            center -
-                                bottomPixel
-                        )
-
-                totalStrength +=
-                    gradient
-
-                pixelCount++
-
-                if (
-                    gradient >
-                    edgeThreshold
-                ) {
-                    edgeCount++
-                }
-
-                if (
-                    gradient >
-                    strongThreshold
-                ) {
-                    strongEdgeCount++
-                }
-
-                if (
-                    x <
-                    small.width / 2
-                ) {
-
-                    leftGraySum +=
-                        center
-
-                    leftCount++
-
-                } else {
-
-                    rightGraySum +=
-                        center
-
-                    rightCount++
-                }
-            }
-        }
-
-        val edgeDensity =
-            if (
-                pixelCount > 0
-            ) {
-
-                edgeCount.toDouble() /
-                    pixelCount.toDouble() *
-                    100.0
-
-            } else {
-                0.0
-            }
-
-        val strongEdgeDensity =
-            if (
-                pixelCount > 0
-            ) {
-
-                strongEdgeCount.toDouble() /
-                    pixelCount.toDouble() *
-                    100.0
-
-            } else {
-                0.0
-            }
-
-        val averageStrength =
-            if (
-                pixelCount > 0
-            ) {
-
-                totalStrength.toDouble() /
-                    pixelCount.toDouble()
-
-            } else {
-                0.0
-            }
-
-        val leftAverage =
-            if (
-                leftCount > 0
-            ) {
-
-                leftGraySum.toDouble() /
-                    leftCount.toDouble()
-
-            } else {
-                0.0
-            }
-
-        val rightAverage =
-            if (
-                rightCount > 0
-            ) {
-
-                rightGraySum.toDouble() /
-                    rightCount.toDouble()
-
-            } else {
-                0.0
-            }
-
-        val symmetryError =
-            abs(
-                leftAverage -
-                    rightAverage
-            )
-
-        val sensitivityFactor =
-            0.55 +
-                sensitivity / 133.3
-
-        val shapeError =
-            (
-                edgeDensity *
-                    1.1 +
-                    averageStrength *
-                    0.45
-                ) *
-                sensitivityFactor
-
-        val wrinkle =
-            (
-                strongEdgeDensity *
-                    4.0 +
-                    edgeDensity *
-                    0.7
-                ) *
-                sensitivityFactor
-
-        val deformation =
-            (
-                averageStrength *
-                    0.9 +
-                    strongEdgeDensity *
-                    2.5
-                ) *
-                sensitivityFactor
-
-        val symmetry =
-            symmetryError *
-                1.8 *
-                sensitivityFactor
-
-        val defectLevel =
-            (
-                shapeError *
-                    0.30 +
-                    wrinkle *
-                    0.25 +
-                    deformation *
-                    0.25 +
-                    symmetry *
-                    0.20
-                )
-
-        val formingScore =
-            (
-                100.0 -
-                    defectLevel
-                )
-                .coerceIn(
-                    0.0,
-                    100.0
-                )
 
         /*
          * =====================================================
-         * Model / Line별 FORMING 판정 기준 적용
+         * FORMING V2
          * =====================================================
          *
-         * FORMING Quality Score는 높을수록 양호합니다.
-         * 현재 선택된 Model / Line에 저장된 기준값을 사용합니다.
+         * 파우치 전체 반사광보다
+         * Cup Corner / Wall / 중앙 경계 / 국부 Fold를 우선 분석합니다.
+         */
+        val v2 =
+            FormingInspectionV2.analyze(
+                roi = roi,
+                sensitivity = sensitivity
+            )
+
+        /*
+         * 기존 Model / Line 기준은 참고용으로 남깁니다.
+         * V2 현장 판정에는 직접 사용하지 않습니다.
          */
         val inspectionSpec =
             InspectionSpecStore.getCurrent(
@@ -1657,111 +1424,121 @@ Forming Score : -
                     InspectionSpecStore.InspectionType.FORMING
             )
 
-        val judgment =
-            inspectionSpec.judge(
-                formingScore
-            )
-
-        /*
-         * 공용 NG 후보 표시
-         * 알고리즘 자체는 이번 단계에서 변경하지 않습니다.
-         */
-        val markerResult =
-            DefectMarker.markDefectRegions(
-                sourceBitmap = source,
-                roiLeft = roiStartX,
-                roiTop = roiStartY,
-                roiWidth = roi.width,
-                roiHeight = roi.height,
-                sensitivity = sensitivity,
-                maxRegions = 5
-            )
-
-        val regionCount =
-            markerResult.regions.size
-
-        val regionSummary =
-            DefectMarker.buildRegionSummary(
-                markerResult.regions
-            )
-
         lastFormingScore =
-            formingScore
+            v2.qualityScore
 
         lastWrinkle =
-            wrinkle
+            v2.localFoldRisk
 
         lastDeformation =
-            deformation
+            v2.wallRisk
 
         lastSymmetry =
-            symmetry
+            v2.cornerRisk
 
         lastShapeError =
-            shapeError
+            v2.baselineDeviation
 
         lastJudgment =
-            judgment
+            v2.judgment
 
         lastDetails =
             String.format(
                 Locale.getDefault(),
 
                 """
-Wrinkle : %.1f
-Deformation : %.1f
-Symmetry : %.1f
-Shape Error : %.1f
-Forming Score : %.1f / 100
-Sensitivity : %d%%
-NG 후보 영역 : %d개
+FORMING V2
+
+면 자동판별 : %s
+면 판별 Confidence : %.1f / 100
+
+Shape Stability : %.1f / 100
+Corner Risk : %.1f / 100
+Wall Risk : %.1f / 100
+Center Boundary Risk : %.1f / 100
+Local Fold Risk : %.1f / 100
+Reflection Risk : %.1f / 100
+
+Baseline Deviation : %.1f / 100
+Quality Score : %.1f / 100
+Final Judgment : %s
 
 %s
+
+정상 Master 운영 기준
+- 정상 FORMING 사진 10장을 기준군으로 사용
+- FRONT = 금형이 실제 누르는 면 / Stack Cell이 들어가는 Cup 측
+- BACK = 셀 외곽부 측
+- 넓은 파우치의 완만한 울렁임과 반사광은 낮은 가중치
+- Cup Corner / Wall / 중앙 경계의 급격한 형상 변화를 우선 감지
+- 실제 NG 샘플이 없으므로 현재 주의/한계정상/불량 기준은 임시 기준
                 """.trimIndent(),
 
-                wrinkle,
-                deformation,
-                symmetry,
-                shapeError,
-                formingScore,
-                sensitivity,
-                regionCount,
-                regionSummary
+                v2.faceHint,
+                v2.faceConfidence,
+                v2.shapeStability,
+                v2.cornerRisk,
+                v2.wallRisk,
+                v2.centerBoundaryRisk,
+                v2.localFoldRisk,
+                v2.reflectionRisk,
+                v2.baselineDeviation,
+                v2.qualityScore,
+                v2.judgment,
+                v2.reason
             )
 
-
         lastDetails +=
-            "\n\n현재 Model / Line 판정 기준\n" +
+            "\n\n현재 Model / Line 기존 기준 (참고용)\n" +
                 inspectionSpec.criteriaText() +
                 "\n\n" +
-                photoQualityText
+                photoQualityText +
+                "\n\n※ FRONT/BACK 자동판별은 현재 힌트 단계입니다." +
+                "\n※ Confidence가 낮으면 면을 확정하지 않고 '확인 필요'로 표시합니다."
 
         if (!photoQuality.isUsable) {
+
             lastDetails +=
                 "\n" +
                     photoQuality.message
         }
 
         /*
-         * 핵심 추가:
-         * 빨간 후보 표시가 포함된 결과 Bitmap을 보관
-         */
-        /*
-         * 표시 방식만 공통 Renderer로 변경합니다.
-         *
-         * - FORMING 판정 / 후보 검출 알고리즘은 그대로 유지
-         * - "NG 후보 N" 라벨은 ROI 바깥으로 이동
-         * - 빨간 원 선 굵기는 기존의 약 50%
+         * 정상 판정이면 공용 빨간 NG 후보를 표시하지 않습니다.
+         * 정상 파우치 반사/울렁임이 NG 후보로 보이는 오검출을 줄이기 위함입니다.
          */
         val displayBitmap =
-            MarkerDisplayRenderer.renderGeneric(
-                sourceBitmap = source,
-                roiLeft = roiStartX,
-                roiTop = roiStartY,
-                roiWidth = roi.width,
-                roiHeight = roi.height,
-                regions = markerResult.regions
-            )
+            if (
+                v2.showDefectMarkers
+            ) {
+
+                val markerResult =
+                    DefectMarker.markDefectRegions(
+                        sourceBitmap = source,
+                        roiLeft = roiStartX,
+                        roiTop = roiStartY,
+                        roiWidth = roi.width,
+                        roiHeight = roi.height,
+                        sensitivity = sensitivity,
+                        maxRegions = 4
+                    )
+
+                MarkerDisplayRenderer.renderGeneric(
+                    sourceBitmap = source,
+                    roiLeft = roiStartX,
+                    roiTop = roiStartY,
+                    roiWidth = roi.width,
+                    roiHeight = roi.height,
+                    regions = markerResult.regions
+                )
+
+            } else {
+
+                source.copy(
+                    Bitmap.Config.ARGB_8888,
+                    true
+                )
+            }
 
         lastResultBitmap =
             displayBitmap
@@ -1769,20 +1546,8 @@ NG 후보 영역 : %d개
         hasInspectionResult =
             true
 
-        /*
-         * Telegram 자동 알림
-         *
-         * 설정한 전송 기준에 해당하는 판정이면
-         * 결과 이미지 + Model / Line / 검사 항목 / Score를
-         * 자동으로 전송합니다.
-         */
-        sendTelegramAlertIfNeeded()
-
         runOnUiThread {
 
-            /*
-             * lastBitmap은 깨끗한 원본 그대로 유지
-             */
             binding.formingImagePreview.setImageBitmap(
                 displayBitmap
             )
@@ -1791,61 +1556,72 @@ NG 후보 영역 : %d개
                 imageMatrixValue
 
             binding.tvFormingStatus.text =
-                "FORMING ROI 분석 완료 - $judgment"
+                "FORMING V2 분석 완료 - ${v2.judgment}"
 
             binding.tvFormingMetrics.text =
                 String.format(
                     Locale.getDefault(),
 
                     """
-민감도       : %d%%
-Wrinkle      : %.1f
-Deformation  : %.1f
-Symmetry     : %.1f
-Shape Error  : %.1f
-Forming Score: %.1f / 100
+FORMING V2
+
+면 자동판별 : %s
+Confidence : %.1f / 100
+
+Shape Stability : %.1f / 100
+Corner Risk : %.1f / 100
+Wall Risk : %.1f / 100
+Center Boundary : %.1f / 100
+Local Fold : %.1f / 100
+Reflection Risk : %.1f / 100
+
+Baseline Deviation : %.1f / 100
+Quality Score : %.1f / 100
 
 판정 : %s
 
-NG 후보 영역 : %d개
 %s
 
-빨간 원/박스 = Forming 영역에서 국부 변화가 큰 검사 후보
-
-현재 Model / Line 판정 기준
-%s
-
-※ 빨간 표시는 확정 NG가 아닙니다.
-※ 문자·Barcode·반사광도 후보로 검출될 수 있습니다.
-※ 현재 수치는 영상 변화 기반 보조 지표입니다.
-※ 실제 형상 치수 및 깊이 판정에는 Calibration과 Master Sample이 필요합니다.
+※ 정상 판정에서는 빨간 NG 후보를 표시하지 않습니다.
+※ 큰 반사광/완만한 파우치 울렁임은 낮은 가중치로 처리합니다.
+※ 핵심은 Cup Corner / Wall / 중앙 경계 형상 변화입니다.
+※ FRONT/BACK 자동판별은 현재 보조 힌트이며 낮은 Confidence에서는 확인이 필요합니다.
                     """.trimIndent(),
 
-                    sensitivity,
-                    wrinkle,
-                    deformation,
-                    symmetry,
-                    shapeError,
-                    formingScore,
-                    judgment,
-                    regionCount,
-                    regionSummary,
-                    inspectionSpec.criteriaText()
+                    v2.faceHint,
+                    v2.faceConfidence,
+                    v2.shapeStability,
+                    v2.cornerRisk,
+                    v2.wallRisk,
+                    v2.centerBoundaryRisk,
+                    v2.localFoldRisk,
+                    v2.reflectionRisk,
+                    v2.baselineDeviation,
+                    v2.qualityScore,
+                    v2.judgment,
+                    v2.reason
                 )
 
             binding.tvFormingMetrics.append(
                 "\n\n" +
                     photoQualityText +
-                    "\n※ 사진 품질은 검사 판정과 별도의 촬영 상태 보조지표입니다."
+                    "\n※ 사진 품질은 FORMING 판정과 별도의 촬영 상태 보조지표입니다."
             )
 
             if (!photoQuality.isUsable) {
+
                 Toast.makeText(
                     this,
                     "촬영 상태 재확인 권고\n${photoQuality.message}",
                     Toast.LENGTH_LONG
                 ).show()
             }
+        }
+
+        if (
+            !roi.isRecycled
+        ) {
+            roi.recycle()
         }
     }
 
@@ -1856,6 +1632,10 @@ NG 후보 영역 : %d개
      */
 
     private fun sendTelegramAlertIfNeeded() {
+
+        if (telegramAlertQueuedForCurrentResult) {
+            return
+        }
 
         if (
             !TelegramSettingsStore.isReady(
@@ -1873,6 +1653,12 @@ NG 후보 영역 : %d개
         ) {
             return
         }
+
+        /*
+         * 실제 전송 대상임이 확인된 뒤 먼저 잠가
+         * 같은 결과의 중복 발송을 방지합니다.
+         */
+        telegramAlertQueuedForCurrentResult = true
 
         TelegramSender.sendInspectionAlert(
             context = this,
@@ -1963,6 +1749,12 @@ NG 후보 영역 : %d개
             )
 
         if (success) {
+
+            /*
+             * 검사 결과 + 사진 저장 성공 후에만
+             * Telegram 정책에 따라 1회 자동전송합니다.
+             */
+            sendTelegramAlertIfNeeded()
 
             Toast.makeText(
                 this,

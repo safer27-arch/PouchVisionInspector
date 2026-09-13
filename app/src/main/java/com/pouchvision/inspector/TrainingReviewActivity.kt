@@ -1,6 +1,5 @@
 package com.pouchvision.inspector
 
-import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
@@ -28,34 +27,77 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 
 class TrainingReviewActivity : AppCompatActivity() {
 
     companion object {
-        private const val FILTER_ALL = "전체"
-        private const val FILTER_UNLABELED = "미분류만"
-        private const val FILTER_MISMATCH = "AI와 정답 불일치"
+
+        private const val FILTER_ALL =
+            "전체"
+
+        private const val FILTER_UNLABELED =
+            "미분류만"
+
+        private const val FILTER_MISMATCH =
+            "AI와 정답 불일치"
     }
 
+    /*
+     * =========================================================
+     * Main Views
+     * =========================================================
+     */
+
     private lateinit var root: LinearLayout
+
     private lateinit var switchTraining: Switch
+
     private lateinit var spinnerType: Spinner
-    private lateinit var spinnerMode: Spinner
+
+    private lateinit var spinnerViewMode: Spinner
+
     private lateinit var tvSummary: TextView
+
     private lateinit var tvPosition: TextView
+
     private lateinit var imageView: ImageView
+
     private lateinit var tvInfo: TextView
+
     private lateinit var tvDetails: TextView
+
     private lateinit var editNote: EditText
 
+    /*
+     * Bottom Corner 전용
+     */
+    private lateinit var bottomCornerGroundTruthBox:
+        LinearLayout
+
+    /*
+     * 기타 검사 항목용
+     */
+    private lateinit var normalLabelBox:
+        LinearLayout
+
+    /*
+     * =========================================================
+     * Data
+     * =========================================================
+     */
+
     private var allRecords =
-        emptyList<TrainingDataStore.TrainingRecord>()
+        emptyList<
+            TrainingDataStore.TrainingRecord
+        >()
 
     private var filteredRecords =
-        emptyList<TrainingDataStore.TrainingRecord>()
+        emptyList<
+            TrainingDataStore.TrainingRecord
+        >()
 
-    private var currentIndex = 0
+    private var currentIndex =
+        0
 
     private val typeItems =
         listOf(
@@ -67,12 +109,18 @@ class TrainingReviewActivity : AppCompatActivity() {
             "DISASSEMBLY"
         )
 
-    private val modeItems =
+    private val viewModes =
         listOf(
             "전체 데이터",
             FILTER_UNLABELED,
             FILTER_MISMATCH
         )
+
+    /*
+     * =========================================================
+     * ZIP Export
+     * =========================================================
+     */
 
     private val exportLauncher =
         registerForActivityResult(
@@ -81,22 +129,28 @@ class TrainingReviewActivity : AppCompatActivity() {
             )
         ) { uri ->
 
-            if (uri == null) {
+            if (
+                uri == null
+            ) {
                 return@registerForActivityResult
             }
 
             try {
+
                 contentResolver
-                    .openOutputStream(uri)
+                    .openOutputStream(
+                        uri
+                    )
                     ?.use { output ->
 
-                        TrainingDataStore.exportZip(
-                            this,
-                            output
-                        )
+                        TrainingDataStore
+                            .exportZip(
+                                this,
+                                output
+                            )
                     }
                     ?: throw Exception(
-                        "저장 파일을 열 수 없습니다."
+                        "파일을 열 수 없습니다."
                     )
 
                 Toast.makeText(
@@ -105,43 +159,68 @@ class TrainingReviewActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
 
-            } catch (e: Exception) {
+            } catch (
+                e: Exception
+            ) {
 
                 Toast.makeText(
                     this,
-                    "Export 실패 : ${e.message ?: "알 수 없는 오류"}",
+                    "Export 실패: " +
+                        (
+                            e.message
+                                ?: "알 수 없는 오류"
+                            ),
                     Toast.LENGTH_LONG
                 ).show()
             }
         }
 
+    /*
+     * =========================================================
+     * Lifecycle
+     * =========================================================
+     */
+
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
-        super.onCreate(savedInstanceState)
+
+        super.onCreate(
+            savedInstanceState
+        )
 
         setContentView(
             createScreen()
         )
 
-        ViewCompat.setOnApplyWindowInsetsListener(
-            root
-        ) { view, insets ->
+        ViewCompat
+            .setOnApplyWindowInsetsListener(
+                root
+            ) { view, insets ->
 
-            val bars =
-                insets.getInsets(
-                    WindowInsetsCompat.Type.systemBars()
+                val bars =
+                    insets.getInsets(
+                        WindowInsetsCompat
+                            .Type
+                            .systemBars()
+                    )
+
+                view.updatePadding(
+                    left =
+                        bars.left,
+
+                    top =
+                        bars.top,
+
+                    right =
+                        bars.right,
+
+                    bottom =
+                        bars.bottom
                 )
 
-            view.updatePadding(
-                left = bars.left,
-                top = bars.top,
-                right = bars.right,
-                bottom = bars.bottom
-            )
-
-            insets
-        }
+                insets
+            }
 
         ViewCompat.requestApplyInsets(
             root
@@ -150,62 +229,87 @@ class TrainingReviewActivity : AppCompatActivity() {
         setupSpinners()
 
         switchTraining.isChecked =
-            TrainingDataStore.isEnabled(
-                this
-            )
-
-        switchTraining.setOnCheckedChangeListener {
-                _,
-                checked ->
-
-            TrainingDataStore.setEnabled(
-                this,
-                checked
-            )
-
-            if (checked) {
-                syncNow(
-                    showToast = true
+            TrainingDataStore
+                .isEnabled(
+                    this
                 )
-            } else {
-                reload()
+
+        switchTraining
+            .setOnCheckedChangeListener {
+                    _,
+                    checked ->
+
+                TrainingDataStore
+                    .setEnabled(
+                        this,
+                        checked
+                    )
+
+                if (
+                    checked
+                ) {
+
+                    syncNow()
+
+                } else {
+
+                    renderSummary()
+                }
             }
-        }
 
         if (
-            TrainingDataStore.isEnabled(
-                this
-            )
+            TrainingDataStore
+                .isEnabled(
+                    this
+                )
         ) {
+
             syncNow(
-                showToast = false
+                showToast =
+                    false
             )
+
         } else {
+
             reload()
         }
     }
 
     override fun onResume() {
+
         super.onResume()
 
         if (
             ::root.isInitialized &&
-            TrainingDataStore.isEnabled(
-                this
-            )
+            TrainingDataStore
+                .isEnabled(
+                    this
+                )
         ) {
+
             syncNow(
-                showToast = false
+                showToast =
+                    false
             )
         }
     }
 
-    private fun createScreen(): View {
+    /*
+     * =========================================================
+     * Screen
+     * =========================================================
+     */
+
+    private fun createScreen():
+        View {
 
         val scroll =
-            ScrollView(this).apply {
+            ScrollView(
+                this
+            ).apply {
 
-                isFillViewport = true
+                isFillViewport =
+                    true
 
                 setBackgroundColor(
                     Color.parseColor(
@@ -215,17 +319,22 @@ class TrainingReviewActivity : AppCompatActivity() {
             }
 
         root =
-            LinearLayout(this).apply {
+            LinearLayout(
+                this
+            ).apply {
+
                 orientation =
                     LinearLayout.VERTICAL
             }
 
         root.addView(
-            createHeader()
+            header()
         )
 
         val content =
-            LinearLayout(this).apply {
+            LinearLayout(
+                this
+            ).apply {
 
                 orientation =
                     LinearLayout.VERTICAL
@@ -234,7 +343,7 @@ class TrainingReviewActivity : AppCompatActivity() {
                     dp(14),
                     dp(14),
                     dp(14),
-                    dp(30)
+                    dp(28)
                 )
             }
 
@@ -243,8 +352,11 @@ class TrainingReviewActivity : AppCompatActivity() {
          * 학습 모드
          * =====================================================
          */
+
         switchTraining =
-            Switch(this).apply {
+            Switch(
+                this
+            ).apply {
 
                 text =
                     "학습 데이터 수집 ON"
@@ -264,8 +376,22 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
             }
 
-        val trainingBox =
-            LinearLayout(this).apply {
+        val syncButton =
+            actionButton(
+                text =
+                    "현재 검사이력 가져오기",
+
+                color =
+                    "#123E63"
+            ) {
+
+                syncNow()
+            }
+
+        val trainingModeBox =
+            LinearLayout(
+                this
+            ).apply {
 
                 orientation =
                     LinearLayout.VERTICAL
@@ -275,37 +401,41 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
 
                 addView(
-                    infoText().apply {
+                    TextView(
+                        this@TrainingReviewActivity
+                    ).apply {
 
                         text =
-                            "검사 결과 사진을 학습용으로 별도 보관합니다.\n" +
-                                "사진을 보고 실제 정답을 직접 지정해주세요."
+                            "검사 결과 이미지를 학습용 폴더에 별도 보관합니다.\n" +
+                            "Bottom Corner는 실제 주름 개수를 정답으로 지정합니다."
+
+                        textSize =
+                            13f
+
+                        setTextColor(
+                            Color.parseColor(
+                                "#627D98"
+                            )
+                        )
 
                         setPadding(
                             0,
                             dp(8),
                             0,
-                            dp(4)
+                            dp(6)
                         )
                     }
                 )
 
                 addView(
-                    fullButton(
-                        "현재 검사이력 가져오기",
-                        "#123E63"
-                    ) {
-                        syncNow(
-                            showToast = true
-                        )
-                    }
+                    syncButton
                 )
             }
 
         content.addView(
             card(
                 "학습 모드",
-                trainingBox
+                trainingModeBox
             )
         )
 
@@ -314,38 +444,45 @@ class TrainingReviewActivity : AppCompatActivity() {
          * 필터
          * =====================================================
          */
-        spinnerType =
-            Spinner(this)
 
-        spinnerMode =
-            Spinner(this)
+        spinnerType =
+            Spinner(
+                this
+            )
+
+        spinnerViewMode =
+            Spinner(
+                this
+            )
 
         val filterBox =
-            LinearLayout(this).apply {
+            LinearLayout(
+                this
+            ).apply {
 
                 orientation =
                     LinearLayout.VERTICAL
 
                 addView(
-                    labelText(
+                    smallLabel(
                         "검사 항목"
                     )
                 )
 
                 addView(
                     spinnerType,
-                    spinnerLayoutParams()
+                    spinnerParams()
                 )
 
                 addView(
-                    labelText(
+                    smallLabel(
                         "보기 방식"
                     )
                 )
 
                 addView(
-                    spinnerMode,
-                    spinnerLayoutParams()
+                    spinnerViewMode,
+                    spinnerParams()
                 )
             }
 
@@ -361,6 +498,7 @@ class TrainingReviewActivity : AppCompatActivity() {
          * 학습 현황
          * =====================================================
          */
+
         tvSummary =
             infoText()
 
@@ -373,17 +511,20 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         /*
          * =====================================================
-         * 학습 사진
+         * 현재 데이터
          * =====================================================
          */
-        tvPosition =
-            TextView(this).apply {
 
-                gravity =
-                    Gravity.CENTER
+        tvPosition =
+            TextView(
+                this
+            ).apply {
 
                 textSize =
                     15f
+
+                gravity =
+                    Gravity.CENTER
 
                 setTypeface(
                     null,
@@ -398,51 +539,60 @@ class TrainingReviewActivity : AppCompatActivity() {
             }
 
         imageView =
-            ImageView(this).apply {
-
-                scaleType =
-                    ImageView.ScaleType.FIT_CENTER
+            ImageView(
+                this
+            ).apply {
 
                 adjustViewBounds =
                     true
+
+                scaleType =
+                    ImageView.ScaleType
+                        .FIT_CENTER
 
                 setBackgroundColor(
                     Color.parseColor(
                         "#E9EEF3"
                     )
                 )
+
+                minimumHeight =
+                    dp(260)
             }
 
         tvInfo =
             infoText()
 
         tvDetails =
-            infoText().apply {
+            infoText()
+                .apply {
 
-                textSize =
-                    12f
+                    textSize =
+                        12f
 
-                maxLines =
-                    8
-
-                setTextColor(
-                    Color.parseColor(
-                        "#627D98"
+                    setTextColor(
+                        Color.parseColor(
+                            "#627D98"
+                        )
                     )
-                )
-            }
+
+                    maxLines =
+                        12
+                }
 
         editNote =
-            EditText(this).apply {
+            EditText(
+                this
+            ).apply {
 
                 hint =
                     "라벨 메모 (선택)"
 
-                textSize =
-                    14f
-
                 minHeight =
                     dp(50)
+
+                textSize =
+                    14f
 
                 setTextColor(
                     Color.parseColor(
@@ -457,8 +607,9 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
 
                 background =
-                    roundedBackground(
-                        "#F4F6F8"
+                    rounded(
+                        "#F4F6F8",
+                        8
                     )
 
                 setPadding(
@@ -469,8 +620,28 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
             }
 
+        /*
+         * =====================================================
+         * Bottom Corner 실제 주름 개수 입력
+         * =====================================================
+         */
+
+        bottomCornerGroundTruthBox =
+            createBottomCornerGroundTruthBox()
+
+        /*
+         * =====================================================
+         * 기타 검사 정답 라벨
+         * =====================================================
+         */
+
+        normalLabelBox =
+            createNormalLabelBox()
+
         val reviewBox =
-            LinearLayout(this).apply {
+            LinearLayout(
+                this
+            ).apply {
 
                 orientation =
                     LinearLayout.VERTICAL
@@ -481,10 +652,12 @@ class TrainingReviewActivity : AppCompatActivity() {
 
                 addView(
                     imageView,
+
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         dp(300)
                     ).apply {
+
                         topMargin =
                             dp(8)
                     }
@@ -492,42 +665,61 @@ class TrainingReviewActivity : AppCompatActivity() {
 
                 addView(
                     tvInfo,
-                    marginParams(
-                        10
-                    )
-                )
 
-                addView(
-                    tvDetails,
-                    marginParams(
-                        8
-                    )
-                )
-
-                addView(
-                    editNote,
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(52)
+                        LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
+
                         topMargin =
                             dp(10)
                     }
                 )
 
                 addView(
-                    createLabelButtons()
+                    tvDetails,
+
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+
+                        topMargin =
+                            dp(8)
+                    }
                 )
 
                 addView(
-                    createNavigationButtons()
+                    editNote,
+
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(52)
+                    ).apply {
+
+                        topMargin =
+                            dp(10)
+                    }
                 )
 
                 addView(
-                    fullButton(
-                        "현재 정답 라벨 지우기",
+                    bottomCornerGroundTruthBox
+                )
+
+                addView(
+                    normalLabelBox
+                )
+
+                addView(
+                    navigationRow()
+                )
+
+                addView(
+                    actionButton(
+                        "현재 정답 지우기",
                         "#7B8794"
                     ) {
+
                         clearCurrentLabel()
                     }
                 )
@@ -535,7 +727,7 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         content.addView(
             card(
-                "정답 라벨 지정",
+                "정답 Ground Truth 지정",
                 reviewBox
             )
         )
@@ -545,20 +737,29 @@ class TrainingReviewActivity : AppCompatActivity() {
          * Export
          * =====================================================
          */
+
         content.addView(
-            fullButton(
+            actionButton(
                 "학습 데이터 ZIP Export",
                 "#0F6B50"
             ) {
+
                 exportZip()
             }
         )
 
+        /*
+         * =====================================================
+         * Back
+         * =====================================================
+         */
+
         content.addView(
-            fullButton(
+            actionButton(
                 "뒤로",
                 "#486581"
             ) {
+
                 finish()
             }
         )
@@ -574,46 +775,367 @@ class TrainingReviewActivity : AppCompatActivity() {
         return scroll
     }
 
+    /*
+     * =========================================================
+     * Bottom Corner Ground Truth UI
+     * =========================================================
+     */
+
+    private fun createBottomCornerGroundTruthBox():
+        LinearLayout {
+
+        val outer =
+            LinearLayout(
+                this
+            ).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    0,
+                    dp(14),
+                    0,
+                    dp(4)
+                )
+            }
+
+        outer.addView(
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "Bottom Corner 실제 주름 개수"
+
+                textSize =
+                    16f
+
+                setTypeface(
+                    null,
+                    Typeface.BOLD
+                )
+
+                setTextColor(
+                    Color.parseColor(
+                        "#102A43"
+                    )
+                )
+            }
+        )
+
+        outer.addView(
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "Master 기준\n" +
+                    "0개 = 정상  |  1개 = 정상\n" +
+                    "2개 = 한계정상  |  3개 이상 = 불량"
+
+                textSize =
+                    13f
+
+                setTextColor(
+                    Color.parseColor(
+                        "#486581"
+                    )
+                )
+
+                setPadding(
+                    0,
+                    dp(4),
+                    0,
+                    dp(8)
+                )
+            }
+        )
+
+        val row1 =
+            LinearLayout(
+                this
+            ).apply {
+
+                orientation =
+                    LinearLayout.HORIZONTAL
+            }
+
+        row1.addView(
+            compactButton(
+                "주름 0개\n정상",
+                "#2E7D32"
+            ) {
+
+                setCurrentWrinkleCount(
+                    TrainingDataStore
+                        .WRINKLE_COUNT_0
+                )
+            },
+
+            weightParams()
+        )
+
+        row1.addView(
+            compactButton(
+                "주름 1개\n정상",
+                "#388E3C"
+            ) {
+
+                setCurrentWrinkleCount(
+                    TrainingDataStore
+                        .WRINKLE_COUNT_1
+                )
+            },
+
+            weightParams(
+                6
+            )
+        )
+
+        val row2 =
+            LinearLayout(
+                this
+            ).apply {
+
+                orientation =
+                    LinearLayout.HORIZONTAL
+            }
+
+        row2.addView(
+            compactButton(
+                "주름 2개\n한계정상",
+                "#C47A00"
+            ) {
+
+                setCurrentWrinkleCount(
+                    TrainingDataStore
+                        .WRINKLE_COUNT_2
+                )
+            },
+
+            weightParams()
+        )
+
+        row2.addView(
+            compactButton(
+                "주름 3개 이상\n불량",
+                "#B42318"
+            ) {
+
+                setCurrentWrinkleCount(
+                    TrainingDataStore
+                        .WRINKLE_COUNT_3_PLUS
+                )
+            },
+
+            weightParams(
+                6
+            )
+        )
+
+        outer.addView(
+            row1
+        )
+
+        outer.addView(
+            row2
+        )
+
+        return outer
+    }
+
+    /*
+     * =========================================================
+     * 일반 검사 정답 UI
+     * =========================================================
+     */
+
+    private fun createNormalLabelBox():
+        LinearLayout {
+
+        val outer =
+            LinearLayout(
+                this
+            ).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    0,
+                    dp(12),
+                    0,
+                    dp(4)
+                )
+            }
+
+        outer.addView(
+            TextView(
+                this
+            ).apply {
+
+                text =
+                    "작업자 실제 정답"
+
+                textSize =
+                    16f
+
+                setTypeface(
+                    null,
+                    Typeface.BOLD
+                )
+
+                setTextColor(
+                    Color.parseColor(
+                        "#102A43"
+                    )
+                )
+
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    dp(6)
+                )
+            }
+        )
+
+        val row1 =
+            LinearLayout(
+                this
+            ).apply {
+
+                orientation =
+                    LinearLayout.HORIZONTAL
+            }
+
+        row1.addView(
+            compactButton(
+                "정상",
+                "#2E7D32"
+            ) {
+
+                setCurrentLabel(
+                    TrainingDataStore
+                        .LABEL_NORMAL
+                )
+            },
+
+            weightParams()
+        )
+
+        row1.addView(
+            compactButton(
+                "주의",
+                "#C47A00"
+            ) {
+
+                setCurrentLabel(
+                    TrainingDataStore
+                        .LABEL_WARNING
+                )
+            },
+
+            weightParams(
+                6
+            )
+        )
+
+        val row2 =
+            LinearLayout(
+                this
+            ).apply {
+
+                orientation =
+                    LinearLayout.HORIZONTAL
+            }
+
+        row2.addView(
+            compactButton(
+                "한계정상",
+                "#B45309"
+            ) {
+
+                setCurrentLabel(
+                    TrainingDataStore
+                        .LABEL_LIMIT
+                )
+            },
+
+            weightParams()
+        )
+
+        row2.addView(
+            compactButton(
+                "불량",
+                "#B42318"
+            ) {
+
+                setCurrentLabel(
+                    TrainingDataStore
+                        .LABEL_NG
+                )
+            },
+
+            weightParams(
+                6
+            )
+        )
+
+        outer.addView(
+            row1
+        )
+
+        outer.addView(
+            row2
+        )
+
+        return outer
+    }
+
+    /*
+     * =========================================================
+     * Spinner
+     * =========================================================
+     */
+
     private fun setupSpinners() {
 
         spinnerType.adapter =
-            createSpinnerAdapter(
+            spinnerAdapter(
                 typeItems
             )
 
-        spinnerMode.adapter =
-            createSpinnerAdapter(
-                modeItems
+        spinnerViewMode.adapter =
+            spinnerAdapter(
+                viewModes
             )
 
-        val listener =
-            object :
-                AdapterView.OnItemSelectedListener {
+        spinnerType
+            .onItemSelectedListener =
+            simpleItemSelectedListener {
 
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    applyFilter()
-                }
-
-                override fun onNothingSelected(
-                    parent: AdapterView<*>?
-                ) {
-                }
+                applyFilter()
             }
 
-        spinnerType.onItemSelectedListener =
-            listener
+        spinnerViewMode
+            .onItemSelectedListener =
+            simpleItemSelectedListener {
 
-        spinnerMode.onItemSelectedListener =
-            listener
+                applyFilter()
+            }
     }
 
+    /*
+     * =========================================================
+     * Sync
+     * =========================================================
+     */
+
     private fun syncNow(
-        showToast: Boolean = true
+        showToast: Boolean =
+            true
     ) {
 
         val added =
@@ -624,29 +1146,38 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         reload()
 
-        if (showToast) {
+        if (
+            showToast
+        ) {
 
-            val message =
-                if (added > 0) {
+            Toast.makeText(
+                this,
 
-                    "학습 데이터 ${added}건 추가"
+                if (
+                    added > 0
+                ) {
+
+                    "학습 데이터 ${added}건을 추가했습니다."
 
                 } else {
 
                     "새로 가져올 검사 이미지가 없습니다."
-                }
+                },
 
-            Toast.makeText(
-                this,
-                message,
                 Toast.LENGTH_SHORT
             ).show()
         }
     }
 
+    /*
+     * =========================================================
+     * Reload
+     * =========================================================
+     */
+
     private fun reload() {
 
-        val previousId =
+        val keepId =
             filteredRecords
                 .getOrNull(
                     currentIndex
@@ -654,34 +1185,43 @@ class TrainingReviewActivity : AppCompatActivity() {
                 ?.sourceId
 
         allRecords =
-            TrainingDataStore.load(
-                this
-            )
+            TrainingDataStore
+                .load(
+                    this
+                )
 
         applyFilter(
-            previousId
+            preferredId =
+                keepId
         )
     }
 
+    /*
+     * =========================================================
+     * Filter
+     * =========================================================
+     */
+
     private fun applyFilter(
-        preferredId: Long? = null
+        preferredId: Long? =
+            null
     ) {
 
         if (
             !::spinnerType.isInitialized ||
-            !::spinnerMode.isInitialized
+            !::spinnerViewMode.isInitialized
         ) {
             return
         }
 
-        val selectedType =
+        val type =
             spinnerType
                 .selectedItem
                 ?.toString()
                 ?: FILTER_ALL
 
-        val selectedMode =
-            spinnerMode
+        val mode =
+            spinnerViewMode
                 .selectedItem
                 ?.toString()
                 ?: "전체 데이터"
@@ -690,27 +1230,32 @@ class TrainingReviewActivity : AppCompatActivity() {
             allRecords
                 .filter {
 
-                    selectedType ==
+                    type ==
                         FILTER_ALL ||
 
-                        it.inspectionType.equals(
-                            selectedType,
-                            ignoreCase = true
-                        )
+                        it.inspectionType
+                            .equals(
+                                type,
+                                ignoreCase =
+                                    true
+                            )
                 }
                 .filter {
 
                     when (
-                        selectedMode
+                        mode
                     ) {
 
                         FILTER_UNLABELED ->
+
                             !it.isLabeled
 
                         FILTER_MISMATCH ->
+
                             it.isMismatch
 
                         else ->
+
                             true
                     }
                 }
@@ -720,28 +1265,33 @@ class TrainingReviewActivity : AppCompatActivity() {
                 preferredId != null
             ) {
 
-                val found =
-                    filteredRecords
-                        .indexOfFirst {
-                            it.sourceId ==
-                                preferredId
-                        }
+                filteredRecords
+                    .indexOfFirst {
 
-                if (
-                    found >= 0
-                ) {
-                    found
-                } else {
-                    0
-                }
+                        it.sourceId ==
+                            preferredId
+                    }
+                    .takeIf {
+
+                        it >= 0
+                    }
+                    ?: 0
 
             } else {
+
                 0
             }
 
         renderSummary()
+
         renderCurrent()
     }
+
+    /*
+     * =========================================================
+     * Summary
+     * =========================================================
+     */
 
     private fun renderSummary() {
 
@@ -750,11 +1300,13 @@ class TrainingReviewActivity : AppCompatActivity() {
 
         val labeled =
             allRecords.count {
+
                 it.isLabeled
             }
 
         val mismatch =
             allRecords.count {
+
                 it.isMismatch
             }
 
@@ -762,76 +1314,153 @@ class TrainingReviewActivity : AppCompatActivity() {
             spinnerType
                 .selectedItem
                 ?.toString()
+                ?.takeIf {
 
-        val inspectionType =
-            if (
-                selectedType == null ||
-                selectedType == FILTER_ALL
-            ) {
-                null
-            } else {
-                selectedType
-            }
+                    it !=
+                        FILTER_ALL
+                }
 
         val counts =
             TrainingDataStore
                 .countByLabel(
                     this,
-                    inspectionType
+                    selectedType
                 )
+
+        val wrinkleCounts =
+            TrainingDataStore
+                .countByWrinkleGroundTruth(
+                    this
+                )
+
+        val bottomCornerRecords =
+            allRecords.filter {
+
+                it.isBottomCorner
+            }
+
+        val wrinkleGtDone =
+            bottomCornerRecords.count {
+
+                it.hasWrinkleCountGroundTruth
+            }
 
         tvSummary.text =
             buildString {
 
                 append(
-                    "수집 : ${total}건"
+                    "수집 : ${total}건  |  "
                 )
 
                 append(
-                    "  |  라벨완료 : ${labeled}건"
+                    "라벨완료 : ${labeled}건  |  "
                 )
 
                 append(
-                    "\n미분류 : ${total - labeled}건"
+                    "미분류 : ${total - labeled}건\n"
                 )
 
                 append(
-                    "  |  AI/정답 불일치 : ${mismatch}건"
+                    "AI/정답 불일치 : ${mismatch}건\n\n"
                 )
 
                 append(
-                    "\n\n정상 : ${
+                    "정상 ${
                         counts[
-                            TrainingDataStore.LABEL_NORMAL
+                            TrainingDataStore
+                                .LABEL_NORMAL
                         ] ?: 0
                     }"
                 )
 
                 append(
-                    "  |  주의 : ${
+                    "  |  주의 ${
                         counts[
-                            TrainingDataStore.LABEL_WARNING
+                            TrainingDataStore
+                                .LABEL_WARNING
                         ] ?: 0
                     }"
                 )
 
                 append(
-                    "\n한계정상 : ${
+                    "  |  한계정상 ${
                         counts[
-                            TrainingDataStore.LABEL_LIMIT
+                            TrainingDataStore
+                                .LABEL_LIMIT
                         ] ?: 0
                     }"
                 )
 
                 append(
-                    "  |  불량 : ${
+                    "  |  불량 ${
                         counts[
-                            TrainingDataStore.LABEL_NG
+                            TrainingDataStore
+                                .LABEL_NG
                         ] ?: 0
                     }"
                 )
+
+                if (
+                    bottomCornerRecords.isNotEmpty()
+                ) {
+
+                    append(
+                        "\n\n"
+                    )
+
+                    append(
+                        "Bottom Corner 주름 개수 Ground Truth\n"
+                    )
+
+                    append(
+                        "입력완료 : ${wrinkleGtDone}" +
+                            " / ${bottomCornerRecords.size}건\n"
+                    )
+
+                    append(
+                        "0개 ${
+                            wrinkleCounts[
+                                TrainingDataStore
+                                    .WRINKLE_COUNT_0
+                            ] ?: 0
+                        }"
+                    )
+
+                    append(
+                        "  |  1개 ${
+                            wrinkleCounts[
+                                TrainingDataStore
+                                    .WRINKLE_COUNT_1
+                            ] ?: 0
+                        }"
+                    )
+
+                    append(
+                        "  |  2개 ${
+                            wrinkleCounts[
+                                TrainingDataStore
+                                    .WRINKLE_COUNT_2
+                            ] ?: 0
+                        }"
+                    )
+
+                    append(
+                        "  |  3개+ ${
+                            wrinkleCounts[
+                                TrainingDataStore
+                                    .WRINKLE_COUNT_3_PLUS
+                            ] ?: 0
+                        }"
+                    )
+                }
             }
     }
+
+    /*
+     * =========================================================
+     * Current Record
+     * =========================================================
+     */
 
     private fun renderCurrent() {
 
@@ -842,13 +1471,14 @@ class TrainingReviewActivity : AppCompatActivity() {
             tvPosition.text =
                 "표시할 학습 데이터가 없습니다."
 
-            imageView.setImageDrawable(
-                null
-            )
+            imageView
+                .setImageDrawable(
+                    null
+                )
 
             tvInfo.text =
-                "검사 결과를 먼저 저장한 뒤\n" +
-                    "'현재 검사이력 가져오기'를 눌러주세요."
+                "검사 후 결과를 저장하고\n" +
+                "'현재 검사이력 가져오기'를 눌러주세요."
 
             tvDetails.text =
                 ""
@@ -857,14 +1487,24 @@ class TrainingReviewActivity : AppCompatActivity() {
                 ""
             )
 
+            bottomCornerGroundTruthBox
+                .visibility =
+                View.GONE
+
+            normalLabelBox
+                .visibility =
+                View.GONE
+
             return
         }
 
         currentIndex =
-            currentIndex.coerceIn(
-                0,
-                filteredRecords.lastIndex
-            )
+            currentIndex
+                .coerceIn(
+                    0,
+                    filteredRecords
+                        .lastIndex
+                )
 
         val record =
             filteredRecords[
@@ -874,39 +1514,82 @@ class TrainingReviewActivity : AppCompatActivity() {
         tvPosition.text =
             "${currentIndex + 1} / ${filteredRecords.size}"
 
-        val imageFile =
+        /*
+         * Image
+         */
+
+        val file =
             File(
                 record.imagePath
             )
 
         if (
-            imageFile.exists()
+            file.exists()
         ) {
 
-            imageView.setImageBitmap(
-                BitmapFactory.decodeFile(
-                    imageFile.absolutePath
+            imageView
+                .setImageBitmap(
+                    BitmapFactory
+                        .decodeFile(
+                            file.absolutePath
+                        )
                 )
-            )
 
         } else {
 
-            imageView.setImageDrawable(
-                null
-            )
+            imageView
+                .setImageDrawable(
+                    null
+                )
         }
 
-        val comparison =
-            when {
+        /*
+         * Bottom Corner / Other UI
+         */
 
-                !record.isLabeled ->
-                    "정답 라벨 미지정"
+        if (
+            record.isBottomCorner
+        ) {
 
-                record.isMismatch ->
-                    "⚠ AI 판정과 실제 정답이 다릅니다."
+            bottomCornerGroundTruthBox
+                .visibility =
+                View.VISIBLE
 
-                else ->
-                    "✅ AI 판정과 실제 정답이 일치합니다."
+            normalLabelBox
+                .visibility =
+                View.GONE
+
+        } else {
+
+            bottomCornerGroundTruthBox
+                .visibility =
+                View.GONE
+
+            normalLabelBox
+                .visibility =
+                View.VISIBLE
+        }
+
+        /*
+         * AI vs Ground Truth
+         */
+
+        val mismatchText =
+            if (
+                record.isMismatch
+            ) {
+
+                "⚠ AI 판정과 정답이 다릅니다."
+
+            } else if (
+                record.isLabeled
+            ) {
+
+                "✅ AI 판정과 정답이 일치합니다."
+
+            } else {
+
+                "정답 라벨 미지정"
             }
 
         tvInfo.text =
@@ -918,17 +1601,19 @@ class TrainingReviewActivity : AppCompatActivity() {
 
                 append(
                     "Model : ${
-                        record.model.ifBlank {
-                            "-"
-                        }
+                        record.model
+                            .ifBlank {
+                                "-"
+                            }
                     }"
                 )
 
                 append(
                     "  |  Line : ${
-                        record.line.ifBlank {
-                            "-"
-                        }
+                        record.line
+                            .ifBlank {
+                                "-"
+                            }
                     }\n"
                 )
 
@@ -943,33 +1628,186 @@ class TrainingReviewActivity : AppCompatActivity() {
 
                 append(
                     "AI 판정 : ${
-                        record.aiJudgment.ifBlank {
-                            "-"
-                        }
+                        record.aiJudgment
+                            .ifBlank {
+                                "-"
+                            }
                     }\n"
                 )
 
                 append(
                     "실제 정답 : ${
-                        record.trueLabel.ifBlank {
-                            "미지정"
-                        }
+                        record.trueLabel
+                            .ifBlank {
+                                "미지정"
+                            }
                     }\n"
                 )
 
+                if (
+                    record.isBottomCorner
+                ) {
+
+                    append(
+                        "실제 주름 개수 : ${
+                            record.wrinkleCountText
+                        }\n"
+                    )
+                }
+
                 append(
-                    comparison
+                    mismatchText
                 )
             }
 
+        /*
+         * Details
+         */
+
         tvDetails.text =
-            "검사시간 : ${record.dateTime}\n" +
-                record.details
+            buildString {
+
+                append(
+                    "검사시간 : ${
+                        record.dateTime
+                    }\n"
+                )
+
+                if (
+                    record.isBottomCorner
+                ) {
+
+                    append(
+                        "\n[Bottom Corner Master 기준]\n"
+                    )
+
+                    append(
+                        "0개 = 정상\n"
+                    )
+
+                    append(
+                        "1개 = 정상\n"
+                    )
+
+                    append(
+                        "2개 = 한계정상\n"
+                    )
+
+                    append(
+                        "3개 이상 = 불량\n\n"
+                    )
+                }
+
+                append(
+                    record.details
+                )
+            }
 
         editNote.setText(
             record.note
         )
     }
+
+    /*
+     * =========================================================
+     * Bottom Corner 주름 개수 Ground Truth
+     * =========================================================
+     */
+
+    private fun setCurrentWrinkleCount(
+        countCode: Int
+    ) {
+
+        val record =
+            filteredRecords
+                .getOrNull(
+                    currentIndex
+                )
+                ?: return
+
+        if (
+            !record.isBottomCorner
+        ) {
+
+            Toast.makeText(
+                this,
+                "Bottom Corner 데이터가 아닙니다.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val ok =
+            TrainingDataStore
+                .setWrinkleCountGroundTruth(
+
+                    context =
+                        this,
+
+                    sourceId =
+                        record.sourceId,
+
+                    countCode =
+                        countCode,
+
+                    note =
+                        editNote.text
+                            ?.toString()
+                            .orEmpty()
+                )
+
+        if (
+            !ok
+        ) {
+
+            Toast.makeText(
+                this,
+                "주름 개수 저장 실패",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        val countText =
+            TrainingDataStore
+                .wrinkleCountText(
+                    countCode
+                )
+
+        val label =
+            TrainingDataStore
+                .labelFromWrinkleCount(
+                    countCode
+                )
+
+        Toast.makeText(
+            this,
+            "실제 주름 : $countText → $label",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        val currentId =
+            record.sourceId
+
+        allRecords =
+            TrainingDataStore
+                .load(
+                    this
+                )
+
+        applyFilter(
+            preferredId =
+                currentId
+        )
+    }
+
+    /*
+     * =========================================================
+     * 일반 정답 라벨
+     * =========================================================
+     */
 
     private fun setCurrentLabel(
         label: String
@@ -982,47 +1820,56 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
                 ?: return
 
-        val success =
+        val ok =
             TrainingDataStore
                 .setLabel(
-                    context = this,
-                    sourceId = record.sourceId,
-                    label = label,
+
+                    context =
+                        this,
+
+                    sourceId =
+                        record.sourceId,
+
+                    label =
+                        label,
+
                     note =
                         editNote.text
                             ?.toString()
                             .orEmpty()
                 )
 
-        if (!success) {
+        if (
+            ok
+        ) {
 
             Toast.makeText(
                 this,
-                "라벨 저장 실패",
-                Toast.LENGTH_LONG
+                "정답 라벨 : $label",
+                Toast.LENGTH_SHORT
             ).show()
 
-            return
-        }
+            val currentId =
+                record.sourceId
 
-        Toast.makeText(
-            this,
-            "실제 정답 : $label",
-            Toast.LENGTH_SHORT
-        ).show()
+            allRecords =
+                TrainingDataStore
+                    .load(
+                        this
+                    )
 
-        val id =
-            record.sourceId
-
-        allRecords =
-            TrainingDataStore.load(
-                this
+            applyFilter(
+                preferredId =
+                    currentId
             )
-
-        applyFilter(
-            id
-        )
+        }
     }
+
+    /*
+     * =========================================================
+     * Clear
+     * =========================================================
+     */
 
     private fun clearCurrentLabel() {
 
@@ -1033,21 +1880,41 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
                 ?: return
 
-        TrainingDataStore
-            .clearLabel(
+        val ok =
+            TrainingDataStore
+                .clearLabel(
+                    this,
+                    record.sourceId
+                )
+
+        if (
+            ok
+        ) {
+
+            Toast.makeText(
                 this,
-                record.sourceId
-            )
+                "현재 정답을 지웠습니다.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
 
         allRecords =
-            TrainingDataStore.load(
-                this
-            )
+            TrainingDataStore
+                .load(
+                    this
+                )
 
         applyFilter(
-            record.sourceId
+            preferredId =
+                record.sourceId
         )
     }
+
+    /*
+     * =========================================================
+     * Navigation
+     * =========================================================
+     */
 
     private fun move(
         delta: Int
@@ -1066,141 +1933,60 @@ class TrainingReviewActivity : AppCompatActivity() {
                 )
                 .coerceIn(
                     0,
-                    filteredRecords.lastIndex
+                    filteredRecords
+                        .lastIndex
                 )
 
         renderCurrent()
     }
 
-    private fun createLabelButtons():
+    private fun navigationRow():
         LinearLayout {
 
-        val container =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.VERTICAL
-
-                setPadding(
-                    0,
-                    dp(8),
-                    0,
-                    0
-                )
-            }
-
-        val row1 =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.HORIZONTAL
-            }
-
-        row1.addView(
-            smallButton(
-                "정상",
-                "#2E7D32"
-            ) {
-                setCurrentLabel(
-                    TrainingDataStore.LABEL_NORMAL
-                )
-            },
-            weightedParams()
-        )
-
-        row1.addView(
-            smallButton(
-                "주의",
-                "#C47A00"
-            ) {
-                setCurrentLabel(
-                    TrainingDataStore.LABEL_WARNING
-                )
-            },
-            weightedParams(
-                leftDp = 6
-            )
-        )
-
-        val row2 =
-            LinearLayout(this).apply {
-
-                orientation =
-                    LinearLayout.HORIZONTAL
-            }
-
-        row2.addView(
-            smallButton(
-                "한계정상",
-                "#B45309"
-            ) {
-                setCurrentLabel(
-                    TrainingDataStore.LABEL_LIMIT
-                )
-            },
-            weightedParams()
-        )
-
-        row2.addView(
-            smallButton(
-                "불량",
-                "#B42318"
-            ) {
-                setCurrentLabel(
-                    TrainingDataStore.LABEL_NG
-                )
-            },
-            weightedParams(
-                leftDp = 6
-            )
-        )
-
-        container.addView(
-            row1
-        )
-
-        container.addView(
-            row2
-        )
-
-        return container
-    }
-
-    private fun createNavigationButtons():
-        LinearLayout {
-
-        return LinearLayout(this).apply {
+        return LinearLayout(
+            this
+        ).apply {
 
             orientation =
                 LinearLayout.HORIZONTAL
 
             addView(
-                smallButton(
+                compactButton(
                     "← 이전",
                     "#486581"
                 ) {
+
                     move(
                         -1
                     )
                 },
-                weightedParams()
+
+                weightParams()
             )
 
             addView(
-                smallButton(
+                compactButton(
                     "다음 →",
                     "#486581"
                 ) {
+
                     move(
                         1
                     )
                 },
-                weightedParams(
-                    leftDp = 6
+
+                weightParams(
+                    6
                 )
             )
         }
     }
+
+    /*
+     * =========================================================
+     * Export
+     * =========================================================
+     */
 
     private fun exportZip() {
 
@@ -1221,18 +2007,28 @@ class TrainingReviewActivity : AppCompatActivity() {
             SimpleDateFormat(
                 "yyyyMMdd_HHmmss",
                 Locale.getDefault()
-            ).format(
-                Date()
             )
+                .format(
+                    Date()
+                )
 
         exportLauncher.launch(
             "PouchTraining_$time.zip"
         )
     }
 
-    private fun createHeader(): View {
+    /*
+     * =========================================================
+     * Header
+     * =========================================================
+     */
 
-        return LinearLayout(this).apply {
+    private fun header():
+        View {
+
+        return LinearLayout(
+            this
+        ).apply {
 
             orientation =
                 LinearLayout.VERTICAL
@@ -1300,163 +2096,96 @@ class TrainingReviewActivity : AppCompatActivity() {
         }
     }
 
+    /*
+     * =========================================================
+     * Card
+     * =========================================================
+     */
+
     private fun card(
         title: String,
         child: View
     ): LinearLayout {
 
-        val view =
-            LinearLayout(this).apply {
+        return LinearLayout(
+            this
+        ).apply {
 
-                orientation =
-                    LinearLayout.VERTICAL
+            orientation =
+                LinearLayout.VERTICAL
 
-                setPadding(
-                    dp(16),
-                    dp(16),
-                    dp(16),
-                    dp(16)
-                )
-
-                background =
-                    roundedBackground(
-                        "#FFFFFF"
-                    )
-
-                addView(
-                    TextView(
-                        this@TrainingReviewActivity
-                    ).apply {
-
-                        text =
-                            title
-
-                        textSize =
-                            18f
-
-                        setTypeface(
-                            null,
-                            Typeface.BOLD
-                        )
-
-                        setTextColor(
-                            Color.parseColor(
-                                "#102A43"
-                            )
-                        )
-
-                        setPadding(
-                            0,
-                            0,
-                            0,
-                            dp(10)
-                        )
-                    }
-                )
-
-                addView(
-                    child
-                )
-            }
-
-        view.layoutParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-
-                bottomMargin =
-                    dp(12)
-            }
-
-        return view
-    }
-
-    private fun fullButton(
-        textValue: String,
-        colorValue: String,
-        action: () -> Unit
-    ): Button {
-
-        val button =
-            Button(this).apply {
-
-                text =
-                    textValue
-
-                textSize =
-                    15f
-
-                minHeight =
-                    dp(52)
-
-                setTextColor(
-                    Color.WHITE
-                )
-
-                backgroundTintList =
-                    ColorStateList.valueOf(
-                        Color.parseColor(
-                            colorValue
-                        )
-                    )
-
-                setOnClickListener {
-                    action()
-                }
-            }
-
-        button.layoutParams =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-
-                topMargin =
-                    dp(8)
-            }
-
-        return button
-    }
-
-    private fun smallButton(
-        textValue: String,
-        colorValue: String,
-        action: () -> Unit
-    ): Button {
-
-        return Button(this).apply {
-
-            text =
-                textValue
-
-            textSize =
-                14f
-
-            minHeight =
-                dp(50)
-
-            setTextColor(
-                Color.WHITE
+            setPadding(
+                dp(16),
+                dp(16),
+                dp(16),
+                dp(16)
             )
 
-            backgroundTintList =
-                ColorStateList.valueOf(
-                    Color.parseColor(
-                        colorValue
-                    )
+            background =
+                rounded(
+                    "#FFFFFF",
+                    14
                 )
 
-            setOnClickListener {
-                action()
-            }
+            addView(
+                TextView(
+                    this@TrainingReviewActivity
+                ).apply {
+
+                    text =
+                        title
+
+                    textSize =
+                        18f
+
+                    setTypeface(
+                        null,
+                        Typeface.BOLD
+                    )
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#102A43"
+                        )
+                    )
+
+                    setPadding(
+                        0,
+                        0,
+                        0,
+                        dp(10)
+                    )
+                }
+            )
+
+            addView(
+                child
+            )
+
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+
+                    bottomMargin =
+                        dp(12)
+                }
         }
     }
+
+    /*
+     * =========================================================
+     * Text
+     * =========================================================
+     */
 
     private fun infoText():
         TextView {
 
-        return TextView(this).apply {
+        return TextView(
+            this
+        ).apply {
 
             textSize =
                 14f
@@ -1469,19 +2198,21 @@ class TrainingReviewActivity : AppCompatActivity() {
 
             setLineSpacing(
                 0f,
-                1.18f
+                1.12f
             )
         }
     }
 
-    private fun labelText(
-        value: String
+    private fun smallLabel(
+        text: String
     ): TextView {
 
-        return TextView(this).apply {
+        return TextView(
+            this
+        ).apply {
 
-            text =
-                value
+            this.text =
+                text
 
             textSize =
                 13f
@@ -1493,65 +2224,194 @@ class TrainingReviewActivity : AppCompatActivity() {
 
             setTextColor(
                 Color.parseColor(
-                    "#334E68"
+                    "#486581"
                 )
             )
 
             setPadding(
                 0,
-                dp(8),
+                dp(6),
                 0,
                 dp(4)
             )
         }
     }
 
-    private fun createSpinnerAdapter(
+    /*
+     * =========================================================
+     * Buttons
+     * =========================================================
+     */
+
+    private fun actionButton(
+        text: String,
+        color: String,
+        action: () -> Unit
+    ): Button {
+
+        return Button(
+            this
+        ).apply {
+
+            this.text =
+                text
+
+            isAllCaps =
+                false
+
+            textSize =
+                14f
+
+            setTextColor(
+                Color.WHITE
+            )
+
+            backgroundTintList =
+                android.content.res
+                    .ColorStateList
+                    .valueOf(
+                        Color.parseColor(
+                            color
+                        )
+                    )
+
+            setOnClickListener {
+
+                action()
+            }
+
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(52)
+                ).apply {
+
+                    topMargin =
+                        dp(8)
+                }
+        }
+    }
+
+    private fun compactButton(
+        text: String,
+        color: String,
+        action: () -> Unit
+    ): Button {
+
+        return Button(
+            this
+        ).apply {
+
+            this.text =
+                text
+
+            isAllCaps =
+                false
+
+            textSize =
+                13f
+
+            gravity =
+                Gravity.CENTER
+
+            setTextColor(
+                Color.WHITE
+            )
+
+            backgroundTintList =
+                android.content.res
+                    .ColorStateList
+                    .valueOf(
+                        Color.parseColor(
+                            color
+                        )
+                    )
+
+            setOnClickListener {
+
+                action()
+            }
+        }
+    }
+
+    /*
+     * =========================================================
+     * Spinner Helpers
+     * =========================================================
+     */
+
+    private fun spinnerAdapter(
         items: List<String>
     ): ArrayAdapter<String> {
 
         return ArrayAdapter(
             this,
-            android.R.layout.simple_spinner_item,
+            android.R.layout
+                .simple_spinner_item,
             items
         ).apply {
 
             setDropDownViewResource(
-                android.R.layout.simple_spinner_dropdown_item
+                android.R.layout
+                    .simple_spinner_dropdown_item
             )
         }
     }
 
-    private fun spinnerLayoutParams():
+    private fun simpleItemSelectedListener(
+        action: () -> Unit
+    ): AdapterView
+        .OnItemSelectedListener {
+
+        return object :
+            AdapterView
+                .OnItemSelectedListener {
+
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+
+                action()
+            }
+
+            override fun onNothingSelected(
+                parent: AdapterView<*>?
+            ) {
+                // No action
+            }
+        }
+    }
+
+    /*
+     * =========================================================
+     * Layout Params
+     * =========================================================
+     */
+
+    private fun spinnerParams():
         LinearLayout.LayoutParams {
 
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(52)
-        )
-    }
-
-    private fun marginParams(
-        top: Int
-    ): LinearLayout.LayoutParams {
-
-        return LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
 
-            topMargin =
-                dp(top)
+            bottomMargin =
+                dp(4)
         }
     }
 
-    private fun weightedParams(
-        leftDp: Int = 0
+    private fun weightParams(
+        leftDp: Int =
+            0
     ): LinearLayout.LayoutParams {
 
         return LinearLayout.LayoutParams(
             0,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
+            dp(60),
             1f
         ).apply {
 
@@ -1565,23 +2425,43 @@ class TrainingReviewActivity : AppCompatActivity() {
         }
     }
 
-    private fun roundedBackground(
-        colorValue: String
+    /*
+     * =========================================================
+     * Drawable
+     * =========================================================
+     */
+
+    private fun rounded(
+        color: String,
+        radiusDp: Int
     ): GradientDrawable {
 
-        return GradientDrawable().apply {
+        return GradientDrawable()
+            .apply {
 
-            setColor(
-                Color.parseColor(
-                    colorValue
+                shape =
+                    GradientDrawable
+                        .RECTANGLE
+
+                setColor(
+                    Color.parseColor(
+                        color
+                    )
                 )
-            )
 
-            cornerRadius =
-                dp(12)
-                    .toFloat()
-        }
+                cornerRadius =
+                    dp(
+                        radiusDp
+                    )
+                        .toFloat()
+            }
     }
+
+    /*
+     * =========================================================
+     * DP
+     * =========================================================
+     */
 
     private fun dp(
         value: Int
@@ -1591,8 +2471,9 @@ class TrainingReviewActivity : AppCompatActivity() {
             value *
                 resources
                     .displayMetrics
-                    .density
+                    .density +
+                0.5f
             )
-            .roundToInt()
+            .toInt()
     }
 }
